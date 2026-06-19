@@ -40,29 +40,34 @@
         body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
 
         /* ===== TOP APP BAR ===== */
-        .app-bar{background:linear-gradient(135deg,var(--primary),#1a2744);color:#fff;position:sticky;top:0;z-index:50;box-shadow:0 2px 6px rgba(0,0,0,.12)}
-        .app-bar-main{display:flex;align-items:center;gap:16px;padding:10px 24px}
-        .ab-brand{display:flex;flex-direction:column;min-width:0;line-height:1.25}
-        .ab-eyebrow{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-        .ab-title{font-size:1rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .app-bar{background:oklch(30% .065 263);color:#f7f8fc;position:sticky;top:0;z-index:50;box-shadow:0 1px 0 rgba(255,255,255,.08),0 8px 18px rgba(23,32,56,.16)}
+        .app-bar-main{display:grid;grid-template-columns:minmax(230px,1fr) auto auto;align-items:center;gap:14px;padding:8px 20px;min-height:52px}
+        .ab-brand{display:flex;flex-direction:column;min-width:0;line-height:1.15}
+        .ab-eyebrow{font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:oklch(75% .15 71);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+        .ab-title{font-size:.95rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .inline-title{cursor:default}
         .inline-title.editable{cursor:text}
         .inline-title-input{font:inherit;font-weight:inherit;color:inherit;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);border-radius:5px;padding:1px 5px;min-width:60px;max-width:100%;outline:none}
         .ab-brand .inline-title-input{width:100%}
         .ch-hdr .inline-title-input{width:min(720px,100%)}
         .ch-title-input{background:#fff;border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,145,26,.15);padding:2px 6px}
-        .ab-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
-        .ab-btn{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.22);padding:6px 13px;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s;white-space:nowrap}
-        .ab-btn:hover{background:rgba(255,255,255,.2)}
+        .ab-status{justify-self:end;font-size:.72rem;font-weight:700;white-space:nowrap;min-width:0}
+        .ab-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+        .ab-cluster{display:flex;align-items:center;gap:4px;padding:2px;border:1px solid rgba(255,255,255,.12);border-radius:9px;background:rgba(255,255,255,.05)}
+        .ab-btn{background:transparent;color:#f7f8fc;border:1px solid transparent;padding:6px 10px;border-radius:7px;font-size:.76rem;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s,border-color .15s,color .15s;white-space:nowrap;min-height:32px}
+        .ab-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.14)}
         .ab-btn:disabled{opacity:.4;cursor:not-allowed}
-        .ab-btn.primary{background:var(--accent);border-color:var(--accent)}
-        .ab-btn.primary:hover{background:#cf7e14}
-        .ab-btn[aria-expanded="true"]{background:rgba(255,255,255,.22)}
-        .ab-actions .menu-trigger{width:auto;height:auto;background:var(--accent);border-color:var(--accent);color:#fff;padding:6px 13px;border-radius:7px;font-size:.78rem;font-weight:600;white-space:nowrap}
-        .ab-actions .menu-trigger:hover{background:#cf7e14}
-        .save-state{font-size:.72rem;font-weight:600;margin-right:2px;white-space:nowrap}
-        .save-saving{color:#ffe0b2}
-        .save-saved{color:#bdeec2}
+        .ab-icon-btn{width:32px;padding:6px 0;font-size:.9rem}
+        .ab-btn.primary{background:oklch(68% .17 64);border-color:oklch(68% .17 64);color:#24160a}
+        .ab-btn.primary:hover{background:oklch(73% .17 64);border-color:oklch(73% .17 64)}
+        .ab-btn.editing{background:rgba(232,145,26,.2);border-color:rgba(232,145,26,.55);color:oklch(86% .13 75)}
+        .ab-btn[aria-expanded="true"]{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.24)}
+        .ab-actions .menu-wrap{display:flex}
+        .ab-actions .menu-trigger{width:auto;height:auto;min-height:32px;background:oklch(68% .17 64);border-color:oklch(68% .17 64);color:#24160a;padding:6px 12px;border-radius:7px;font-size:.76rem;font-weight:800;white-space:nowrap}
+        .ab-actions .menu-trigger:hover{background:oklch(73% .17 64)}
+        .save-state{display:inline-flex;align-items:center;gap:5px}
+        .save-saving{color:oklch(86% .12 78)}
+        .save-saved{color:oklch(83% .12 145)}
 
         /* ===== COLOR KEY (collapsible) ===== */
         .ab-key{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:10px 24px;background:#fff;color:var(--text-sec);border-top:1px solid rgba(0,0,0,.08)}
@@ -88,8 +93,8 @@
         .btn-s:hover{background:#f1f3f4}
 
         /* ===== CHAPTER HDR ===== */
-        .ch-hdr{padding:16px 32px 8px}
-        .ch-hdr h2{font-size:1.05rem;color:var(--primary);font-weight:700}
+        .ch-hdr{padding:12px 28px 10px;background:oklch(97% .006 263);border-bottom:1px solid var(--border-light)}
+        .ch-hdr h2{font-size:1rem;color:var(--primary);font-weight:750}
 
         /* ===== STAGE HDR (STICKY) ===== */
         .stage-outer{position:sticky;top:calc(var(--legend-h,48px) + var(--toolbar-h,0px));z-index:35;background:var(--primary);border-bottom:2px solid var(--accent);box-shadow:0 3px 8px rgba(0,0,0,.12)}
@@ -233,10 +238,19 @@
         .proj-empty{text-align:center;color:var(--text-sec);padding:24px 12px;font-size:.84rem}
 
         /* ===== RESPONSIVE ===== */
+        @media(max-width:980px){
+            .app-bar-main{grid-template-columns:1fr;align-items:start}
+            .ab-status{justify-self:start}
+            .ab-actions{width:100%;overflow-x:auto;padding-bottom:1px;scrollbar-width:none}
+            .ab-actions::-webkit-scrollbar{display:none}
+        }
         @media(max-width:640px){
-            .app-bar-main{padding:9px 14px;gap:10px}
+            .app-bar-main{padding:8px 14px;gap:7px}
+            .ab-cluster{gap:2px}
+            .ab-btn{padding:5px 8px}
+            .ab-icon-btn{width:30px}
             .ab-key{padding:9px 14px;gap:9px}
-            .ch-hdr{padding:12px 16px 6px}
+            .ch-hdr{padding:10px 16px 8px}
             .ch-hdr h2{font-size:.95rem}
         }
         @media print{
@@ -624,6 +638,7 @@ function buildPromptExport(payload) {
 function buildStandaloneHtml(payload) {
     const html = document.documentElement.cloneNode(true);
     html.querySelector("#sjm-embedded-project")?.remove();
+    html.querySelectorAll(".menu-portal,.cell-tick,.m-ov").forEach((el) => el.remove());
     const root = html.querySelector("#root");
     if (root) root.textContent = "";
 
@@ -741,6 +756,7 @@ const LEGEND = [
 ];
 
 function TopBar({ innerRef, currentName, onRenameCurrent, onProjects, onDownloadExport, onStandaloneExport, onPromptExport, canExport, saveState, lastSaved,
+        viewOnly,
         editMode, onToggleEdit, canUndo, canRedo, onUndo, onRedo }) {
     const [keyOpen, setKeyOpen] = useState(false);
     const [promptCopied, setPromptCopied] = useState(false);
@@ -756,35 +772,49 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onProjects, onDownload
                 <div className="ab-brand">
                     <span className="ab-eyebrow">Service Blueprint Viewer</span>
                     <InlineTitleEdit className="ab-title" value={currentName} fallback="No project loaded"
-                        disabled={!currentName} onCommit={onRenameCurrent} />
+                        disabled={!currentName || viewOnly} onCommit={onRenameCurrent} />
                 </div>
-                <div className="ab-actions">
+                {!viewOnly && <div className="ab-status" aria-live="polite">
                     {saveState === "saving" ? (
-                        <span className="save-state save-saving">Saving…</span>
+                        <span className="save-state save-saving">Saving...</span>
                     ) : lastSaved ? (
                         <span className="save-state save-saved">
                             Saved ✓<span className="save-meta">Last saved {fmtDate(lastSaved)}</span>
                         </span>
                     ) : null}
-                    <button className="ab-btn" onClick={onUndo} disabled={!canUndo} title="Undo (⌘/Ctrl+Z)">↶ Undo</button>
-                    <button className="ab-btn" onClick={onRedo} disabled={!canRedo} title="Redo (⌘/Ctrl+Shift+Z)">↷ Redo</button>
-                    <button className="ab-btn" aria-expanded={keyOpen}
-                        onClick={() => setKeyOpen((o) => !o)}>Key {keyOpen ? "▴" : "▾"}</button>
-                    <button className={`ab-btn${editMode ? " primary" : ""}`} aria-pressed={editMode}
-                        onClick={onToggleEdit} disabled={!canExport}>{editMode ? "✓ Editing" : "✏️ Edit"}</button>
-                    <button className="ab-btn" onClick={onProjects}>Projects</button>
-                    {canExport ? (
-                        <Menu trigger={promptCopied ? "Copied ✓" : "Export ▾"} align="right">
-                            {(close) => (
-                                <>
-                                    <button className="menu-item" onClick={() => { onStandaloneExport(); close(); }}>Download standalone HTML</button>
-                                    <button className="menu-item" onClick={() => copyPrompt(close)}>Copy as prompt</button>
-                                    <button className="menu-item" onClick={() => { onDownloadExport(); close(); }}>Export as JSON</button>
-                                </>
+                </div>}
+                <div className="ab-actions">
+                    {!viewOnly && (
+                        <div className="ab-cluster" aria-label="History controls">
+                            <button className="ab-btn ab-icon-btn" onClick={onUndo} disabled={!canUndo} title="Undo (⌘/Ctrl+Z)" aria-label="Undo">↶</button>
+                            <button className="ab-btn ab-icon-btn" onClick={onRedo} disabled={!canRedo} title="Redo (⌘/Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+                        </div>
+                    )}
+                    <div className="ab-cluster">
+                        <button className="ab-btn" aria-expanded={keyOpen}
+                            onClick={() => setKeyOpen((o) => !o)}>Key {keyOpen ? "▴" : "▾"}</button>
+                        {!viewOnly && (
+                            <button className={`ab-btn${editMode ? " editing" : ""}`} aria-pressed={editMode}
+                                onClick={onToggleEdit} disabled={!canExport}>{editMode ? "Editing" : "Edit"}</button>
+                        )}
+                    </div>
+                    {!viewOnly && (
+                        <div className="ab-cluster">
+                            <button className="ab-btn" onClick={onProjects}>Projects</button>
+                            {canExport ? (
+                                <Menu trigger={promptCopied ? "Copied ✓" : "Export ▾"} align="right">
+                                    {(close) => (
+                                        <>
+                                            <button className="menu-item" onClick={() => { onStandaloneExport(); close(); }}>Download standalone HTML</button>
+                                            <button className="menu-item" onClick={() => copyPrompt(close)}>Copy as prompt</button>
+                                            <button className="menu-item" onClick={() => { onDownloadExport(); close(); }}>Export as JSON</button>
+                                        </>
+                                    )}
+                                </Menu>
+                            ) : (
+                                <button className="ab-btn primary" disabled>Export</button>
                             )}
-                        </Menu>
-                    ) : (
-                        <button className="ab-btn primary" disabled>Export</button>
+                        </div>
                     )}
                 </div>
             </div>
@@ -914,8 +944,9 @@ function ProjectManager({ projects, currentId, onOpen, onDelete, onRename, onNew
 // ═══════════════════════════════════════
 // TAB BAR
 // ═══════════════════════════════════════
-function TabBar({ journeys, activeTab, setActiveTab, onNew, onLoad, onDelete }) {
+function TabBar({ journeys, activeTab, setActiveTab, onNew, onLoad, onDelete, viewOnly }) {
     if (!journeys.length) return null;
+    if (viewOnly && journeys.length <= 1) return null;
     return (
         <div className="tab-bar">
             <div className="tab-scroll">
@@ -924,15 +955,19 @@ function TabBar({ journeys, activeTab, setActiveTab, onNew, onLoad, onDelete }) 
                         <button className="tab-select" onClick={() => setActiveTab(i)} title={j.title}>
                             <span className="tab-ttl">{j.title}</span>
                         </button>
-                        <button className="tab-del" aria-label={`Delete ${j.title}`}
-                            title="Delete sheet" onClick={() => onDelete(i)}>×</button>
+                        {!viewOnly && (
+                            <button className="tab-del" aria-label={`Delete ${j.title}`}
+                                title="Delete sheet" onClick={() => onDelete(i)}>×</button>
+                        )}
                     </div>
                 ))}
             </div>
-            <div className="tab-actions">
-                <button className="tab-load" onClick={onLoad}>+ Load</button>
-                <button className="tab-load" onClick={onNew}>+ New</button>
-            </div>
+            {!viewOnly && (
+                <div className="tab-actions">
+                    <button className="tab-load" onClick={onLoad}>+ Load</button>
+                    <button className="tab-load" onClick={onNew}>+ New</button>
+                </div>
+            )}
         </div>
     );
 }
@@ -1424,6 +1459,7 @@ function App() {
     const [projects, setProjects] = useState([]);
     const [currentId, setCurrentId] = useState(null);
     const [standaloneName, setStandaloneName] = useState(null);
+    const [viewOnly, setViewOnly] = useState(false);
     const [ready, setReady] = useState(false);
     const [saveState, setSaveState] = useState("idle");
     const [editMode, setEditMode] = useState(false);
@@ -1509,6 +1545,7 @@ function App() {
                 setProjects([]);
                 setCurrentId(null);
                 setStandaloneName(embedded.name || "Standalone Service Journey");
+                setViewOnly(true);
                 replaceJourneys(hydrate(embedded.journeys || []));
                 clearHistory();
                 setLastSaved(embedded.lastSavedAt ? new Date(embedded.lastSavedAt).getTime() : null);
@@ -1938,10 +1975,11 @@ function App() {
                 onDownloadExport={exportProject} onStandaloneExport={exportStandaloneHtml}
                 onPromptExport={copyPromptExport}
                 canExport={journeys.length > 0} saveState={saveState} lastSaved={lastSaved}
+                viewOnly={viewOnly}
                 editMode={editMode} onToggleEdit={() => setEditMode((e) => !e)}
                 canUndo={historyState.canUndo} canRedo={historyState.canRedo}
                 onUndo={undo} onRedo={redo} />
-            {editMode && journeys.length > 0 && (
+            {!viewOnly && editMode && journeys.length > 0 && (
                 <FormatToolbar innerRef={toolbarRef} cell={selectedCell}
                     onMode={(m) => selected && handleCellMode(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, m)}
                     onAlign={(a) => selected && handleCellAlign(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, a)} />
@@ -1952,7 +1990,7 @@ function App() {
                 ) : (
                     journeys.map((j, i) => (
                         <div key={j.id + "-" + i} style={{ display: i === tab ? "block" : "none" }}>
-                            <JourneyView journey={j} jIdx={i} editMode={editMode}
+                            <JourneyView journey={j} jIdx={i} editMode={!viewOnly && editMode}
                                 selected={selected} onSelect={setSelected} onDeselect={() => setSelected(null)}
                                 onTitleEdit={renameJourneyTitle}
                                 onCellEdit={handleCellEdit} onCellTags={handleCellTags}
@@ -1964,9 +2002,9 @@ function App() {
             </main>
             <TabBar journeys={journeys} activeTab={tab} setActiveTab={setTab}
                 onNew={newBlankJourney} onLoad={() => setModal(true)}
-                onDelete={deleteJourney} />
-            {modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} />}
-            {projModal && <ProjectManager projects={projects} currentId={currentId}
+                onDelete={deleteJourney} viewOnly={viewOnly} />
+            {!viewOnly && modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} />}
+            {!viewOnly && projModal && <ProjectManager projects={projects} currentId={currentId}
                 onOpen={openProject} onDelete={deleteProject} onRename={renameProject}
                 onNew={newProject} onClose={() => setProjModal(false)} />}
         </>
