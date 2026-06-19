@@ -35,18 +35,27 @@
             --legend-h: 48px;
         }
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5}
+        body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
 
-        /* ===== HEADER ===== */
-        .app-header{background:linear-gradient(135deg,var(--primary),#1a2744);color:#fff;padding:28px 32px;position:relative;overflow:hidden}
-        .app-header::after{content:'';position:absolute;bottom:0;right:0;width:150px;height:150px;background:var(--accent);clip-path:polygon(100% 0,0 100%,100% 100%);opacity:.7}
-        .app-header h1{font-size:1.5rem;margin-bottom:3px;position:relative;z-index:1}
-        .app-header p{opacity:.7;font-size:.82rem;position:relative;z-index:1}
-        .hdr-badge{display:inline-block;background:var(--accent);color:#fff;padding:2px 13px;border-radius:14px;font-size:.72rem;font-weight:600;margin-bottom:7px;position:relative;z-index:1}
+        /* ===== TOP APP BAR ===== */
+        .app-bar{background:linear-gradient(135deg,var(--primary),#1a2744);color:#fff;position:sticky;top:0;z-index:50;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+        .app-bar-main{display:flex;align-items:center;gap:16px;padding:10px 24px}
+        .ab-brand{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+        .ab-eyebrow{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent)}
+        .ab-title{font-size:1rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .ab-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
+        .ab-btn{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.22);padding:6px 13px;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s;white-space:nowrap}
+        .ab-btn:hover{background:rgba(255,255,255,.2)}
+        .ab-btn:disabled{opacity:.4;cursor:not-allowed}
+        .ab-btn.primary{background:var(--accent);border-color:var(--accent)}
+        .ab-btn.primary:hover{background:#cf7e14}
+        .ab-btn[aria-expanded="true"]{background:rgba(255,255,255,.22)}
+        .save-state{font-size:.72rem;font-weight:600;margin-right:2px;white-space:nowrap}
+        .save-saving{color:#ffe0b2}
+        .save-saved{color:#bdeec2}
 
-        /* ===== LEGEND ===== */
-        .legend-bar{background:#fff;border-bottom:1px solid var(--border);padding:11px 24px;display:flex;flex-wrap:wrap;gap:13px;align-items:center;position:sticky;top:0;z-index:50;box-shadow:0 2px 6px rgba(0,0,0,.06)}
-        .legend-title{font-weight:700;font-size:.76rem;color:var(--text-sec);text-transform:uppercase;letter-spacing:.5px}
+        /* ===== COLOR KEY (collapsible) ===== */
+        .ab-key{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:10px 24px;background:#fff;color:var(--text-sec);border-top:1px solid rgba(0,0,0,.08)}
         .legend-item{display:flex;align-items:center;gap:5px;font-size:.74rem;color:var(--text-sec)}
         .legend-swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0}
 
@@ -69,9 +78,8 @@
         .btn-s:hover{background:#f1f3f4}
 
         /* ===== CHAPTER HDR ===== */
-        .ch-hdr{background:var(--primary);color:#fff;padding:18px 32px;display:flex;align-items:center;gap:14px}
-        .ch-hdr h2{font-size:1.15rem}
-        .ch-badge{background:var(--accent);color:#fff;padding:3px 13px;border-radius:13px;font-size:.7rem;font-weight:700;flex-shrink:0;white-space:nowrap}
+        .ch-hdr{padding:16px 32px 8px}
+        .ch-hdr h2{font-size:1.05rem;color:var(--primary);font-weight:700}
 
         /* ===== STAGE HDR (STICKY) ===== */
         .stage-outer{position:sticky;top:var(--legend-h,48px);z-index:35;background:var(--primary);border-bottom:2px solid var(--accent);box-shadow:0 3px 8px rgba(0,0,0,.12)}
@@ -156,8 +164,8 @@
         .bp-bullet{padding-left:14px;position:relative;margin-bottom:4px}
         .bp-bullet::before{content:'•';position:absolute;left:2px;color:var(--accent);font-weight:700}
 
-        .bp-pain-item{padding:4px 8px;background:#fee2e2;border-radius:4px;margin-bottom:4px;border-left:3px solid var(--red);font-size:.76rem}
-        .bp-suggest-item{padding:4px 8px;background:#dbeafe;border-radius:4px;margin-bottom:4px;border-left:3px solid var(--blue);font-size:.76rem}
+        .bp-pain-item{padding:4px 8px;background:#fee2e2;border:1px solid #f3b9bd;border-radius:4px;margin-bottom:4px;font-size:.76rem}
+        .bp-suggest-item{padding:4px 8px;background:#dbeafe;border:1px solid #b7d3f3;border-radius:4px;margin-bottom:4px;font-size:.76rem}
 
         .emotion-icon{font-size:1.4rem;display:block;margin-bottom:2px}
         .emotion-text{font-size:.72rem;font-weight:600}
@@ -195,16 +203,6 @@
         .m-file{margin-top:10px}
         .m-ft{padding:12px 20px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:8px}
 
-        /* ===== LEGEND ACTIONS ===== */
-        .legend-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
-        .proj-name{font-size:.74rem;font-weight:600;color:var(--primary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px}
-        .proj-name .dot{display:none}
-        .lb-btn{background:#fff;border:1px solid var(--border);padding:6px 12px;border-radius:7px;font-size:.74rem;font-weight:600;cursor:pointer;color:var(--primary);font-family:inherit;transition:background .15s;white-space:nowrap}
-        .lb-btn:hover{background:#f1f3f4}
-        .lb-btn:disabled{opacity:.4;cursor:not-allowed}
-        .lb-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-        .lb-btn.primary:hover{background:#cf7e14}
-
         /* ===== PROJECT MANAGER ===== */
         .proj-list{display:flex;flex-direction:column;gap:8px}
         .proj-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border-light);border-radius:8px;background:#fafbfc}
@@ -221,16 +219,14 @@
 
         /* ===== RESPONSIVE ===== */
         @media(max-width:640px){
-            .app-header{padding:18px 16px}
-            .app-header h1{font-size:1.15rem}
-            .legend-bar{padding:8px 12px;gap:8px}
-            .legend-title{display:none}
-            .ch-hdr{padding:12px 16px}
+            .app-bar-main{padding:9px 14px;gap:10px}
+            .ab-key{padding:9px 14px;gap:9px}
+            .ch-hdr{padding:12px 16px 6px}
             .ch-hdr h2{font-size:.95rem}
         }
         @media print{
-            .tab-bar,.m-ov{display:none}
-            .legend-bar,.stage-outer{position:static}
+            .tab-bar,.m-ov,.ab-actions{display:none}
+            .app-bar,.stage-outer{position:static}
             .ll{position:static}
         }
     </style>
@@ -301,20 +297,7 @@ const fmtDate = (ts) => {
 };
 
 // ═══════════════════════════════════════
-// HEADER
-// ═══════════════════════════════════════
-function Header() {
-    return (
-        <header className="app-header">
-            <div className="hdr-badge">Service Blueprint Viewer</div>
-            <h1>Preschool Regulatory Review — Service Blueprints</h1>
-            <p>Load extracted JSON data to visualize frontstage / backstage touchpoints, pain points, and recommendations.</p>
-        </header>
-    );
-}
-
-// ═══════════════════════════════════════
-// LEGEND BAR
+// TOP APP BAR + COLLAPSIBLE KEY
 // ═══════════════════════════════════════
 const LEGEND = [
     { label: "Operator Actions", color: "#fff", border: true },
@@ -326,22 +309,38 @@ const LEGEND = [
     { label: "Suggestions", color: "#eff6ff" },
 ];
 
-function LegendBar({ innerRef, currentName, onProjects, onExport, canExport }) {
+function TopBar({ innerRef, currentName, onProjects, onExport, canExport, saveState }) {
+    const [keyOpen, setKeyOpen] = useState(false);
     return (
-        <nav className="legend-bar" ref={innerRef}>
-            <span className="legend-title">Swim Lanes:</span>
-            {LEGEND.map((l, i) => (
-                <div key={i} className="legend-item">
-                    <div className="legend-swatch" style={{ background: l.color, border: l.border ? "1px solid #ccc" : "none" }} />
-                    {l.label}
+        <header className="app-bar" ref={innerRef}>
+            <div className="app-bar-main">
+                <div className="ab-brand">
+                    <span className="ab-eyebrow">Service Blueprint Viewer</span>
+                    <span className="ab-title" title={currentName || ""}>{currentName || "No project loaded"}</span>
                 </div>
-            ))}
-            <div className="legend-actions">
-                {currentName && <span className="proj-name" title={currentName}>📁 {currentName}</span>}
-                <button className="lb-btn" onClick={onProjects}>🗂 Projects</button>
-                <button className="lb-btn primary" onClick={onExport} disabled={!canExport}>⬇ Export</button>
+                <div className="ab-actions">
+                    {saveState && saveState !== "idle" && (
+                        <span className={`save-state save-${saveState}`}>
+                            {saveState === "saving" ? "Saving…" : "Saved ✓"}
+                        </span>
+                    )}
+                    <button className="ab-btn" aria-expanded={keyOpen}
+                        onClick={() => setKeyOpen((o) => !o)}>Key {keyOpen ? "▴" : "▾"}</button>
+                    <button className="ab-btn" onClick={onProjects}>Projects</button>
+                    <button className="ab-btn primary" onClick={onExport} disabled={!canExport}>Export</button>
+                </div>
             </div>
-        </nav>
+            {keyOpen && (
+                <div className="ab-key">
+                    {LEGEND.map((l, i) => (
+                        <div key={i} className="legend-item">
+                            <span className="legend-swatch" style={{ background: l.color, border: l.border ? "1px solid #ccc" : "none" }} />
+                            {l.label}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </header>
     );
 }
 
@@ -529,7 +528,6 @@ function JourneyView({ journey, jIdx, onCellEdit }) {
         <div ref={ref}>
             {/* Chapter header */}
             <div className="ch-hdr">
-                <span className="ch-badge">{journey.badge}</span>
                 <h2>{journey.title}</h2>
             </div>
 
@@ -588,6 +586,7 @@ function App() {
     const [projects, setProjects] = useState([]);
     const [currentId, setCurrentId] = useState(null);
     const [ready, setReady] = useState(false);
+    const [saveState, setSaveState] = useState("idle");
     const legendRef = useRef(null);
     const saveTimer = useRef(null);
     // Mirror of `journeys` kept in sync synchronously so export/save always
@@ -624,9 +623,12 @@ function App() {
     // ── Autosave current project (debounced) ──
     useEffect(() => {
         if (!ready || currentId == null) return;
+        setSaveState("saving");
         clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(() => {
-            dbSaveJourneys(currentId, journeys).then(refreshProjects);
+            dbSaveJourneys(currentId, journeysRef.current)
+                .then(refreshProjects)
+                .then(() => setSaveState("saved"));
         }, 600);
         return () => clearTimeout(saveTimer.current);
     }, [journeys, currentId, ready, refreshProjects]);
@@ -752,10 +754,9 @@ function App() {
 
     return (
         <>
-            <Header />
-            <LegendBar innerRef={legendRef} currentName={currentName}
+            <TopBar innerRef={legendRef} currentName={currentName}
                 onProjects={() => setProjModal(true)} onExport={exportProject}
-                canExport={journeys.length > 0} />
+                canExport={journeys.length > 0} saveState={saveState} />
             <main className="main-content">
                 {journeys.length === 0 ? (
                     <EmptyState onLoad={() => setModal(true)} />
