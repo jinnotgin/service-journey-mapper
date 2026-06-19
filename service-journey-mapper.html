@@ -10,7 +10,8 @@
         "imports": {
             "react": "https://esm.sh/react@19.2.0",
             "react/jsx-runtime": "https://esm.sh/react@19.2.0/jsx-runtime",
-            "react-dom/": "https://esm.sh/react-dom@19.2.0/"
+            "react-dom/": "https://esm.sh/react-dom@19.2.0/",
+            "dexie": "https://esm.sh/dexie@4.0.8"
         }
     }
     </script>
@@ -194,6 +195,30 @@
         .m-file{margin-top:10px}
         .m-ft{padding:12px 20px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:8px}
 
+        /* ===== LEGEND ACTIONS ===== */
+        .legend-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+        .proj-name{font-size:.74rem;font-weight:600;color:var(--primary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px}
+        .proj-name .dot{display:none}
+        .lb-btn{background:#fff;border:1px solid var(--border);padding:6px 12px;border-radius:7px;font-size:.74rem;font-weight:600;cursor:pointer;color:var(--primary);font-family:inherit;transition:background .15s;white-space:nowrap}
+        .lb-btn:hover{background:#f1f3f4}
+        .lb-btn:disabled{opacity:.4;cursor:not-allowed}
+        .lb-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+        .lb-btn.primary:hover{background:#cf7e14}
+
+        /* ===== PROJECT MANAGER ===== */
+        .proj-list{display:flex;flex-direction:column;gap:8px}
+        .proj-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border-light);border-radius:8px;background:#fafbfc}
+        .proj-row.current{border-color:var(--accent);background:#fffaf2}
+        .proj-info{flex:1;min-width:0}
+        .proj-info .pn{font-weight:600;font-size:.84rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .proj-info .pn .cur-badge{display:inline-block;background:var(--accent);color:#fff;font-size:.6rem;font-weight:700;padding:1px 7px;border-radius:9px;margin-left:6px;vertical-align:middle;text-transform:uppercase;letter-spacing:.5px}
+        .proj-info .pm{font-size:.7rem;color:var(--text-sec);margin-top:2px}
+        .proj-actions{display:flex;gap:6px;flex-shrink:0}
+        .icon-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:.72rem;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-sec);transition:background .15s}
+        .icon-btn:hover{background:#f1f3f4;color:var(--text)}
+        .icon-btn.danger:hover{background:#fee2e2;color:var(--red);border-color:#f5b5b5}
+        .proj-empty{text-align:center;color:var(--text-sec);padding:24px 12px;font-size:.84rem}
+
         /* ===== RESPONSIVE ===== */
         @media(max-width:640px){
             .app-header{padding:18px 16px}
@@ -215,9 +240,65 @@
 <script type="text/babel" data-type="module">
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
+import Dexie from "dexie";
 
 const COL_W = 260;
 const LBL_W = 180;
+
+// ═══════════════════════════════════════
+// PERSISTENCE (Dexie / IndexedDB)
+// ═══════════════════════════════════════
+const db = new Dexie("ServiceJourneyMapperDB");
+db.version(1).stores({ projects: "++id, name, updatedAt" });
+
+const LAST_KEY = "sjm:lastProjectId";
+
+const dbListProjects   = () => db.projects.orderBy("updatedAt").reverse().toArray();
+const dbGetProject     = (id) => db.projects.get(id);
+const dbDeleteProject  = (id) => db.projects.delete(id);
+const dbSaveJourneys   = (id, journeys) => db.projects.update(id, { journeys, updatedAt: Date.now() });
+const dbRenameProject  = (id, name) => db.projects.update(id, { name, updatedAt: Date.now() });
+const dbCreateProject  = (name, journeys = []) => {
+    const now = Date.now();
+    return db.projects.add({ name, journeys, createdAt: now, updatedAt: now });
+};
+
+// ═══════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════
+// Accept a JSON array of journeys, or an exported project file
+// ({ name, journeys }). Returns { name?, journeys }.
+function parseInput(text) {
+    const t = text.trim();
+    if (!t) throw new Error("Input is empty.");
+    let obj;
+    try {
+        obj = JSON.parse(t);
+    } catch (e) {
+        throw new Error(`Invalid JSON: ${e.message}`);
+    }
+    if (Array.isArray(obj)) return { journeys: obj };
+    if (obj && Array.isArray(obj.journeys)) return { name: obj.name, journeys: obj.journeys };
+    throw new Error("Expected a JSON array of journeys, or an object with a \"journeys\" array.");
+}
+
+function downloadFile(filename, text, type) {
+    const blob = new Blob([text], { type: type || "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    a.remove(); URL.revokeObjectURL(url);
+}
+
+const safeName = (s) => (s || "export").replace(/[^a-z0-9_-]+/gi, "_").replace(/^_+|_+$/g, "") || "export";
+const defaultName = (projects) => `Project ${(projects?.length || 0) + 1}`;
+const fmtDate = (ts) => {
+    if (!ts) return "—";
+    const d = new Date(ts);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " +
+        d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+};
 
 // ═══════════════════════════════════════
 // HEADER
@@ -227,7 +308,7 @@ function Header() {
         <header className="app-header">
             <div className="hdr-badge">Service Blueprint Viewer</div>
             <h1>Preschool Regulatory Review — Service Blueprints</h1>
-            <p>Load extracted JSONL data to visualize frontstage / backstage touchpoints, pain points, and recommendations.</p>
+            <p>Load extracted JSON data to visualize frontstage / backstage touchpoints, pain points, and recommendations.</p>
         </header>
     );
 }
@@ -245,7 +326,7 @@ const LEGEND = [
     { label: "Suggestions", color: "#eff6ff" },
 ];
 
-function LegendBar({ innerRef }) {
+function LegendBar({ innerRef, currentName, onProjects, onExport, canExport }) {
     return (
         <nav className="legend-bar" ref={innerRef}>
             <span className="legend-title">Swim Lanes:</span>
@@ -255,6 +336,11 @@ function LegendBar({ innerRef }) {
                     {l.label}
                 </div>
             ))}
+            <div className="legend-actions">
+                {currentName && <span className="proj-name" title={currentName}>📁 {currentName}</span>}
+                <button className="lb-btn" onClick={onProjects}>🗂 Projects</button>
+                <button className="lb-btn primary" onClick={onExport} disabled={!canExport}>⬇ Export</button>
+            </div>
         </nav>
     );
 }
@@ -267,10 +353,10 @@ function EmptyState({ onLoad }) {
         <div className="empty-state">
             <div className="empty-icon">📋</div>
             <h2>No Service Journeys Loaded</h2>
-            <p>Load JSONL data extracted from a service blueprint to visualize journey maps with dynamic rows, columns, and Excel-like tabs.</p>
+            <p>Load JSON data extracted from a service blueprint to visualize journey maps with dynamic rows, columns, and Excel-like tabs.</p>
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-                <button className="btn-p" onClick={onLoad}>📂 Load JSONL Data</button>
-                <div className="empty-hint">Or run <code>window.loadJSONL(text)</code> in the browser console</div>
+                <button className="btn-p" onClick={onLoad}>📂 Load JSON Data</button>
+                <div className="empty-hint">Or run <code>window.loadJSON(text)</code> in the browser console</div>
             </div>
         </div>
     );
@@ -291,31 +377,76 @@ function LoadModal({ onLoad, onClose }) {
         r.readAsText(f);
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!text.trim()) return;
-        try { onLoad(text); onClose(); }
-        catch (err) { alert("Error parsing JSONL:\n" + err.message); }
+        try { await onLoad(text); onClose(); }
+        catch (err) { alert("Error parsing data:\n" + err.message); }
     };
 
     return (
         <div className="m-ov" onClick={onClose}>
             <div className="m-box" onClick={(e) => e.stopPropagation()}>
                 <div className="m-hdr">
-                    <h3>Load JSONL Data</h3>
+                    <h3>Load JSON Data</h3>
                     <button className="m-close" onClick={onClose}>✕</button>
                 </div>
                 <div className="m-body">
-                    <p>Paste the extracted JSONL below, or upload a <code>.jsonl</code> / <code>.txt</code> file.</p>
+                    <p>Paste extracted JSON below, or upload a <code>.json</code> / <code>.txt</code> file. Exported project files are also accepted.</p>
                     <textarea value={text} onChange={(e) => setText(e.target.value)} rows={14}
-                        placeholder={'Paste JSONL here…\n\nEach line = one JSON object = one service journey tab.'} />
+                        placeholder={'Paste JSON here…\n\nA JSON array of service journeys (each item = one tab).'} />
                     <div className="m-file">
                         <button className="btn-s" onClick={() => fileRef.current?.click()}>📁 Upload file</button>
-                        <input ref={fileRef} type="file" accept=".jsonl,.json,.txt" onChange={handleFile} style={{ display: "none" }} />
+                        <input ref={fileRef} type="file" accept=".json,.txt" onChange={handleFile} style={{ display: "none" }} />
                     </div>
                 </div>
                 <div className="m-ft">
                     <button className="btn-s" onClick={onClose}>Cancel</button>
                     <button className="btn-p" onClick={handleSubmit} disabled={!text.trim()}>Load Data</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════
+// PROJECT MANAGER
+// ═══════════════════════════════════════
+function ProjectManager({ projects, currentId, onOpen, onDelete, onRename, onNew, onClose }) {
+    return (
+        <div className="m-ov" onClick={onClose}>
+            <div className="m-box" onClick={(e) => e.stopPropagation()}>
+                <div className="m-hdr">
+                    <h3>Projects</h3>
+                    <button className="m-close" onClick={onClose}>✕</button>
+                </div>
+                <div className="m-body">
+                    <p>Each project keeps its own journeys, saved in your browser (IndexedDB). Open one to switch, or create a new project to start fresh.</p>
+                    {projects.length === 0 ? (
+                        <div className="proj-empty">No saved projects yet. Create one to get started.</div>
+                    ) : (
+                        <div className="proj-list">
+                            {projects.map((p) => (
+                                <div key={p.id} className={`proj-row${p.id === currentId ? " current" : ""}`}>
+                                    <div className="proj-info">
+                                        <div className="pn">
+                                            {p.name}
+                                            {p.id === currentId && <span className="cur-badge">current</span>}
+                                        </div>
+                                        <div className="pm">{(p.journeys?.length || 0)} journey(s) · updated {fmtDate(p.updatedAt)}</div>
+                                    </div>
+                                    <div className="proj-actions">
+                                        {p.id !== currentId && <button className="icon-btn" onClick={() => onOpen(p.id)}>Open</button>}
+                                        <button className="icon-btn" onClick={() => onRename(p.id, p.name)}>Rename</button>
+                                        <button className="icon-btn danger" onClick={() => onDelete(p.id, p.name)}>Delete</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                <div className="m-ft">
+                    <button className="btn-s" onClick={onClose}>Close</button>
+                    <button className="btn-p" onClick={onNew}>+ New Project</button>
                 </div>
             </div>
         </div>
@@ -346,7 +477,7 @@ function TabBar({ journeys, activeTab, setActiveTab, onLoad }) {
 // ═══════════════════════════════════════
 // BLUEPRINT ROW
 // ═══════════════════════════════════════
-function BlueprintRow({ row }) {
+function BlueprintRow({ row, onCellEdit }) {
     return (
         <tr className={row.rowType || ""}>
             <td className="ll">{row.laneLabel}</td>
@@ -356,6 +487,7 @@ function BlueprintRow({ row }) {
                     colSpan={cell.colspan || undefined}
                     contentEditable
                     suppressContentEditableWarning
+                    onBlur={(e) => onCellEdit(ci, e.currentTarget.innerHTML)}
                     dangerouslySetInnerHTML={{ __html: cell.html }}
                 />
             ))}
@@ -366,7 +498,7 @@ function BlueprintRow({ row }) {
 // ═══════════════════════════════════════
 // JOURNEY VIEW
 // ═══════════════════════════════════════
-function JourneyView({ journey }) {
+function JourneyView({ journey, jIdx, onCellEdit }) {
     const ref = useRef(null);
     const numCols = journey.stages.length;
     const tw = LBL_W + numCols * COL_W;
@@ -433,7 +565,8 @@ function JourneyView({ journey }) {
                         <table className="bp" style={{ minWidth: tw }}>
                             <tbody>
                                 {sj.rows.map((row, ri) => (
-                                    <BlueprintRow key={ri} row={row} />
+                                    <BlueprintRow key={ri} row={row}
+                                        onCellEdit={(cellIdx, html) => onCellEdit(jIdx, si, ri, cellIdx, html)} />
                                 ))}
                             </tbody>
                         </table>
@@ -451,22 +584,160 @@ function App() {
     const [journeys, setJourneys] = useState([]);
     const [tab, setTab] = useState(0);
     const [modal, setModal] = useState(false);
+    const [projModal, setProjModal] = useState(false);
+    const [projects, setProjects] = useState([]);
+    const [currentId, setCurrentId] = useState(null);
+    const [ready, setReady] = useState(false);
     const legendRef = useRef(null);
+    const saveTimer = useRef(null);
+    // Mirror of `journeys` kept in sync synchronously so export/save always
+    // read the latest value (contentEditable onBlur fires before button clicks).
+    const journeysRef = useRef([]);
 
-    const loadFromText = useCallback((text) => {
-        const lines = text.trim().split("\n").filter((l) => l.trim());
-        const data = lines.map((l) => JSON.parse(l));
-        if (!data.length) throw new Error("No valid journey data found.");
-        setJourneys(data);
-        setTab(0);
-        console.log(`%c✅ Loaded ${data.length} service journey(s)`, "color:#2e7d32;font-weight:bold;font-size:14px");
+    const updateJourneys = useCallback((next) => {
+        journeysRef.current = typeof next === "function" ? next(journeysRef.current) : next;
+        setJourneys(journeysRef.current);
     }, []);
+
+    const refreshProjects = useCallback(async () => {
+        setProjects(await dbListProjects());
+    }, []);
+
+    const currentName = projects.find((p) => p.id === currentId)?.name || null;
+
+    // ── Init: load project list + reopen last project ──
+    useEffect(() => {
+        (async () => {
+            const list = await dbListProjects();
+            setProjects(list);
+            const last = Number(localStorage.getItem(LAST_KEY));
+            const open = list.find((p) => p.id === last) || list[0];
+            if (open) {
+                setCurrentId(open.id);
+                updateJourneys(open.journeys || []);
+                localStorage.setItem(LAST_KEY, String(open.id));
+            }
+            setReady(true);
+        })();
+    }, [updateJourneys]);
+
+    // ── Autosave current project (debounced) ──
+    useEffect(() => {
+        if (!ready || currentId == null) return;
+        clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(() => {
+            dbSaveJourneys(currentId, journeys).then(refreshProjects);
+        }, 600);
+        return () => clearTimeout(saveTimer.current);
+    }, [journeys, currentId, ready, refreshProjects]);
+
+    // ── Load data (JSON array / exported project) ──
+    const loadFromText = useCallback(async (text) => {
+        const parsed = parseInput(text);
+        const data = parsed.journeys;
+        if (!data.length) throw new Error("No valid journey data found.");
+        let id = currentId;
+        if (id == null) {
+            const name = parsed.name || defaultName(projects);
+            id = await dbCreateProject(name, data);
+            setCurrentId(id);
+            localStorage.setItem(LAST_KEY, String(id));
+        }
+        updateJourneys(data);
+        setTab(0);
+        await refreshProjects();
+        console.log(`%c✅ Loaded ${data.length} service journey(s)`, "color:#2e7d32;font-weight:bold;font-size:14px");
+    }, [currentId, projects, refreshProjects, updateJourneys]);
+
+    // ── Cell edits → state (keyed by journey/sub-journey/row/cell) ──
+    const handleCellEdit = useCallback((jIdx, sjIdx, rowIdx, cellIdx, html) => {
+        updateJourneys((prev) => {
+            const j = prev[jIdx];
+            const cur = j?.subJourneys?.[sjIdx]?.rows?.[rowIdx]?.cells?.[cellIdx];
+            if (!cur || cur.html === html) return prev;
+            const next = prev.slice();
+            const nj = { ...j, subJourneys: j.subJourneys.slice() };
+            const nsj = { ...nj.subJourneys[sjIdx], rows: nj.subJourneys[sjIdx].rows.slice() };
+            const nrow = { ...nsj.rows[rowIdx], cells: nsj.rows[rowIdx].cells.slice() };
+            nrow.cells[cellIdx] = { ...nrow.cells[cellIdx], html };
+            nsj.rows[rowIdx] = nrow;
+            nj.subJourneys[sjIdx] = nsj;
+            next[jIdx] = nj;
+            return next;
+        });
+    }, [updateJourneys]);
+
+    // ── Project actions ──
+    const openProject = useCallback(async (id) => {
+        const p = await dbGetProject(id);
+        if (!p) return;
+        setCurrentId(id);
+        updateJourneys(p.journeys || []);
+        setTab(0);
+        localStorage.setItem(LAST_KEY, String(id));
+        setProjModal(false);
+    }, [updateJourneys]);
+
+    const deleteProject = useCallback(async (id, name) => {
+        if (!confirm(`Delete project "${name}"?\nThis permanently removes its saved data and cannot be undone.`)) return;
+        await dbDeleteProject(id);
+        if (id === currentId) {
+            const remaining = (await dbListProjects());
+            const fallback = remaining[0];
+            if (fallback) {
+                setCurrentId(fallback.id);
+                updateJourneys(fallback.journeys || []);
+                localStorage.setItem(LAST_KEY, String(fallback.id));
+            } else {
+                setCurrentId(null);
+                updateJourneys([]);
+                localStorage.removeItem(LAST_KEY);
+            }
+            setTab(0);
+        }
+        await refreshProjects();
+    }, [currentId, refreshProjects, updateJourneys]);
+
+    const renameProject = useCallback(async (id, name) => {
+        const nn = prompt("Rename project", name);
+        if (nn == null || !nn.trim()) return;
+        await dbRenameProject(id, nn.trim());
+        await refreshProjects();
+    }, [refreshProjects]);
+
+    const newProject = useCallback(async () => {
+        const name = prompt("New project name", defaultName(projects));
+        if (name == null) return;
+        const id = await dbCreateProject(name.trim() || defaultName(projects), []);
+        setCurrentId(id);
+        updateJourneys([]);
+        setTab(0);
+        localStorage.setItem(LAST_KEY, String(id));
+        await refreshProjects();
+        setProjModal(false);
+        setModal(true); // prompt to load data into the fresh project
+    }, [projects, refreshProjects, updateJourneys]);
+
+    // ── Export full project state ──
+    const exportProject = useCallback(() => {
+        const data = journeysRef.current;
+        if (!data.length) return;
+        const payload = {
+            type: "service-journey-mapper",
+            version: 1,
+            name: currentName || "Service Journeys",
+            exportedAt: new Date().toISOString(),
+            journeys: data,
+        };
+        downloadFile(safeName(currentName) + ".json", JSON.stringify(payload, null, 2), "application/json");
+    }, [currentName]);
 
     // Expose to console
     useEffect(() => {
-        window.loadJSONL = loadFromText;
-        return () => { delete window.loadJSONL; };
-    }, [loadFromText]);
+        window.loadJSON = loadFromText;
+        window.exportProject = exportProject;
+        return () => { delete window.loadJSON; delete window.exportProject; };
+    }, [loadFromText, exportProject]);
 
     // Legend height → CSS var
     useEffect(() => {
@@ -482,20 +753,25 @@ function App() {
     return (
         <>
             <Header />
-            <LegendBar innerRef={legendRef} />
+            <LegendBar innerRef={legendRef} currentName={currentName}
+                onProjects={() => setProjModal(true)} onExport={exportProject}
+                canExport={journeys.length > 0} />
             <main className="main-content">
                 {journeys.length === 0 ? (
                     <EmptyState onLoad={() => setModal(true)} />
                 ) : (
                     journeys.map((j, i) => (
-                        <div key={j.id + i} style={{ display: i === tab ? "block" : "none" }}>
-                            <JourneyView journey={j} />
+                        <div key={j.id + "-" + i} style={{ display: i === tab ? "block" : "none" }}>
+                            <JourneyView journey={j} jIdx={i} onCellEdit={handleCellEdit} />
                         </div>
                     ))
                 )}
             </main>
             <TabBar journeys={journeys} activeTab={tab} setActiveTab={setTab} onLoad={() => setModal(true)} />
             {modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} />}
+            {projModal && <ProjectManager projects={projects} currentId={currentId}
+                onOpen={openProject} onDelete={deleteProject} onRename={renameProject}
+                onNew={newProject} onClose={() => setProjModal(false)} />}
         </>
     );
 }
