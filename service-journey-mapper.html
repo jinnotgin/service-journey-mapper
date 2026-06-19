@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Blueprint Viewer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@19.2.0",
+            "react/jsx-runtime": "https://esm.sh/react@19.2.0/jsx-runtime",
+            "react-dom/": "https://esm.sh/react-dom@19.2.0/"
+        }
+    }
+    </script>
+
+
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e6b;
+            --accent: #e8911a;
+            --red: #c62828;
+            --green: #2e7d32;
+            --blue: #1565c0;
+            --purple: #6a1b9a;
+            --gold: #e65100;
+            --bg: #f4f5f9;
+            --border: #d0d5dd;
+            --border-light: #e8ecf1;
+            --text: #1a1a2e;
+            --text-sec: #5a6376;
+            --legend-h: 48px;
+        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5}
+
+        /* ===== HEADER ===== */
+        .app-header{background:linear-gradient(135deg,var(--primary),#1a2744);color:#fff;padding:28px 32px;position:relative;overflow:hidden}
+        .app-header::after{content:'';position:absolute;bottom:0;right:0;width:150px;height:150px;background:var(--accent);clip-path:polygon(100% 0,0 100%,100% 100%);opacity:.7}
+        .app-header h1{font-size:1.5rem;margin-bottom:3px;position:relative;z-index:1}
+        .app-header p{opacity:.7;font-size:.82rem;position:relative;z-index:1}
+        .hdr-badge{display:inline-block;background:var(--accent);color:#fff;padding:2px 13px;border-radius:14px;font-size:.72rem;font-weight:600;margin-bottom:7px;position:relative;z-index:1}
+
+        /* ===== LEGEND ===== */
+        .legend-bar{background:#fff;border-bottom:1px solid var(--border);padding:11px 24px;display:flex;flex-wrap:wrap;gap:13px;align-items:center;position:sticky;top:0;z-index:50;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+        .legend-title{font-weight:700;font-size:.76rem;color:var(--text-sec);text-transform:uppercase;letter-spacing:.5px}
+        .legend-item{display:flex;align-items:center;gap:5px;font-size:.74rem;color:var(--text-sec)}
+        .legend-swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0}
+
+        /* ===== MAIN ===== */
+        .main-content{padding-bottom:50px;min-height:60vh}
+
+        /* ===== EMPTY ===== */
+        .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:55vh;gap:10px;text-align:center;padding:40px 20px}
+        .empty-icon{font-size:4rem}
+        .empty-state h2{font-size:1.25rem;color:var(--primary)}
+        .empty-state p{color:var(--text-sec);max-width:400px;font-size:.88rem}
+        .empty-hint{font-size:.76rem;color:var(--text-sec);margin-top:4px}
+        .empty-hint code{background:#e8ecf1;padding:2px 6px;border-radius:4px;font-family:Menlo,Consolas,monospace;font-size:.7rem}
+
+        /* ===== BUTTONS ===== */
+        .btn-p{background:var(--accent);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:.86rem;font-weight:600;cursor:pointer;transition:background .15s}
+        .btn-p:hover{background:#cf7e14}
+        .btn-p:disabled{opacity:.4;cursor:not-allowed}
+        .btn-s{background:#fff;color:var(--text);border:1px solid var(--border);padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:500;cursor:pointer;transition:background .15s}
+        .btn-s:hover{background:#f1f3f4}
+
+        /* ===== CHAPTER HDR ===== */
+        .ch-hdr{background:var(--primary);color:#fff;padding:18px 32px;display:flex;align-items:center;gap:14px}
+        .ch-hdr h2{font-size:1.15rem}
+        .ch-badge{background:var(--accent);color:#fff;padding:3px 13px;border-radius:13px;font-size:.7rem;font-weight:700;flex-shrink:0;white-space:nowrap}
+
+        /* ===== STAGE HDR (STICKY) ===== */
+        .stage-outer{position:sticky;top:var(--legend-h,48px);z-index:35;background:var(--primary);border-bottom:2px solid var(--accent);box-shadow:0 3px 8px rgba(0,0,0,.12)}
+        .scroll-hide{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+        .scroll-hide::-webkit-scrollbar{display:none}
+
+        /* ===== SUB-JOURNEY HDR ===== */
+        .sj-scroll{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;background:#1e293b;border:1px solid var(--border);border-top:none}
+        .sj-scroll::-webkit-scrollbar{display:none}
+
+        /* ===== BP TABLE ===== */
+        .bp{border-collapse:collapse;table-layout:fixed}
+        .bp td{border:1px solid var(--border-light);padding:10px 12px;vertical-align:top;text-align:left;font-size:.8rem}
+
+        /* Lane label */
+        .ll{width:180px;min-width:180px;max-width:180px;position:sticky;left:0;z-index:10;font-weight:700;font-size:.74rem;text-transform:uppercase;letter-spacing:.5px;background:#fff;border-right:2px solid var(--border)}
+
+        /* Stage header cells */
+        .stg-ll{background:var(--primary)!important;color:#fff!important;border:1px solid rgba(255,255,255,.15)!important;border-right:2px solid rgba(255,255,255,.3)!important;text-align:left!important}
+        .stg-c{min-width:260px;background:var(--primary)!important;color:#fff!important;font-weight:700!important;font-size:.84rem!important;text-align:center!important;vertical-align:middle!important;border:1px solid rgba(255,255,255,.15)!important}
+
+        /* SJ header cells */
+        .sj-ll{background:#1e293b!important;color:#fff!important;border:1px solid rgba(255,255,255,.1)!important;border-right:2px solid rgba(255,255,255,.2)!important;font-size:.74rem!important;text-align:left!important}
+        .sj-tc{background:#1e293b!important;color:#fff!important;font-weight:700!important;font-size:.7rem!important;text-transform:uppercase!important;letter-spacing:1.5px!important;text-align:center!important;padding:8px 12px!important;border:1px solid rgba(255,255,255,.1)!important}
+
+        /* Data cell */
+        .dc{min-width:260px}
+        .dc-span{min-width:auto!important;width:auto!important}
+
+        /* Wrapper */
+        .bpw{overflow-x:auto;background:#fff;border:1px solid var(--border);border-top:none}
+        .bpw::-webkit-scrollbar{height:10px}
+        .bpw::-webkit-scrollbar-track{background:#eee}
+        .bpw::-webkit-scrollbar-thumb{background:var(--accent);border-radius:5px}
+        .bpw{scrollbar-width:thin;scrollbar-color:var(--accent) #eee}
+
+        /* ===== ROW TYPES ===== */
+        .row-agencies>.ll{background:#f5f5f5;color:#616161}
+        .row-agencies>.dc{background:#fafafa}
+
+        .row-operator>.ll{background:#fff;color:var(--text)}
+        .row-operator>.dc{background:#fff}
+
+        .row-fs-human>.ll{background:#dbeafe;color:#1565c0}
+        .row-fs-human>.dc{background:#f0f7ff}
+
+        .row-fs-system>.ll{background:#dbeafe;color:#1565c0}
+        .row-fs-system>.dc{background:#f0f7ff}
+
+        .row-lov>.ll{background:#ff6f00;color:#fff;border-right-color:rgba(255,255,255,.4)}
+        .row-lov>.dc{background:#ff6f00;color:#fff;font-weight:800;text-align:center;padding:6px 12px;font-size:.7rem;text-transform:uppercase;letter-spacing:2px}
+
+        .row-bs-human>.ll{background:#fce8c8;color:#e65100}
+        .row-bs-human>.dc{background:#fdf6ee}
+
+        .row-bs-system>.ll{background:#fce8c8;color:#e65100}
+        .row-bs-system>.dc{background:#fdf6ee}
+
+        .row-support>.ll{background:#e8dff5;color:#6a1b9a}
+        .row-support>.dc{background:#f3f0f9}
+
+        .row-pain>.ll{background:#fecdd3;color:#c62828}
+        .row-pain>.dc{background:#fff5f5}
+
+        .row-verbatim>.ll{background:#fef3c7;color:#92400e}
+        .row-verbatim>.dc{background:#fffbeb;font-style:italic;color:#92400e;font-size:.76rem}
+
+        .row-emotion>.ll{background:#d1fae5;color:#2e7d32}
+        .row-emotion>.dc{background:#f0faf0;text-align:center}
+
+        .row-suggest>.ll{background:#bfdbfe;color:#1565c0}
+        .row-suggest>.dc{background:#eff6ff}
+
+        /* ===== INNER CELL ELEMENTS ===== */
+        .bp-tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:.68rem;font-weight:600;margin:2px 2px 2px 0}
+        .tag-ecda{background:#dbeafe;color:#1e40af}.tag-scdf{background:#fecdd3;color:#991b1b}
+        .tag-ura{background:#ede9fe;color:#5b21b6}.tag-bca{background:#ffedd5;color:#9a3412}
+        .tag-nea{background:#d1fae5;color:#065f46}.tag-hpb{background:#ccfbf1;color:#115e59}
+        .tag-msf{background:#fce7f3;color:#9d174d}.tag-gobiz{background:#ede9fe;color:#4338ca}
+        .tag-cms{background:#e0e7ff;color:#3730a3}.tag-acra{background:#f3f4f6;color:#374151}
+
+        .bp-bullet{padding-left:14px;position:relative;margin-bottom:4px}
+        .bp-bullet::before{content:'•';position:absolute;left:2px;color:var(--accent);font-weight:700}
+
+        .bp-pain-item{padding:4px 8px;background:#fee2e2;border-radius:4px;margin-bottom:4px;border-left:3px solid var(--red);font-size:.76rem}
+        .bp-suggest-item{padding:4px 8px;background:#dbeafe;border-radius:4px;margin-bottom:4px;border-left:3px solid var(--blue);font-size:.76rem}
+
+        .emotion-icon{font-size:1.4rem;display:block;margin-bottom:2px}
+        .emotion-text{font-size:.72rem;font-weight:600}
+        .emotion-neg{color:var(--red)}.emotion-pos{color:var(--green)}.emotion-neu{color:var(--gold)}
+
+        .stage-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;font-size:.8rem;margin-right:6px}
+
+        /* ===== EDITABLE ===== */
+        td[contenteditable="true"]{cursor:text;outline:none;transition:box-shadow .15s}
+        td[contenteditable="true"]:hover{box-shadow:inset 0 0 0 2px rgba(232,145,26,.25)}
+        td[contenteditable="true"]:focus{box-shadow:inset 0 0 0 2px var(--accent)}
+
+        /* ===== TAB BAR ===== */
+        .tab-bar{position:fixed;bottom:0;left:0;right:0;height:42px;background:#e2e6ec;border-top:1px solid #bcc3cf;display:flex;align-items:flex-end;padding:0 8px;z-index:100}
+        .tab-scroll{display:flex;align-items:flex-end;overflow-x:auto;flex:1;gap:2px;scrollbar-width:none}
+        .tab-scroll::-webkit-scrollbar{display:none}
+        .tab-btn{flex-shrink:0;height:33px;padding:0 15px;border:1px solid #bcc3cf;border-bottom:none;border-radius:7px 7px 0 0;background:#d5dae2;font-size:.72rem;font-weight:600;cursor:pointer;color:var(--text-sec);display:flex;align-items:center;gap:6px;transition:background .15s;max-width:340px;white-space:nowrap;overflow:hidden;font-family:inherit}
+        .tab-btn:hover{background:#e8ecf1}
+        .tab-btn.active{background:#fff;color:var(--text);border-top:2px solid var(--accent);height:35px;z-index:1}
+        .tab-bdg{background:var(--primary);color:#fff;padding:1px 7px;border-radius:9px;font-size:.6rem;font-weight:700;flex-shrink:0}
+        .tab-ttl{overflow:hidden;text-overflow:ellipsis}
+        .tab-load{flex-shrink:0;height:29px;padding:0 13px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:.72rem;font-weight:600;cursor:pointer;color:var(--primary);margin:0 0 5px 8px;transition:background .15s;font-family:inherit}
+        .tab-load:hover{background:#f1f3f4}
+
+        /* ===== MODAL ===== */
+        .m-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+        .m-box{background:#fff;border-radius:12px;width:100%;max-width:620px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+        .m-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border-light)}
+        .m-hdr h3{font-size:1rem;color:var(--primary)}
+        .m-close{background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-sec);padding:4px}
+        .m-body{padding:14px 20px;flex:1;overflow-y:auto}
+        .m-body>p{font-size:.84rem;color:var(--text-sec);margin-bottom:10px}
+        .m-body textarea{width:100%;border:1px solid var(--border);border-radius:8px;padding:11px;font-family:Menlo,Consolas,monospace;font-size:.74rem;resize:vertical;line-height:1.5;outline:none}
+        .m-body textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,145,26,.15)}
+        .m-file{margin-top:10px}
+        .m-ft{padding:12px 20px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:8px}
+
+        /* ===== RESPONSIVE ===== */
+        @media(max-width:640px){
+            .app-header{padding:18px 16px}
+            .app-header h1{font-size:1.15rem}
+            .legend-bar{padding:8px 12px;gap:8px}
+            .legend-title{display:none}
+            .ch-hdr{padding:12px 16px}
+            .ch-hdr h2{font-size:.95rem}
+        }
+        @media print{
+            .tab-bar,.m-ov{display:none}
+            .legend-bar,.stage-outer{position:static}
+            .ll{position:static}
+        }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-type="module">
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createRoot } from "react-dom/client";
+
+const COL_W = 260;
+const LBL_W = 180;
+
+// ═══════════════════════════════════════
+// HEADER
+// ═══════════════════════════════════════
+function Header() {
+    return (
+        <header className="app-header">
+            <div className="hdr-badge">Service Blueprint Viewer</div>
+            <h1>Preschool Regulatory Review — Service Blueprints</h1>
+            <p>Load extracted JSONL data to visualize frontstage / backstage touchpoints, pain points, and recommendations.</p>
+        </header>
+    );
+}
+
+// ═══════════════════════════════════════
+// LEGEND BAR
+// ═══════════════════════════════════════
+const LEGEND = [
+    { label: "Operator Actions", color: "#fff", border: true },
+    { label: "Frontstage (Visible)", color: "#f0f7ff" },
+    { label: "Line of Visibility", color: "#ff6f00" },
+    { label: "Backstage (Hidden)", color: "#fdf6ee" },
+    { label: "Support Processes", color: "#f3f0f9" },
+    { label: "Pain Points", color: "#fff5f5" },
+    { label: "Suggestions", color: "#eff6ff" },
+];
+
+function LegendBar({ innerRef }) {
+    return (
+        <nav className="legend-bar" ref={innerRef}>
+            <span className="legend-title">Swim Lanes:</span>
+            {LEGEND.map((l, i) => (
+                <div key={i} className="legend-item">
+                    <div className="legend-swatch" style={{ background: l.color, border: l.border ? "1px solid #ccc" : "none" }} />
+                    {l.label}
+                </div>
+            ))}
+        </nav>
+    );
+}
+
+// ═══════════════════════════════════════
+// EMPTY STATE
+// ═══════════════════════════════════════
+function EmptyState({ onLoad }) {
+    return (
+        <div className="empty-state">
+            <div className="empty-icon">📋</div>
+            <h2>No Service Journeys Loaded</h2>
+            <p>Load JSONL data extracted from a service blueprint to visualize journey maps with dynamic rows, columns, and Excel-like tabs.</p>
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                <button className="btn-p" onClick={onLoad}>📂 Load JSONL Data</button>
+                <div className="empty-hint">Or run <code>window.loadJSONL(text)</code> in the browser console</div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════
+// LOAD MODAL
+// ═══════════════════════════════════════
+function LoadModal({ onLoad, onClose }) {
+    const [text, setText] = useState("");
+    const fileRef = useRef(null);
+
+    const handleFile = (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = (ev) => setText(ev.target.result);
+        r.readAsText(f);
+    };
+
+    const handleSubmit = () => {
+        if (!text.trim()) return;
+        try { onLoad(text); onClose(); }
+        catch (err) { alert("Error parsing JSONL:\n" + err.message); }
+    };
+
+    return (
+        <div className="m-ov" onClick={onClose}>
+            <div className="m-box" onClick={(e) => e.stopPropagation()}>
+                <div className="m-hdr">
+                    <h3>Load JSONL Data</h3>
+                    <button className="m-close" onClick={onClose}>✕</button>
+                </div>
+                <div className="m-body">
+                    <p>Paste the extracted JSONL below, or upload a <code>.jsonl</code> / <code>.txt</code> file.</p>
+                    <textarea value={text} onChange={(e) => setText(e.target.value)} rows={14}
+                        placeholder={'Paste JSONL here…\n\nEach line = one JSON object = one service journey tab.'} />
+                    <div className="m-file">
+                        <button className="btn-s" onClick={() => fileRef.current?.click()}>📁 Upload file</button>
+                        <input ref={fileRef} type="file" accept=".jsonl,.json,.txt" onChange={handleFile} style={{ display: "none" }} />
+                    </div>
+                </div>
+                <div className="m-ft">
+                    <button className="btn-s" onClick={onClose}>Cancel</button>
+                    <button className="btn-p" onClick={handleSubmit} disabled={!text.trim()}>Load Data</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════
+// TAB BAR
+// ═══════════════════════════════════════
+function TabBar({ journeys, activeTab, setActiveTab, onLoad }) {
+    if (!journeys.length) return null;
+    return (
+        <div className="tab-bar">
+            <div className="tab-scroll">
+                {journeys.map((j, i) => (
+                    <button key={j.id + i} className={`tab-btn${i === activeTab ? " active" : ""}`}
+                        onClick={() => setActiveTab(i)} title={`${j.badge}: ${j.title}`}>
+                        <span className="tab-bdg">{j.badge}</span>
+                        <span className="tab-ttl">{j.title}</span>
+                    </button>
+                ))}
+            </div>
+            <button className="tab-load" onClick={onLoad}>+ Load</button>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════
+// BLUEPRINT ROW
+// ═══════════════════════════════════════
+function BlueprintRow({ row }) {
+    return (
+        <tr className={row.rowType || ""}>
+            <td className="ll">{row.laneLabel}</td>
+            {row.cells.map((cell, ci) => (
+                <td key={ci}
+                    className={`dc${cell.colspan ? " dc-span" : ""}`}
+                    colSpan={cell.colspan || undefined}
+                    contentEditable
+                    suppressContentEditableWarning
+                    dangerouslySetInnerHTML={{ __html: cell.html }}
+                />
+            ))}
+        </tr>
+    );
+}
+
+// ═══════════════════════════════════════
+// JOURNEY VIEW
+// ═══════════════════════════════════════
+function JourneyView({ journey }) {
+    const ref = useRef(null);
+    const numCols = journey.stages.length;
+    const tw = LBL_W + numCols * COL_W;
+
+    // scroll sync
+    useEffect(() => {
+        const c = ref.current;
+        if (!c) return;
+        const els = Array.from(c.querySelectorAll("[data-ss]"));
+        if (els.length < 2) return;
+        let lock = false;
+        const hm = new Map();
+        els.forEach((el) => {
+            const h = () => {
+                if (lock) return;
+                lock = true;
+                const l = el.scrollLeft;
+                els.forEach((o) => { if (o !== el) o.scrollLeft = l; });
+                requestAnimationFrame(() => { lock = false; });
+            };
+            hm.set(el, h);
+            el.addEventListener("scroll", h, { passive: true });
+        });
+        return () => hm.forEach((h, el) => el.removeEventListener("scroll", h));
+    }, [journey]);
+
+    return (
+        <div ref={ref}>
+            {/* Chapter header */}
+            <div className="ch-hdr">
+                <span className="ch-badge">{journey.badge}</span>
+                <h2>{journey.title}</h2>
+            </div>
+
+            {/* Stage header — sticky */}
+            <div className="stage-outer">
+                <div className="scroll-hide" data-ss="">
+                    <table className="bp" style={{ minWidth: tw }}>
+                        <tbody><tr>
+                            <td className="ll stg-ll">{journey.stageLabel}</td>
+                            {journey.stages.map((s, i) => (
+                                <td key={i} className="stg-c" style={{ width: COL_W, minWidth: COL_W }}>
+                                    {s.num != null && <span className="stage-num">{s.num}</span>}
+                                    {" "}{s.title}
+                                </td>
+                            ))}
+                        </tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Sub-journeys */}
+            {journey.subJourneys.map((sj, si) => (
+                <div key={si}>
+                    <div className="sj-scroll" data-ss="">
+                        <table className="bp" style={{ minWidth: tw }}>
+                            <tbody><tr>
+                                <td className="ll sj-ll">SUB-JOURNEY</td>
+                                <td colSpan={numCols} className="sj-tc">▼ {sj.title}</td>
+                            </tr></tbody>
+                        </table>
+                    </div>
+                    <div className="bpw" data-ss="">
+                        <table className="bp" style={{ minWidth: tw }}>
+                            <tbody>
+                                {sj.rows.map((row, ri) => (
+                                    <BlueprintRow key={ri} row={row} />
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════
+// APP
+// ═══════════════════════════════════════
+function App() {
+    const [journeys, setJourneys] = useState([]);
+    const [tab, setTab] = useState(0);
+    const [modal, setModal] = useState(false);
+    const legendRef = useRef(null);
+
+    const loadFromText = useCallback((text) => {
+        const lines = text.trim().split("\n").filter((l) => l.trim());
+        const data = lines.map((l) => JSON.parse(l));
+        if (!data.length) throw new Error("No valid journey data found.");
+        setJourneys(data);
+        setTab(0);
+        console.log(`%c✅ Loaded ${data.length} service journey(s)`, "color:#2e7d32;font-weight:bold;font-size:14px");
+    }, []);
+
+    // Expose to console
+    useEffect(() => {
+        window.loadJSONL = loadFromText;
+        return () => { delete window.loadJSONL; };
+    }, [loadFromText]);
+
+    // Legend height → CSS var
+    useEffect(() => {
+        const el = legendRef.current;
+        if (!el) return;
+        const update = () => document.documentElement.style.setProperty("--legend-h", el.offsetHeight + "px");
+        update();
+        const ro = new ResizeObserver(update);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
+    return (
+        <>
+            <Header />
+            <LegendBar innerRef={legendRef} />
+            <main className="main-content">
+                {journeys.length === 0 ? (
+                    <EmptyState onLoad={() => setModal(true)} />
+                ) : (
+                    journeys.map((j, i) => (
+                        <div key={j.id + i} style={{ display: i === tab ? "block" : "none" }}>
+                            <JourneyView journey={j} />
+                        </div>
+                    ))
+                )}
+            </main>
+            <TabBar journeys={journeys} activeTab={tab} setActiveTab={setTab} onLoad={() => setModal(true)} />
+            {modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} />}
+        </>
+    );
+}
+
+createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
