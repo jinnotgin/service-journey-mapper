@@ -279,6 +279,8 @@
         .menu-portal{position:fixed;z-index:300;margin-top:0}
         .menu-item{display:flex;align-items:center;gap:7px;width:100%;background:none;border:none;padding:7px 9px;border-radius:6px;font-size:.78rem;font-weight:500;color:var(--text);cursor:pointer;font-family:inherit;text-align:left}
         .menu-item:hover{background:#f1f3f4}
+        .menu-item:disabled{opacity:.38;cursor:not-allowed}
+        .menu-item:disabled:hover{background:none}
         .menu-item.danger{color:var(--red)}
         .menu-item.danger:hover{background:#fee2e2}
         .menu-head{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-sec);padding:6px 9px 3px}
@@ -301,6 +303,18 @@
         .row-menu{position:absolute;top:3px;right:3px;z-index:11}
         .hdr-edit{outline:none;cursor:text}
         .hdr-edit:focus{box-shadow:inset 0 0 0 2px var(--accent);border-radius:4px}
+        .drag-handle{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:inherit;cursor:grab;font-size:.66rem;line-height:1;vertical-align:middle;user-select:none;opacity:.78}
+        .drag-handle:hover{opacity:1;background:rgba(255,255,255,.16)}
+        .drag-handle:active{cursor:grabbing}
+        .row-drag{position:absolute;top:5px;left:5px;z-index:11;border-color:var(--border);background:rgba(255,255,255,.7);color:var(--text-sec)}
+        .row-drag:hover{background:#fff}
+        .ll.ll-editing{padding-left:28px}
+        .stg-drag,.sub-drag{position:absolute;top:5px;left:5px}
+        .dragging{opacity:.56}
+        .drop-before{box-shadow:inset 4px 0 0 var(--accent), inset 0 0 0 1px rgba(232,145,26,.35)}
+        .drop-after{box-shadow:inset -4px 0 0 var(--accent), inset 0 0 0 1px rgba(232,145,26,.35)}
+        tr.drop-before>.ll,tr.drop-before>.dc{box-shadow:inset 0 4px 0 var(--accent)}
+        .add-row-bar.drop-end{box-shadow:inset 0 3px 0 var(--accent);background:#fff8ed}
 
         /* sub-stage header row */
         .sub-c{background:#243049!important;color:#fff!important;font-weight:600!important;font-size:.73rem!important;text-align:center!important;vertical-align:middle!important;border:1px solid rgba(255,255,255,.12)!important}
@@ -382,6 +396,53 @@ const blankCells = (total, mode = "text", align = "left") =>
     Array.from({ length: Math.max(total, 1) }, () => ({ mode, html: "", align }));
 
 const rowWidth = (cells) => (cells || []).reduce((a, c) => a + (c.colspan || 1), 0);
+function moveArrayRange(items, from, count, to) {
+    if (count <= 0 || from === to || from < 0 || from >= items.length) return items;
+    const safeCount = Math.min(count, items.length - from);
+    const insertAtOriginal = Math.max(0, Math.min(to, items.length));
+    if (insertAtOriginal >= from && insertAtOriginal <= from + safeCount) return items;
+    const next = items.slice();
+    const moved = next.splice(from, safeCount);
+    const insertAt = insertAtOriginal > from ? insertAtOriginal - safeCount : insertAtOriginal;
+    next.splice(insertAt, 0, ...moved);
+    return next;
+}
+
+function cellsToLeafCells(cells) {
+    const leaves = [];
+    (cells || []).forEach((cell, cellIdx) => {
+        const w = cell.colspan || 1;
+        const base = { ...cell };
+        delete base.colspan;
+        for (let i = 0; i < w; i++) leaves.push({ ...base, __spanKey: `${cellIdx}` });
+    });
+    return leaves;
+}
+
+function leafCellsToCells(leaves) {
+    const out = [];
+    (leaves || []).forEach((leaf) => {
+        const { __spanKey, ...cell } = leaf;
+        const last = out[out.length - 1];
+        if (last && last.__spanKey === __spanKey) {
+            last.colspan = (last.colspan || 1) + 1;
+        } else {
+            out.push({ ...cell, __spanKey, colspan: 1 });
+        }
+    });
+    return out.map(({ __spanKey, ...cell }) => {
+        if (cell.colspan === 1) delete cell.colspan;
+        return cell;
+    });
+}
+
+function moveLeafRangeInRow(row, from, count, to) {
+    if (row.rowType === DIVIDER_TYPE) return row;
+    const leaves = cellsToLeafCells(row.cells);
+    const moved = moveArrayRange(leaves, from, count, to);
+    if (moved === leaves) return row;
+    return { ...row, cells: leafCellsToCells(moved) };
+}
 
 // Insert one leaf column at global leaf index `at`. If the position falls inside
 // a spanning cell, widen that cell; otherwise insert a fresh empty cell.
@@ -1161,13 +1222,19 @@ function Cell({ cell, editMode, selected, rowBg, onSelect, onEditHtml, onTagsCha
 // ═══════════════════════════════════════
 // BLUEPRINT ROW
 // ═══════════════════════════════════════
-function BlueprintRow({ row, editMode, total, selectedCellIdx, onSelect, onCellEdit, onCellTags, onRowAction, onDeselect }) {
+function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, dragState, dropRowIdx,
+        onSelect, onCellEdit, onCellTags, onRowAction, onRowDragStart, onRowDragOver, onRowDrop, onDragEnd, onDeselect }) {
     const rowBg = row.customColor || null;
     const isDivider = row.rowType === DIVIDER_TYPE;
     return (
-        <tr className={row.rowType || ""}>
-            <td className="ll" style={rowBg ? { background: rowBg } : undefined}>
+        <tr className={`${row.rowType || ""}${dragState?.type === "row" && dragState.rowIdx === rowIdx ? " dragging" : ""}${dropRowIdx === rowIdx ? " drop-before" : ""}`}
+            onDragOver={editMode ? (e) => onRowDragOver(e, rowIdx) : undefined}
+            onDrop={editMode ? (e) => onRowDrop(e, rowIdx) : undefined}>
+            <td className={`ll${editMode ? " ll-editing" : ""}`} style={rowBg ? { background: rowBg } : undefined}>
                 {editMode && (
+                    <>
+                    <span className="drag-handle row-drag" draggable title="Drag to reorder row"
+                        onDragStart={(e) => onRowDragStart(e, rowIdx)} onDragEnd={onDragEnd}>⠿</span>
                     <span className="row-menu">
                         <Menu trigger="⋮" align="left">
                             {(close) => (
@@ -1199,6 +1266,7 @@ function BlueprintRow({ row, editMode, total, selectedCellIdx, onSelect, onCellE
                             )}
                         </Menu>
                     </span>
+                    </>
                 )}
                 <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
                     onBlur={editMode ? (e) => onRowAction("label", e.currentTarget.textContent) : undefined}>
@@ -1303,12 +1371,69 @@ function FormatToolbar({ innerRef, cell, onMode, onAlign }) {
 function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
         onTitleEdit, onCellEdit, onCellTags, onRowAction, onStageAction, onAddRow }) {
     const ref = useRef(null);
+    const [dragState, setDragState] = useState(null);
+    const [dropTarget, setDropTarget] = useState(null);
     const stages = journey.stages;
     const total = totalLeaves(stages);
     const hasSub = stages.some((s) => (s.subStages?.length || 0) > 0);
     const tw = LBL_W + total * COL_W;
     const hdrW = tw + (editMode ? 62 : 0);
     const onStage = (action, payload) => onStageAction(jIdx, action, payload);
+    const clearDrag = () => { setDragState(null); setDropTarget(null); };
+    const startDrag = (e, state) => {
+        setDragState(state);
+        setDropTarget(null);
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", JSON.stringify(state));
+    };
+    const getDropSide = (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        return e.clientX > r.left + r.width / 2 ? "after" : "before";
+    };
+    const rowDragOver = (e, sjIdx, rowIdx) => {
+        if (dragState?.type !== "row" || dragState.sjIdx !== sjIdx) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        setDropTarget({ type: "row", sjIdx, rowIdx });
+    };
+    const rowDrop = (e, sjIdx, rowIdx) => {
+        if (dragState?.type !== "row" || dragState.sjIdx !== sjIdx) return;
+        e.preventDefault();
+        onRowAction(jIdx, dragState.sjIdx, dragState.rowIdx, "moveTo", { toRowIdx: rowIdx });
+        clearDrag();
+    };
+    const rowDropEnd = (e, sjIdx, rowCount) => {
+        if (dragState?.type !== "row" || dragState.sjIdx !== sjIdx) return;
+        e.preventDefault();
+        onRowAction(jIdx, sjIdx, dragState.rowIdx, "moveTo", { toRowIdx: rowCount });
+        clearDrag();
+    };
+    const stageDragOver = (e, stageIdx) => {
+        if (dragState?.type !== "stage") return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        setDropTarget({ type: "stage", stageIdx, side: getDropSide(e) });
+    };
+    const stageDrop = (e, stageIdx) => {
+        if (dragState?.type !== "stage") return;
+        e.preventDefault();
+        const side = getDropSide(e);
+        onStage("moveStage", { fromIdx: dragState.stageIdx, toIdx: stageIdx + (side === "after" ? 1 : 0) });
+        clearDrag();
+    };
+    const subDragOver = (e, stageIdx, subIdx) => {
+        if (dragState?.type !== "subStage" || dragState.stageIdx !== stageIdx) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        setDropTarget({ type: "subStage", stageIdx, subIdx, side: getDropSide(e) });
+    };
+    const subDrop = (e, stageIdx, subIdx) => {
+        if (dragState?.type !== "subStage" || dragState.stageIdx !== stageIdx) return;
+        e.preventDefault();
+        const side = getDropSide(e);
+        onStage("moveSubStage", { stageIdx, fromIdx: dragState.subIdx, toIdx: subIdx + (side === "after" ? 1 : 0) });
+        clearDrag();
+    };
 
     // scroll sync
     useEffect(() => {
@@ -1358,10 +1483,16 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                     const lc = leafCount(s);
                                     const sHasSub = (s.subStages?.length || 0) > 0;
                                     return (
-                                        <td key={si} className="stg-c" colSpan={lc}
+                                        <td key={si} className={`stg-c${dropTarget?.type === "stage" && dropTarget.stageIdx === si ? ` drop-${dropTarget.side}` : ""}`} colSpan={lc}
                                             rowSpan={hasSub && !sHasSub ? 2 : 1}
-                                            style={{ minWidth: lc * COL_W }}>
+                                            style={{ minWidth: lc * COL_W }}
+                                            onDragOver={editMode ? (e) => stageDragOver(e, si) : undefined}
+                                            onDrop={editMode ? (e) => stageDrop(e, si) : undefined}>
                                             {editMode && (
+                                                <>
+                                                <span className="drag-handle stg-drag" draggable title="Drag to reorder stage"
+                                                    onDragStart={(e) => startDrag(e, { type: "stage", stageIdx: si })}
+                                                    onDragEnd={clearDrag}>⠿</span>
                                                 <Menu trigger="⋮" align="right">
                                                     {(close) => (
                                                         <>
@@ -1372,6 +1503,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                         </>
                                                     )}
                                                 </Menu>
+                                                </>
                                             )}
                                             {s.num != null && <span className="stage-num">{s.num}</span>}{" "}
                                             <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
@@ -1393,8 +1525,16 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                         const subs = s.subStages || [];
                                         if (!subs.length) return null;
                                         return subs.map((ss, ssi) => (
-                                            <td key={si + "-" + ssi} className="sub-c" style={{ minWidth: COL_W }}>
+                                            <td key={si + "-" + ssi}
+                                                className={`sub-c${dropTarget?.type === "subStage" && dropTarget.stageIdx === si && dropTarget.subIdx === ssi ? ` drop-${dropTarget.side}` : ""}`}
+                                                style={{ minWidth: COL_W }}
+                                                onDragOver={editMode ? (e) => subDragOver(e, si, ssi) : undefined}
+                                                onDrop={editMode ? (e) => subDrop(e, si, ssi) : undefined}>
                                                 {editMode && (
+                                                    <>
+                                                    <span className="drag-handle sub-drag" draggable title="Drag within this stage"
+                                                        onDragStart={(e) => startDrag(e, { type: "subStage", stageIdx: si, subIdx: ssi })}
+                                                        onDragEnd={clearDrag}>⠿</span>
                                                     <Menu trigger="⋮" align="right">
                                                         {(close) => (
                                                             <>
@@ -1404,6 +1544,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                             </>
                                                         )}
                                                     </Menu>
+                                                    </>
                                                 )}
                                                 <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
                                                     onBlur={editMode ? (e) => onStage("renameSubStage", { stageIdx: si, subIdx: ssi, value: e.currentTarget.textContent }) : undefined}>
@@ -1426,19 +1567,33 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                         <table className="bp" style={{ minWidth: tw }}>
                             <tbody>
                                 {sj.rows.map((row, ri) => (
-                                    <BlueprintRow key={ri} row={row} editMode={editMode} total={total}
+                                    <BlueprintRow key={ri} row={row} rowIdx={ri}
+                                        editMode={editMode} total={total}
+                                        dragState={dragState?.type === "row" && dragState.sjIdx === si ? dragState : null}
+                                        dropRowIdx={dropTarget?.type === "row" && dropTarget.sjIdx === si ? dropTarget.rowIdx : null}
                                         selectedCellIdx={selected && selected.jIdx === jIdx && selected.sjIdx === si && selected.rowIdx === ri ? selected.cellIdx : null}
                                         onSelect={(ci) => onSelect({ jIdx, sjIdx: si, rowIdx: ri, cellIdx: ci })}
                                         onCellEdit={(ci, html) => onCellEdit(jIdx, si, ri, ci, html)}
                                         onCellTags={(ci, tags) => onCellTags(jIdx, si, ri, ci, tags)}
                                         onRowAction={(action, value) => onRowAction(jIdx, si, ri, action, value)}
+                                        onRowDragStart={(e) => startDrag(e, { type: "row", sjIdx: si, rowIdx: ri })}
+                                        onRowDragOver={(e, targetRowIdx) => rowDragOver(e, si, targetRowIdx)}
+                                        onRowDrop={(e, targetRowIdx) => rowDrop(e, si, targetRowIdx)}
+                                        onDragEnd={clearDrag}
                                         onDeselect={onDeselect} />
                                 ))}
                             </tbody>
                         </table>
                     </div>
                     {editMode && (
-                        <div className="add-row-bar">
+                        <div className={`add-row-bar${dropTarget?.type === "rowEnd" && dropTarget.sjIdx === si ? " drop-end" : ""}`}
+                            onDragOver={editMode ? (e) => {
+                                if (dragState?.type === "row" && dragState.sjIdx === si) {
+                                    e.preventDefault();
+                                    setDropTarget({ type: "rowEnd", sjIdx: si });
+                                }
+                            } : undefined}
+                            onDrop={editMode ? (e) => rowDropEnd(e, si, sj.rows.length) : undefined}>
                             <button className="add-row-btn" onClick={() => onAddRow(jIdx, si)}>＋ Add row</button>
                         </div>
                     )}
@@ -1653,6 +1808,14 @@ function App() {
             const sj = { ...sjs[sjIdx], rows: sjs[sjIdx].rows.slice() };
             const rows = sj.rows;
             if (action === "delete") rows.splice(rowIdx, 1);
+            else if (action === "moveTo") {
+                const toRowIdx = Math.max(0, Math.min(value?.toRowIdx ?? rowIdx, rows.length));
+                const moved = moveArrayRange(rows, rowIdx, 1, toRowIdx);
+                if (moved === rows) return j;
+                sj.rows = moved;
+                sjs[sjIdx] = sj;
+                return { ...j, subJourneys: sjs };
+            }
             else if (action === "insertAbove") rows.splice(rowIdx, 0, newRow(total));
             else if (action === "insertBelow") rows.splice(rowIdx + 1, 0, newRow(total));
             else if (action === "type") {
@@ -1707,6 +1870,24 @@ function App() {
                     return c;
                 }) };
             }
+            if (action === "moveStage") {
+                const { fromIdx } = payload;
+                const toIdx = Math.max(0, Math.min(payload.toIdx, stages.length));
+                if (fromIdx < 0 || fromIdx >= stages.length) return j;
+                const movedStages = moveArrayRange(stages, fromIdx, 1, toIdx);
+                if (movedStages === stages) return j;
+                const start = leafStart(j.stages, fromIdx);
+                const cnt = leafCount(j.stages[fromIdx]);
+                const target = toIdx >= j.stages.length ? totalLeaves(j.stages) : leafStart(j.stages, toIdx);
+                return {
+                    ...j,
+                    stages: movedStages,
+                    subJourneys: j.subJourneys.map((sj) => ({
+                        ...sj,
+                        rows: sj.rows.map((r) => moveLeafRangeInRow(r, start, cnt, target)),
+                    })),
+                };
+            }
             if (action === "addSubStage") {
                 const { stageIdx } = payload;
                 const before = stages[stageIdx].subStages.length;
@@ -1728,6 +1909,26 @@ function App() {
                     return { ...j, stages, subJourneys: mapRows((cells) => removeLeafFromRow(cells, gi)) };
                 }
                 return { ...j, stages };
+            }
+            if (action === "moveSubStage") {
+                const { stageIdx, fromIdx } = payload;
+                const subs = stages[stageIdx]?.subStages || [];
+                const toIdx = Math.max(0, Math.min(payload.toIdx, subs.length));
+                if (subs.length <= 1 || fromIdx < 0 || fromIdx >= subs.length) return j;
+                const movedSubs = moveArrayRange(subs, fromIdx, 1, toIdx);
+                if (movedSubs === subs) return j;
+                stages[stageIdx] = { ...stages[stageIdx], subStages: movedSubs };
+                const start = leafStart(j.stages, stageIdx);
+                const fromLeaf = start + fromIdx;
+                const toLeaf = start + toIdx;
+                return {
+                    ...j,
+                    stages,
+                    subJourneys: j.subJourneys.map((sj) => ({
+                        ...sj,
+                        rows: sj.rows.map((r) => moveLeafRangeInRow(r, fromLeaf, 1, toLeaf)),
+                    })),
+                };
             }
             if (action === "renameStage") { stages[payload.stageIdx] = { ...stages[payload.stageIdx], title: payload.value }; return { ...j, stages }; }
             if (action === "renameSubStage") {
