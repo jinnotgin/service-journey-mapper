@@ -45,6 +45,12 @@
         .ab-brand{display:flex;flex-direction:column;min-width:0;line-height:1.25}
         .ab-eyebrow{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
         .ab-title{font-size:1rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .inline-title{cursor:default}
+        .inline-title.editable{cursor:text}
+        .inline-title-input{font:inherit;font-weight:inherit;color:inherit;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);border-radius:5px;padding:1px 5px;min-width:60px;max-width:100%;outline:none}
+        .ab-brand .inline-title-input{width:100%}
+        .ch-hdr .inline-title-input{width:min(720px,100%)}
+        .ch-title-input{background:#fff;border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,145,26,.15);padding:2px 6px}
         .ab-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
         .ab-btn{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.22);padding:6px 13px;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s;white-space:nowrap}
         .ab-btn:hover{background:rgba(255,255,255,.2)}
@@ -189,7 +195,8 @@
         .tab-btn.active{background:#fff;color:var(--text);border-top:2px solid var(--accent);height:35px;z-index:1}
         .tab-bdg{background:var(--primary);color:#fff;padding:1px 7px;border-radius:9px;font-size:.6rem;font-weight:700;flex-shrink:0}
         .tab-ttl{overflow:hidden;text-overflow:ellipsis}
-        .tab-load{flex-shrink:0;height:29px;padding:0 13px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:.72rem;font-weight:600;cursor:pointer;color:var(--primary);margin:0 0 5px 8px;transition:background .15s;font-family:inherit}
+        .tab-actions{display:flex;align-items:flex-end;gap:6px;margin:0 0 5px 8px;flex-shrink:0}
+        .tab-load{height:29px;padding:0 13px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:.72rem;font-weight:600;cursor:pointer;color:var(--primary);transition:background .15s;font-family:inherit}
         .tab-load:hover{background:#f1f3f4}
 
         /* ===== MODAL ===== */
@@ -332,6 +339,7 @@ import Dexie from "dexie";
 
 const COL_W = 260;
 const LBL_W = 180;
+const DIVIDER_TYPE = "row-divider";
 
 // ═══════════════════════════════════════
 // STRUCTURE HELPERS (columns / rows / cells)
@@ -349,6 +357,8 @@ const newRow  = (total) => ({
     laneLabel: "New row",
     cells: Array.from({ length: Math.max(total, 1) }, newCell),
 });
+const blankCells = (total, mode = "text", align = "left") =>
+    Array.from({ length: Math.max(total, 1) }, () => ({ mode, html: "", align }));
 
 const rowWidth = (cells) => (cells || []).reduce((a, c) => a + (c.colspan || 1), 0);
 
@@ -461,7 +471,6 @@ const TAG_COLORS = [
 ];
 const ROW_COLORS = ["#ffffff", "#f5f5f5", "#dbeafe", "#fce8c8", "#e8dff5", "#fecdd3", "#d1fae5", "#fef3c7", "#ff6f00", "#1e293b"];
 const TEXT_COLORS = ["#1a1a2e", "#c62828", "#e8911a", "#2e7d32", "#1565c0", "#6a1b9a", "#5a6376", "#ffffff"];
-const DIVIDER_TYPE = "row-divider";
 const ROW_TYPES = [
     ["row-operator", "Operator Actions"],
     ["row-agencies", "Agencies"],
@@ -525,12 +534,91 @@ function downloadFile(filename, text, type) {
 
 const safeName = (s) => (s || "export").replace(/[^a-z0-9_-]+/gi, "_").replace(/^_+|_+$/g, "") || "export";
 const defaultName = (projects) => `Project ${(projects?.length || 0) + 1}`;
+const blankJourneyTitle = (count) => `Untitled eService Journey${count > 0 ? ` ${count + 1}` : ""}`;
 const fmtDate = (ts) => {
     if (!ts) return "—";
     const d = new Date(ts);
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " +
         d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 };
+
+function InlineTitleEdit({ value, fallback, className, inputClassName, disabled, onCommit }) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState(value || "");
+    const inputRef = useRef(null);
+
+    useEffect(() => {
+        if (!editing) setDraft(value || "");
+    }, [value, editing]);
+
+    useEffect(() => {
+        if (!editing) return;
+        inputRef.current?.focus();
+        inputRef.current?.select();
+    }, [editing]);
+
+    const save = () => {
+        const next = draft.trim();
+        setEditing(false);
+        if (next && next !== value) onCommit(next);
+    };
+    const cancel = () => {
+        setDraft(value || "");
+        setEditing(false);
+    };
+
+    if (editing) {
+        return (
+            <input ref={inputRef} className={`${className || ""} inline-title-input ${inputClassName || ""}`}
+                value={draft} onChange={(e) => setDraft(e.target.value)}
+                onBlur={save}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); save(); }
+                    if (e.key === "Escape") { e.preventDefault(); cancel(); }
+                }} />
+        );
+    }
+
+    return (
+        <span className={`${className || ""} inline-title${disabled ? "" : " editable"}`}
+            title={disabled ? (value || "") : "Double-click to edit"}
+            onDoubleClick={disabled ? undefined : () => setEditing(true)}>
+            {value || fallback}
+        </span>
+    );
+}
+
+function createBlankJourney(index = 0) {
+    const stages = [
+        { num: 1, title: "Find Service", subStages: [] },
+        { num: 2, title: "Submit Request", subStages: [] },
+        { num: 3, title: "Receive Outcome", subStages: [] },
+    ];
+    const total = totalLeaves(stages);
+    return hydrate([{
+        id: `journey-${Date.now()}-${index}`,
+        badge: "NEW",
+        title: blankJourneyTitle(index),
+        stageLabel: "eService Journey",
+        stages,
+        subJourneys: [{
+            title: "Main Journey",
+            rows: [
+                { rowType: "row-agencies", laneLabel: "Agencies", cells: blankCells(total, "tags") },
+                { rowType: "row-operator", laneLabel: "User Actions", cells: blankCells(total, "bullets") },
+                { rowType: "row-fs-human", laneLabel: "Frontstage Human", cells: blankCells(total, "bullets") },
+                { rowType: "row-fs-system", laneLabel: "Frontstage System", cells: blankCells(total, "bullets") },
+                { rowType: DIVIDER_TYPE, laneLabel: "Visibility", cells: [{ mode: "text", html: "", align: "center", colspan: total }] },
+                { rowType: "row-bs-human", laneLabel: "Backstage Human", cells: blankCells(total, "bullets") },
+                { rowType: "row-bs-system", laneLabel: "Backstage System", cells: blankCells(total, "bullets") },
+                { rowType: "row-support", laneLabel: "Support Process", cells: blankCells(total, "bullets") },
+                { rowType: "row-pain", laneLabel: "Pain Points", cells: blankCells(total, "boxes") },
+                { rowType: "row-emotion", laneLabel: "Emotion", cells: blankCells(total, "text", "center") },
+                { rowType: "row-suggest", laneLabel: "Opportunities", cells: blankCells(total, "boxes") },
+            ],
+        }],
+    }])[0];
+}
 
 // ═══════════════════════════════════════
 // TOP APP BAR + COLLAPSIBLE KEY
@@ -545,14 +633,15 @@ const LEGEND = [
     { label: "Suggestions", color: "#eff6ff" },
 ];
 
-function TopBar({ innerRef, currentName, onProjects, onExport, canExport, saveState, lastSaved, editMode, onToggleEdit }) {
+function TopBar({ innerRef, currentName, onRenameCurrent, onProjects, onExport, canExport, saveState, lastSaved, editMode, onToggleEdit }) {
     const [keyOpen, setKeyOpen] = useState(false);
     return (
         <header className="app-bar" ref={innerRef}>
             <div className="app-bar-main">
                 <div className="ab-brand">
                     <span className="ab-eyebrow">Service Blueprint Viewer</span>
-                    <span className="ab-title" title={currentName || ""}>{currentName || "No project loaded"}</span>
+                    <InlineTitleEdit className="ab-title" value={currentName} fallback="No project loaded"
+                        disabled={!currentName} onCommit={onRenameCurrent} />
                 </div>
                 <div className="ab-actions">
                     {saveState === "saving" ? (
@@ -587,13 +676,14 @@ function TopBar({ innerRef, currentName, onProjects, onExport, canExport, saveSt
 // ═══════════════════════════════════════
 // EMPTY STATE
 // ═══════════════════════════════════════
-function EmptyState({ onLoad }) {
+function EmptyState({ onNew, onLoad }) {
     return (
         <div className="empty-state">
             <div className="empty-icon">📋</div>
             <h2>No Service Journeys Loaded</h2>
             <p>Load JSON data extracted from a service blueprint to visualize journey maps with dynamic rows, columns, and Excel-like tabs.</p>
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                <button className="btn-p" onClick={onNew}>+ New Blank Journey</button>
                 <button className="btn-p" onClick={onLoad}>📂 Load JSON Data</button>
                 <div className="empty-hint">Or run <code>window.loadJSON(text)</code> in the browser console</div>
             </div>
@@ -695,7 +785,7 @@ function ProjectManager({ projects, currentId, onOpen, onDelete, onRename, onNew
 // ═══════════════════════════════════════
 // TAB BAR
 // ═══════════════════════════════════════
-function TabBar({ journeys, activeTab, setActiveTab, onLoad }) {
+function TabBar({ journeys, activeTab, setActiveTab, onNew, onLoad }) {
     if (!journeys.length) return null;
     return (
         <div className="tab-bar">
@@ -708,7 +798,10 @@ function TabBar({ journeys, activeTab, setActiveTab, onLoad }) {
                     </button>
                 ))}
             </div>
-            <button className="tab-load" onClick={onLoad}>+ Load</button>
+            <div className="tab-actions">
+                <button className="tab-load" onClick={onLoad}>+ Load</button>
+                <button className="tab-load" onClick={onNew}>+ New</button>
+            </div>
         </div>
     );
 }
@@ -805,7 +898,20 @@ function EditableCell({ html, editMode, className, style, colSpan, onCommit, onF
         const el = ref.current;
         if (!el) return;
         const r = el.getBoundingClientRect();
-        setPos({ top: r.top + 4, left: Math.min(r.right - 62, window.innerWidth - 70) });
+        const groupWidth = 56;
+        const groupHeight = 26;
+        const margin = 8;
+
+        let top = r.top - groupHeight / 2;
+        let left = r.right - groupWidth / 2;
+
+        if (top < margin) top = r.top + 4;
+        if (top + groupHeight > window.innerHeight - margin) {
+            top = Math.max(margin, window.innerHeight - groupHeight - margin);
+        }
+
+        left = Math.max(margin, Math.min(left, window.innerWidth - groupWidth - margin));
+        setPos({ top, left });
     }, []);
 
     useEffect(() => {
@@ -1028,7 +1134,7 @@ function FormatToolbar({ innerRef, cell, onMode, onAlign }) {
 // JOURNEY VIEW
 // ═══════════════════════════════════════
 function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
-        onCellEdit, onCellTags, onRowAction, onStageAction, onAddRow }) {
+        onTitleEdit, onCellEdit, onCellTags, onRowAction, onStageAction, onAddRow }) {
     const ref = useRef(null);
     const stages = journey.stages;
     const total = totalLeaves(stages);
@@ -1063,7 +1169,10 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
         <div ref={ref}>
             {/* Chapter header */}
             <div className="ch-hdr">
-                <h2>{journey.title}</h2>
+                <h2>
+                    <InlineTitleEdit value={journey.title} fallback="Untitled Journey"
+                        inputClassName="ch-title-input" onCommit={(value) => onTitleEdit(jIdx, value)} />
+                </h2>
             </div>
 
             {/* Stage header — sticky (two rows when sub-stages exist) */}
@@ -1430,6 +1539,20 @@ function App() {
         await refreshProjects();
     }, [refreshProjects]);
 
+    const renameCurrentProject = useCallback(async (name) => {
+        if (currentId == null || !name.trim()) return;
+        await dbRenameProject(currentId, name.trim());
+        await refreshProjects();
+    }, [currentId, refreshProjects]);
+
+    const renameJourneyTitle = useCallback((jIdx, title) => {
+        editJourney(jIdx, (j) => {
+            const nextTitle = title.trim();
+            if (!nextTitle || j.title === nextTitle) return j;
+            return { ...j, title: nextTitle };
+        });
+    }, [editJourney]);
+
     const newProject = useCallback(async () => {
         const name = prompt("New project name", defaultName(projects));
         if (name == null) return;
@@ -1442,6 +1565,25 @@ function App() {
         setProjModal(false);
         setModal(true); // prompt to load data into the fresh project
     }, [projects, refreshProjects, updateJourneys]);
+
+    const newBlankJourney = useCallback(async () => {
+        const journey = createBlankJourney(journeysRef.current.length);
+        let id = currentId;
+        if (id == null) {
+            id = await dbCreateProject("Blank Service Journey", [journey]);
+            setCurrentId(id);
+            localStorage.setItem(LAST_KEY, String(id));
+            updateJourneys([journey]);
+            setTab(0);
+            await refreshProjects();
+            return;
+        }
+        updateJourneys((prev) => {
+            const next = [...prev, journey];
+            setTab(next.length - 1);
+            return next;
+        });
+    }, [currentId, refreshProjects, updateJourneys]);
 
     // ── Export full project state ──
     const exportProject = useCallback(() => {
@@ -1502,6 +1644,7 @@ function App() {
     return (
         <>
             <TopBar innerRef={legendRef} currentName={currentName}
+                onRenameCurrent={renameCurrentProject}
                 onProjects={() => setProjModal(true)} onExport={exportProject}
                 canExport={journeys.length > 0} saveState={saveState} lastSaved={lastSaved}
                 editMode={editMode} onToggleEdit={() => setEditMode((e) => !e)} />
@@ -1512,12 +1655,13 @@ function App() {
             )}
             <main className="main-content">
                 {journeys.length === 0 ? (
-                    <EmptyState onLoad={() => setModal(true)} />
+                    <EmptyState onNew={newBlankJourney} onLoad={() => setModal(true)} />
                 ) : (
                     journeys.map((j, i) => (
                         <div key={j.id + "-" + i} style={{ display: i === tab ? "block" : "none" }}>
                             <JourneyView journey={j} jIdx={i} editMode={editMode}
                                 selected={selected} onSelect={setSelected} onDeselect={() => setSelected(null)}
+                                onTitleEdit={renameJourneyTitle}
                                 onCellEdit={handleCellEdit} onCellTags={handleCellTags}
                                 onRowAction={handleRowAction} onStageAction={handleStageAction}
                                 onAddRow={handleAddRow} />
@@ -1525,7 +1669,8 @@ function App() {
                     ))
                 )}
             </main>
-            <TabBar journeys={journeys} activeTab={tab} setActiveTab={setTab} onLoad={() => setModal(true)} />
+            <TabBar journeys={journeys} activeTab={tab} setActiveTab={setTab}
+                onNew={newBlankJourney} onLoad={() => setModal(true)} />
             {modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} />}
             {projModal && <ProjectManager projects={projects} currentId={currentId}
                 onOpen={openProject} onDelete={deleteProject} onRename={renameProject}
