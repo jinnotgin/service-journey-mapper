@@ -125,8 +125,8 @@
         .bpw{scrollbar-width:thin;scrollbar-color:var(--accent) #eee}
 
         /* ===== ROW TYPES ===== */
-        .row-agencies>.ll{background:#f5f5f5;color:#616161}
-        .row-agencies>.dc{background:#fafafa}
+        .row-parties>.ll{background:#f5f5f5;color:#616161}
+        .row-parties>.dc{background:#fafafa}
 
         .row-operator>.ll{background:#fff;color:var(--text)}
         .row-operator>.dc{background:#fff}
@@ -190,11 +190,15 @@
         .tab-bar{position:fixed;bottom:0;left:0;right:0;height:42px;background:#e2e6ec;border-top:1px solid #bcc3cf;display:flex;align-items:flex-end;padding:0 8px;z-index:100}
         .tab-scroll{display:flex;align-items:flex-end;overflow-x:auto;flex:1;gap:2px;scrollbar-width:none}
         .tab-scroll::-webkit-scrollbar{display:none}
-        .tab-btn{flex-shrink:0;height:33px;padding:0 15px;border:1px solid #bcc3cf;border-bottom:none;border-radius:7px 7px 0 0;background:#d5dae2;font-size:.72rem;font-weight:600;cursor:pointer;color:var(--text-sec);display:flex;align-items:center;gap:6px;transition:background .15s;max-width:340px;white-space:nowrap;overflow:hidden;font-family:inherit}
+        .tab-btn{flex-shrink:0;height:33px;border:1px solid #bcc3cf;border-bottom:none;border-radius:7px 7px 0 0;background:#d5dae2;color:var(--text-sec);display:flex;align-items:center;max-width:340px;white-space:nowrap;overflow:hidden;transition:background .15s}
         .tab-btn:hover{background:#e8ecf1}
         .tab-btn.active{background:#fff;color:var(--text);border-top:2px solid var(--accent);height:35px;z-index:1}
-        .tab-bdg{background:var(--primary);color:#fff;padding:1px 7px;border-radius:9px;font-size:.6rem;font-weight:700;flex-shrink:0}
+        .tab-select{min-width:0;flex:1;height:100%;padding:0 15px;border:0;background:transparent;color:inherit;font-size:.72rem;font-weight:600;cursor:pointer;display:flex;align-items:center;overflow:hidden;font-family:inherit}
+        .tab-btn.editing .tab-select{padding-right:6px}
         .tab-ttl{overflow:hidden;text-overflow:ellipsis}
+        .tab-del{width:22px;height:22px;margin-right:5px;border:0;border-radius:5px;background:transparent;color:#7a8496;font-size:1rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit}
+        .tab-del:hover{background:#e5e9ef;color:#c62828}
+        .tab-btn.active .tab-del:hover{background:#f1f3f6}
         .tab-actions{display:flex;align-items:flex-end;gap:6px;margin:0 0 5px 8px;flex-shrink:0}
         .tab-load{height:29px;padding:0 13px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:.72rem;font-weight:600;cursor:pointer;color:var(--primary);transition:background .15s;font-family:inherit}
         .tab-load:hover{background:#f1f3f4}
@@ -440,8 +444,7 @@ function hydrate(journeys) {
         const subJourneys = (j.subJourneys || []).map((sj) => ({
             ...sj,
             rows: (sj.rows || []).map((r) => {
-                // Migrate the old "line of visibility" row to the general divider.
-                const rowType = r.rowType === "row-lov" ? DIVIDER_TYPE : r.rowType;
+                const rowType = r.rowType;
                 let cells = (r.cells || []).map((c) => ({
                     mode: c.mode || "text",
                     html: c.html ?? "",
@@ -473,7 +476,7 @@ const ROW_COLORS = ["#ffffff", "#f5f5f5", "#dbeafe", "#fce8c8", "#e8dff5", "#fec
 const TEXT_COLORS = ["#1a1a2e", "#c62828", "#e8911a", "#2e7d32", "#1565c0", "#6a1b9a", "#5a6376", "#ffffff"];
 const ROW_TYPES = [
     ["row-operator", "Operator Actions"],
-    ["row-agencies", "Agencies"],
+    ["row-parties", "Parties"],
     ["row-fs-human", "Frontstage · Human"],
     ["row-fs-system", "Frontstage · System"],
     [DIVIDER_TYPE, "Divider (merged)"],
@@ -604,11 +607,11 @@ function createBlankJourney(index = 0) {
         subJourneys: [{
             title: "Main Journey",
             rows: [
-                { rowType: "row-agencies", laneLabel: "Agencies", cells: blankCells(total, "tags") },
+                { rowType: "row-parties", laneLabel: "Parties", cells: blankCells(total, "tags") },
                 { rowType: "row-operator", laneLabel: "User Actions", cells: blankCells(total, "bullets") },
                 { rowType: "row-fs-human", laneLabel: "Frontstage Human", cells: blankCells(total, "bullets") },
                 { rowType: "row-fs-system", laneLabel: "Frontstage System", cells: blankCells(total, "bullets") },
-                { rowType: DIVIDER_TYPE, laneLabel: "Visibility", cells: [{ mode: "text", html: "", align: "center", colspan: total }] },
+                { rowType: DIVIDER_TYPE, laneLabel: "Line of Visibility", cells: [{ mode: "text", html: "━━━━━━━━ BELOW THIS LINE: BACKSTAGE ACTIONS NOT VISIBLE TO CUSTOMERS ━━━━━━━━", align: "center", colspan: total }] },
                 { rowType: "row-bs-human", laneLabel: "Backstage Human", cells: blankCells(total, "bullets") },
                 { rowType: "row-bs-system", laneLabel: "Backstage System", cells: blankCells(total, "bullets") },
                 { rowType: "row-support", laneLabel: "Support Process", cells: blankCells(total, "bullets") },
@@ -785,17 +788,21 @@ function ProjectManager({ projects, currentId, onOpen, onDelete, onRename, onNew
 // ═══════════════════════════════════════
 // TAB BAR
 // ═══════════════════════════════════════
-function TabBar({ journeys, activeTab, setActiveTab, onNew, onLoad }) {
+function TabBar({ journeys, activeTab, setActiveTab, onNew, onLoad, onDelete, editMode }) {
     if (!journeys.length) return null;
     return (
         <div className="tab-bar">
             <div className="tab-scroll">
                 {journeys.map((j, i) => (
-                    <button key={j.id + i} className={`tab-btn${i === activeTab ? " active" : ""}`}
-                        onClick={() => setActiveTab(i)} title={`${j.badge}: ${j.title}`}>
-                        <span className="tab-bdg">{j.badge}</span>
-                        <span className="tab-ttl">{j.title}</span>
-                    </button>
+                    <div key={j.id + i} className={`tab-btn${i === activeTab ? " active" : ""}${editMode ? " editing" : ""}`}>
+                        <button className="tab-select" onClick={() => setActiveTab(i)} title={j.title}>
+                            <span className="tab-ttl">{j.title}</span>
+                        </button>
+                        {editMode && (
+                            <button className="tab-del" aria-label={`Delete ${j.title}`}
+                                title="Delete sheet" onClick={() => onDelete(i)}>×</button>
+                        )}
+                    </div>
                 ))}
             </div>
             <div className="tab-actions">
@@ -901,9 +908,10 @@ function EditableCell({ html, editMode, className, style, colSpan, onCommit, onF
         const groupWidth = 56;
         const groupHeight = 26;
         const margin = 8;
+        const verticalGap = 8;
 
-        let top = r.top - groupHeight / 2;
-        let left = r.right - groupWidth / 2;
+        let top = r.top - groupHeight - verticalGap;
+        let left = r.right - groupWidth;
 
         if (top < margin) top = r.top + 4;
         if (top + groupHeight > window.innerHeight - margin) {
@@ -1585,6 +1593,23 @@ function App() {
         });
     }, [currentId, refreshProjects, updateJourneys]);
 
+    const deleteJourney = useCallback((jIdx) => {
+        const journey = journeysRef.current[jIdx];
+        if (!journey) return;
+        if (!confirm(`Delete sheet "${journey.title}"?`)) return;
+        updateJourneys((prev) => {
+            const next = prev.filter((_, i) => i !== jIdx);
+            setTab((cur) => {
+                if (!next.length) return 0;
+                if (cur > jIdx) return cur - 1;
+                if (cur >= next.length) return next.length - 1;
+                return cur;
+            });
+            setSelected(null);
+            return next;
+        });
+    }, [updateJourneys]);
+
     // ── Export full project state ──
     const exportProject = useCallback(() => {
         const data = journeysRef.current;
@@ -1670,7 +1695,8 @@ function App() {
                 )}
             </main>
             <TabBar journeys={journeys} activeTab={tab} setActiveTab={setTab}
-                onNew={newBlankJourney} onLoad={() => setModal(true)} />
+                onNew={newBlankJourney} onLoad={() => setModal(true)}
+                onDelete={deleteJourney} editMode={editMode} />
             {modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} />}
             {projModal && <ProjectManager projects={projects} currentId={currentId}
                 onOpen={openProject} onDelete={deleteProject} onRename={renameProject}
