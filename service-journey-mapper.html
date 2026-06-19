@@ -385,6 +385,10 @@ const leafCount   = (stage) => Math.max((stage?.subStages?.length || 0), 1);
 const totalLeaves = (stages) => (stages || []).reduce((n, s) => n + leafCount(s), 0);
 const leafStart   = (stages, stageIdx) =>
     (stages || []).slice(0, stageIdx).reduce((n, s) => n + leafCount(s), 0);
+const nextStageNum = (stages) => {
+    const nums = (stages || []).map((s) => Number(s?.num)).filter(Number.isFinite);
+    return nums.length ? Math.max(...nums) + 1 : (stages?.length || 0) + 1;
+};
 
 const newCell = () => ({ mode: "text", html: "", align: "left" });
 const newRow  = (total) => ({
@@ -1855,7 +1859,7 @@ function App() {
             }));
 
             if (action === "addStage") {
-                stages.push({ title: "New Stage", subStages: [] });
+                stages.push({ num: nextStageNum(stages), title: "New Stage", subStages: [] });
                 return { ...j, stages, subJourneys: mapRows((cells) => [...cells, newCell()]) };
             }
             if (action === "deleteStage") {
