@@ -58,6 +58,8 @@
         .ab-btn.primary{background:var(--accent);border-color:var(--accent)}
         .ab-btn.primary:hover{background:#cf7e14}
         .ab-btn[aria-expanded="true"]{background:rgba(255,255,255,.22)}
+        .ab-actions .menu-trigger{width:auto;height:auto;background:var(--accent);border-color:var(--accent);color:#fff;padding:6px 13px;border-radius:7px;font-size:.78rem;font-weight:600;white-space:nowrap}
+        .ab-actions .menu-trigger:hover{background:#cf7e14}
         .save-state{font-size:.72rem;font-weight:600;margin-right:2px;white-space:nowrap}
         .save-saving{color:#ffe0b2}
         .save-saved{color:#bdeec2}
@@ -194,7 +196,7 @@
         .tab-btn:hover{background:#e8ecf1}
         .tab-btn.active{background:#fff;color:var(--text);border-top:2px solid var(--accent);height:35px;z-index:1}
         .tab-select{min-width:0;flex:1;height:100%;padding:0 15px;border:0;background:transparent;color:inherit;font-size:.72rem;font-weight:600;cursor:pointer;display:flex;align-items:center;overflow:hidden;font-family:inherit}
-        .tab-btn.editing .tab-select{padding-right:6px}
+        .tab-select{padding-right:6px}
         .tab-ttl{overflow:hidden;text-overflow:ellipsis}
         .tab-del{width:22px;height:22px;margin-right:5px;border:0;border-radius:5px;background:transparent;color:#7a8496;font-size:1rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit}
         .tab-del:hover{background:#e5e9ef;color:#c62828}
@@ -344,6 +346,7 @@ import Dexie from "dexie";
 const COL_W = 260;
 const LBL_W = 180;
 const DIVIDER_TYPE = "row-divider";
+const HISTORY_LIMIT = 40;
 
 // ═══════════════════════════════════════
 // STRUCTURE HELPERS (columns / rows / cells)
@@ -526,6 +529,18 @@ function parseInput(text) {
     throw new Error("Expected a JSON array of journeys, or an object with a \"journeys\" array.");
 }
 
+function embeddedProject() {
+    const el = document.getElementById("sjm-embedded-project");
+    if (!el?.textContent?.trim()) return null;
+    try {
+        const data = JSON.parse(el.textContent);
+        return data && Array.isArray(data.journeys) ? data : null;
+    } catch (err) {
+        console.warn("Embedded project JSON could not be parsed.", err);
+        return null;
+    }
+}
+
 function downloadFile(filename, text, type) {
     const blob = new Blob([text], { type: type || "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -533,6 +548,95 @@ function downloadFile(filename, text, type) {
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click();
     a.remove(); URL.revokeObjectURL(url);
+}
+
+function buildPromptExport(payload) {
+    const rowTypes = ROW_TYPES.map(([value, label]) => `${value} (${label})`).join(", ");
+    const json = JSON.stringify(payload, null, 2);
+    const out = [
+        "You are editing a Service Journey Mapper project JSON file.",
+        "",
+        "Return only the edited JSON object. Do not wrap it in Markdown. Do not include commentary before or after the JSON.",
+        "Apply the user's requested changes to the JSON below. If the user has not provided a specific change, improve the blueprint conservatively while preserving existing meaning.",
+        "",
+        "Goal:",
+        "- Improve or modify the service blueprint data while preserving the app's JSON schema.",
+        "- Keep the output directly importable by Service Journey Mapper.",
+        "- Preserve existing ids unless the edit clearly creates a new journey.",
+        "- Preserve the wrapper object shape, including type, version, name, exportedAt, lastSavedAt, and journeys.",
+        "- If you add content, place it in the appropriate row/cell rather than inventing unsupported fields.",
+        "",
+        "Allowed JSON schema:",
+        "- Root object:",
+        "  - type: must be \"service-journey-mapper\".",
+        "  - version: number.",
+        "  - name: string.",
+        "  - exportedAt: ISO timestamp string.",
+        "  - lastSavedAt: ISO timestamp string or null.",
+        "  - journeys: array of Journey objects.",
+        "- Journey:",
+        "  - id: string.",
+        "  - badge: optional string.",
+        "  - title: string.",
+        "  - stageLabel: string.",
+        "  - stages: array of Stage objects.",
+        "  - subJourneys: array of SubJourney objects.",
+        "- Stage:",
+        "  - num: optional number or string.",
+        "  - title: string.",
+        "  - subStages: array of { title: string }. Use [] when there are no sub-stages.",
+        "- SubJourney:",
+        "  - title: string.",
+        "  - rows: array of Row objects.",
+        "- Row:",
+        "  - rowType: one of " + rowTypes + ".",
+        "  - laneLabel: string shown in the row header.",
+        "  - customColor: optional CSS color string. Omit when not needed.",
+        "  - cells: array of Cell objects.",
+        "- Cell:",
+        "  - mode: one of \"text\", \"bullets\", \"boxes\", \"tags\".",
+        "  - html: string. Use simple HTML such as text, div, p, br, b, i, u, span. For tags mode, html is usually \"\".",
+        "  - align: \"left\" or \"center\".",
+        "  - colspan: optional positive integer used only when a cell spans multiple leaf columns.",
+        "  - tags: optional array of { text: string, bg: CSS color string, fg: CSS color string }. Use only for mode \"tags\".",
+        "",
+        "Structural rules:",
+        "- A leaf column is one stage when it has no subStages, or one subStage when subStages exist.",
+        "- For non-divider rows, the sum of cell widths must equal the journey's leaf column count. A cell's width is colspan when present, otherwise 1.",
+        "- A divider row has rowType \"row-divider\" and should have exactly one cell spanning all leaf columns.",
+        "- Divider rows are labelled section breaks. If the divider label/content says Line of Visibility, treat it as the frontstage/backstage boundary. Otherwise do not assume visibility meaning.",
+        "- Do not add row-lov. The current divider type is row-divider.",
+        "- Keep text in cells. Do not add analysis fields, notes fields, comments fields, or metadata fields that the app does not understand.",
+        "- Parties rows identify people, agencies, departments, or systems involved at a step.",
+        "- Frontstage rows describe what the user directly sees or touches.",
+        "- Backstage and Support Process rows describe internal work, systems, or teams.",
+        "- Pain Points are problems. Suggestions are potential improvements. Verbatim rows are evidence and should not be rewritten as universal facts.",
+        "",
+        "Current JSON to edit:",
+        "```json",
+        json,
+        "```",
+    ];
+
+    return out.join("\n").replace(/\n{4,}/g, "\n\n\n").trim() + "\n";
+}
+
+function buildStandaloneHtml(payload) {
+    const html = document.documentElement.cloneNode(true);
+    html.querySelector("#sjm-embedded-project")?.remove();
+    const root = html.querySelector("#root");
+    if (root) root.textContent = "";
+
+    const script = document.createElement("script");
+    script.id = "sjm-embedded-project";
+    script.type = "application/json";
+    script.textContent = JSON.stringify(payload, null, 2).replace(/</g, "\\u003c");
+
+    const appScript = html.querySelector('script[type="text/babel"][data-type="module"]');
+    if (appScript?.parentNode) appScript.parentNode.insertBefore(script, appScript);
+    else html.querySelector("body")?.prepend(script);
+
+    return "<!DOCTYPE html>\n" + html.outerHTML;
 }
 
 const safeName = (s) => (s || "export").replace(/[^a-z0-9_-]+/gi, "_").replace(/^_+|_+$/g, "") || "export";
@@ -636,8 +740,16 @@ const LEGEND = [
     { label: "Suggestions", color: "#eff6ff" },
 ];
 
-function TopBar({ innerRef, currentName, onRenameCurrent, onProjects, onExport, canExport, saveState, lastSaved, editMode, onToggleEdit }) {
+function TopBar({ innerRef, currentName, onRenameCurrent, onProjects, onDownloadExport, onStandaloneExport, onPromptExport, canExport, saveState, lastSaved,
+        editMode, onToggleEdit, canUndo, canRedo, onUndo, onRedo }) {
     const [keyOpen, setKeyOpen] = useState(false);
+    const [promptCopied, setPromptCopied] = useState(false);
+    const copyPrompt = async (close) => {
+        await onPromptExport();
+        setPromptCopied(true);
+        window.setTimeout(() => setPromptCopied(false), 1800);
+        close();
+    };
     return (
         <header className="app-bar" ref={innerRef}>
             <div className="app-bar-main">
@@ -654,12 +766,26 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onProjects, onExport, 
                             Saved ✓<span className="save-meta">Last saved {fmtDate(lastSaved)}</span>
                         </span>
                     ) : null}
+                    <button className="ab-btn" onClick={onUndo} disabled={!canUndo} title="Undo (⌘/Ctrl+Z)">↶ Undo</button>
+                    <button className="ab-btn" onClick={onRedo} disabled={!canRedo} title="Redo (⌘/Ctrl+Shift+Z)">↷ Redo</button>
                     <button className="ab-btn" aria-expanded={keyOpen}
                         onClick={() => setKeyOpen((o) => !o)}>Key {keyOpen ? "▴" : "▾"}</button>
                     <button className={`ab-btn${editMode ? " primary" : ""}`} aria-pressed={editMode}
                         onClick={onToggleEdit} disabled={!canExport}>{editMode ? "✓ Editing" : "✏️ Edit"}</button>
                     <button className="ab-btn" onClick={onProjects}>Projects</button>
-                    <button className="ab-btn primary" onClick={onExport} disabled={!canExport}>Export</button>
+                    {canExport ? (
+                        <Menu trigger={promptCopied ? "Copied ✓" : "Export ▾"} align="right">
+                            {(close) => (
+                                <>
+                                    <button className="menu-item" onClick={() => { onStandaloneExport(); close(); }}>Download standalone HTML</button>
+                                    <button className="menu-item" onClick={() => copyPrompt(close)}>Copy as prompt</button>
+                                    <button className="menu-item" onClick={() => { onDownloadExport(); close(); }}>Export as JSON</button>
+                                </>
+                            )}
+                        </Menu>
+                    ) : (
+                        <button className="ab-btn primary" disabled>Export</button>
+                    )}
                 </div>
             </div>
             {keyOpen && (
@@ -788,20 +914,18 @@ function ProjectManager({ projects, currentId, onOpen, onDelete, onRename, onNew
 // ═══════════════════════════════════════
 // TAB BAR
 // ═══════════════════════════════════════
-function TabBar({ journeys, activeTab, setActiveTab, onNew, onLoad, onDelete, editMode }) {
+function TabBar({ journeys, activeTab, setActiveTab, onNew, onLoad, onDelete }) {
     if (!journeys.length) return null;
     return (
         <div className="tab-bar">
             <div className="tab-scroll">
                 {journeys.map((j, i) => (
-                    <div key={j.id + i} className={`tab-btn${i === activeTab ? " active" : ""}${editMode ? " editing" : ""}`}>
+                    <div key={j.id + i} className={`tab-btn${i === activeTab ? " active" : ""}`}>
                         <button className="tab-select" onClick={() => setActiveTab(i)} title={j.title}>
                             <span className="tab-ttl">{j.title}</span>
                         </button>
-                        {editMode && (
-                            <button className="tab-del" aria-label={`Delete ${j.title}`}
-                                title="Delete sheet" onClick={() => onDelete(i)}>×</button>
-                        )}
+                        <button className="tab-del" aria-label={`Delete ${j.title}`}
+                            title="Delete sheet" onClick={() => onDelete(i)}>×</button>
                     </div>
                 ))}
             </div>
@@ -1299,46 +1423,114 @@ function App() {
     const [projModal, setProjModal] = useState(false);
     const [projects, setProjects] = useState([]);
     const [currentId, setCurrentId] = useState(null);
+    const [standaloneName, setStandaloneName] = useState(null);
     const [ready, setReady] = useState(false);
     const [saveState, setSaveState] = useState("idle");
     const [editMode, setEditMode] = useState(false);
     const [selected, setSelected] = useState(null);
     const [lastSaved, setLastSaved] = useState(null);
+    const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
     const legendRef = useRef(null);
     const toolbarRef = useRef(null);
     const saveTimer = useRef(null);
     const lastSavedRef = useRef(null);
+    const undoStackRef = useRef([]);
+    const redoStackRef = useRef([]);
     // Mirror of `journeys` kept in sync synchronously so export/save always
     // read the latest value (contentEditable onBlur fires before button clicks).
     const journeysRef = useRef([]);
 
-    const updateJourneys = useCallback((next) => {
-        journeysRef.current = typeof next === "function" ? next(journeysRef.current) : next;
-        setJourneys(journeysRef.current);
+    const syncHistoryState = useCallback(() => {
+        setHistoryState({
+            canUndo: undoStackRef.current.length > 0,
+            canRedo: redoStackRef.current.length > 0,
+        });
     }, []);
+
+    const clearHistory = useCallback(() => {
+        undoStackRef.current = [];
+        redoStackRef.current = [];
+        syncHistoryState();
+    }, [syncHistoryState]);
+
+    const applyJourneys = useCallback((nextJourneys) => {
+        journeysRef.current = nextJourneys;
+        setJourneys(nextJourneys);
+        setTab((cur) => nextJourneys.length ? Math.min(cur, nextJourneys.length - 1) : 0);
+    }, []);
+
+    const replaceJourneys = useCallback((next) => {
+        applyJourneys(typeof next === "function" ? next(journeysRef.current) : next);
+    }, [applyJourneys]);
+
+    const commitJourneys = useCallback((next) => {
+        const prev = journeysRef.current;
+        const resolved = typeof next === "function" ? next(prev) : next;
+        if (resolved === prev) return;
+
+        undoStackRef.current.push(prev);
+        if (undoStackRef.current.length > HISTORY_LIMIT) undoStackRef.current.shift();
+        redoStackRef.current = [];
+        applyJourneys(resolved);
+        syncHistoryState();
+    }, [applyJourneys, syncHistoryState]);
+
+    const undo = useCallback(() => {
+        const previous = undoStackRef.current.pop();
+        if (!previous) return;
+        redoStackRef.current.push(journeysRef.current);
+        if (redoStackRef.current.length > HISTORY_LIMIT) redoStackRef.current.shift();
+        applyJourneys(previous);
+        setSelected(null);
+        syncHistoryState();
+    }, [applyJourneys, syncHistoryState]);
+
+    const redo = useCallback(() => {
+        const next = redoStackRef.current.pop();
+        if (!next) return;
+        undoStackRef.current.push(journeysRef.current);
+        if (undoStackRef.current.length > HISTORY_LIMIT) undoStackRef.current.shift();
+        applyJourneys(next);
+        setSelected(null);
+        syncHistoryState();
+    }, [applyJourneys, syncHistoryState]);
 
     const refreshProjects = useCallback(async () => {
         setProjects(await dbListProjects());
     }, []);
 
-    const currentName = projects.find((p) => p.id === currentId)?.name || null;
+    const currentName = projects.find((p) => p.id === currentId)?.name || standaloneName || null;
 
     // ── Init: load project list + reopen last project ──
     useEffect(() => {
         (async () => {
+            const embedded = embeddedProject();
+            if (embedded) {
+                setProjects([]);
+                setCurrentId(null);
+                setStandaloneName(embedded.name || "Standalone Service Journey");
+                replaceJourneys(hydrate(embedded.journeys || []));
+                clearHistory();
+                setLastSaved(embedded.lastSavedAt ? new Date(embedded.lastSavedAt).getTime() : null);
+                setSaveState("idle");
+                setReady(true);
+                return;
+            }
+
             const list = await dbListProjects();
             setProjects(list);
             const last = Number(localStorage.getItem(LAST_KEY));
             const open = list.find((p) => p.id === last) || list[0];
             if (open) {
                 setCurrentId(open.id);
-                updateJourneys(hydrate(open.journeys || []));
+                replaceJourneys(hydrate(open.journeys || []));
+                clearHistory();
                 setLastSaved(open.updatedAt || null);
                 localStorage.setItem(LAST_KEY, String(open.id));
             }
             setReady(true);
         })();
-    }, [updateJourneys]);
+    }, [clearHistory, replaceJourneys]);
 
     // ── Autosave current project (debounced) ──
     useEffect(() => {
@@ -1365,15 +1557,20 @@ function App() {
             setCurrentId(id);
             localStorage.setItem(LAST_KEY, String(id));
         }
-        updateJourneys(data);
+        if (currentId == null) {
+            replaceJourneys(data);
+            clearHistory();
+        } else {
+            commitJourneys(data);
+        }
         setTab(0);
         await refreshProjects();
         console.log(`%c✅ Loaded ${data.length} service journey(s)`, "color:#2e7d32;font-weight:bold;font-size:14px");
-    }, [currentId, projects, refreshProjects, updateJourneys]);
+    }, [clearHistory, commitJourneys, currentId, projects, refreshProjects, replaceJourneys]);
 
     // ── Immutable updaters ──
     const editJourney = useCallback((jIdx, fn) => {
-        updateJourneys((prev) => {
+        commitJourneys((prev) => {
             const j = prev[jIdx];
             if (!j) return prev;
             const nj = fn(j);
@@ -1382,7 +1579,7 @@ function App() {
             next[jIdx] = nj;
             return next;
         });
-    }, [updateJourneys]);
+    }, [commitJourneys]);
 
     // Mutate a single cell via `fn(cellCopy) -> cell`.
     const editCell = useCallback((jIdx, sjIdx, rowIdx, cellIdx, fn) => {
@@ -1390,7 +1587,7 @@ function App() {
             const cur = j.subJourneys?.[sjIdx]?.rows?.[rowIdx]?.cells?.[cellIdx];
             if (!cur) return j;
             const nc = fn({ ...cur });
-            if (nc === cur) return j;
+            if (nc === cur || JSON.stringify(nc) === JSON.stringify(cur)) return j;
             const sjs = j.subJourneys.slice();
             const sj = { ...sjs[sjIdx], rows: sjs[sjIdx].rows.slice() };
             const row = { ...sj.rows[rowIdx], cells: sj.rows[rowIdx].cells.slice() };
@@ -1513,12 +1710,13 @@ function App() {
         const p = await dbGetProject(id);
         if (!p) return;
         setCurrentId(id);
-        updateJourneys(hydrate(p.journeys || []));
+        replaceJourneys(hydrate(p.journeys || []));
+        clearHistory();
         setLastSaved(p.updatedAt || null);
         setTab(0);
         localStorage.setItem(LAST_KEY, String(id));
         setProjModal(false);
-    }, [updateJourneys]);
+    }, [clearHistory, replaceJourneys]);
 
     const deleteProject = useCallback(async (id, name) => {
         if (!confirm(`Delete project "${name}"?\nThis permanently removes its saved data and cannot be undone.`)) return;
@@ -1528,17 +1726,18 @@ function App() {
             const fallback = remaining[0];
             if (fallback) {
                 setCurrentId(fallback.id);
-                updateJourneys(hydrate(fallback.journeys || []));
+                replaceJourneys(hydrate(fallback.journeys || []));
                 localStorage.setItem(LAST_KEY, String(fallback.id));
             } else {
                 setCurrentId(null);
-                updateJourneys([]);
+                replaceJourneys([]);
                 localStorage.removeItem(LAST_KEY);
             }
+            clearHistory();
             setTab(0);
         }
         await refreshProjects();
-    }, [currentId, refreshProjects, updateJourneys]);
+    }, [clearHistory, currentId, refreshProjects, replaceJourneys]);
 
     const renameProject = useCallback(async (id, name) => {
         const nn = prompt("Rename project", name);
@@ -1566,13 +1765,14 @@ function App() {
         if (name == null) return;
         const id = await dbCreateProject(name.trim() || defaultName(projects), []);
         setCurrentId(id);
-        updateJourneys([]);
+        replaceJourneys([]);
+        clearHistory();
         setTab(0);
         localStorage.setItem(LAST_KEY, String(id));
         await refreshProjects();
         setProjModal(false);
         setModal(true); // prompt to load data into the fresh project
-    }, [projects, refreshProjects, updateJourneys]);
+    }, [clearHistory, projects, refreshProjects, replaceJourneys]);
 
     const newBlankJourney = useCallback(async () => {
         const journey = createBlankJourney(journeysRef.current.length);
@@ -1581,23 +1781,24 @@ function App() {
             id = await dbCreateProject("Blank Service Journey", [journey]);
             setCurrentId(id);
             localStorage.setItem(LAST_KEY, String(id));
-            updateJourneys([journey]);
+            replaceJourneys([journey]);
+            clearHistory();
             setTab(0);
             await refreshProjects();
             return;
         }
-        updateJourneys((prev) => {
+        commitJourneys((prev) => {
             const next = [...prev, journey];
             setTab(next.length - 1);
             return next;
         });
-    }, [currentId, refreshProjects, updateJourneys]);
+    }, [clearHistory, commitJourneys, currentId, refreshProjects, replaceJourneys]);
 
     const deleteJourney = useCallback((jIdx) => {
         const journey = journeysRef.current[jIdx];
         if (!journey) return;
         if (!confirm(`Delete sheet "${journey.title}"?`)) return;
-        updateJourneys((prev) => {
+        commitJourneys((prev) => {
             const next = prev.filter((_, i) => i !== jIdx);
             setTab((cur) => {
                 if (!next.length) return 0;
@@ -1608,13 +1809,12 @@ function App() {
             setSelected(null);
             return next;
         });
-    }, [updateJourneys]);
+    }, [commitJourneys]);
 
-    // ── Export full project state ──
-    const exportProject = useCallback(() => {
+    const currentExportPayload = useCallback(() => {
         const data = journeysRef.current;
-        if (!data.length) return;
-        const payload = {
+        if (!data.length) return null;
+        return {
             type: "service-journey-mapper",
             version: 1,
             name: currentName || "Service Journeys",
@@ -1622,15 +1822,57 @@ function App() {
             lastSavedAt: lastSavedRef.current ? new Date(lastSavedRef.current).toISOString() : null,
             journeys: data,
         };
-        downloadFile(safeName(currentName) + ".json", JSON.stringify(payload, null, 2), "application/json");
     }, [currentName]);
+
+    // ── Export full project state ──
+    const exportProject = useCallback(() => {
+        const payload = currentExportPayload();
+        if (!payload) return;
+        downloadFile(safeName(currentName) + ".json", JSON.stringify(payload, null, 2), "application/json");
+    }, [currentExportPayload, currentName]);
+
+    const exportStandaloneHtml = useCallback(() => {
+        const payload = currentExportPayload();
+        if (!payload) return;
+        downloadFile(safeName(currentName) + ".html", buildStandaloneHtml(payload), "text/html");
+    }, [currentExportPayload, currentName]);
+
+    const copyPromptExport = useCallback(async () => {
+        const payload = currentExportPayload();
+        if (!payload) return;
+        const prompt = buildPromptExport(payload);
+        if (navigator.clipboard?.writeText) {
+            try {
+                await navigator.clipboard.writeText(prompt);
+                return;
+            } catch (err) {
+                console.warn("Clipboard API failed, falling back to execCommand.", err);
+            }
+        }
+        const ta = document.createElement("textarea");
+        ta.value = prompt;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+    }, [currentExportPayload]);
 
     // Expose to console
     useEffect(() => {
         window.loadJSON = loadFromText;
         window.exportProject = exportProject;
-        return () => { delete window.loadJSON; delete window.exportProject; };
-    }, [loadFromText, exportProject]);
+        window.exportStandaloneHtml = exportStandaloneHtml;
+        window.exportPrompt = copyPromptExport;
+        return () => {
+            delete window.loadJSON;
+            delete window.exportProject;
+            delete window.exportStandaloneHtml;
+            delete window.exportPrompt;
+        };
+    }, [loadFromText, exportProject, exportStandaloneHtml, copyPromptExport]);
 
     // Legend height → CSS var
     useEffect(() => {
@@ -1661,6 +1903,28 @@ function App() {
     // Mirror lastSaved into a ref so export reads the latest value.
     useEffect(() => { lastSavedRef.current = lastSaved; }, [lastSaved]);
 
+    // App-level history shortcuts. Native text undo stays active while editing a field/cell.
+    useEffect(() => {
+        const isTextEditingTarget = (target) =>
+            target?.closest?.('input, textarea, select, [contenteditable="true"]');
+        const onKeyDown = (e) => {
+            if (!(e.metaKey || e.ctrlKey) || e.altKey || isTextEditingTarget(e.target)) return;
+            const key = e.key.toLowerCase();
+            if (key === "z" && e.shiftKey) {
+                e.preventDefault();
+                redo();
+            } else if (key === "z") {
+                e.preventDefault();
+                undo();
+            } else if (key === "y") {
+                e.preventDefault();
+                redo();
+            }
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [redo, undo]);
+
     // The cell the format toolbar currently targets.
     const selectedCell = selected
         ? journeys[selected.jIdx]?.subJourneys?.[selected.sjIdx]?.rows?.[selected.rowIdx]?.cells?.[selected.cellIdx]
@@ -1670,9 +1934,13 @@ function App() {
         <>
             <TopBar innerRef={legendRef} currentName={currentName}
                 onRenameCurrent={renameCurrentProject}
-                onProjects={() => setProjModal(true)} onExport={exportProject}
+                onProjects={() => setProjModal(true)}
+                onDownloadExport={exportProject} onStandaloneExport={exportStandaloneHtml}
+                onPromptExport={copyPromptExport}
                 canExport={journeys.length > 0} saveState={saveState} lastSaved={lastSaved}
-                editMode={editMode} onToggleEdit={() => setEditMode((e) => !e)} />
+                editMode={editMode} onToggleEdit={() => setEditMode((e) => !e)}
+                canUndo={historyState.canUndo} canRedo={historyState.canRedo}
+                onUndo={undo} onRedo={redo} />
             {editMode && journeys.length > 0 && (
                 <FormatToolbar innerRef={toolbarRef} cell={selectedCell}
                     onMode={(m) => selected && handleCellMode(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, m)}
@@ -1696,7 +1964,7 @@ function App() {
             </main>
             <TabBar journeys={journeys} activeTab={tab} setActiveTab={setTab}
                 onNew={newBlankJourney} onLoad={() => setModal(true)}
-                onDelete={deleteJourney} editMode={editMode} />
+                onDelete={deleteJourney} />
             {modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} />}
             {projModal && <ProjectManager projects={projects} currentId={currentId}
                 onOpen={openProject} onDelete={deleteProject} onRename={renameProject}
