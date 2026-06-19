@@ -10,6 +10,7 @@
         "imports": {
             "react": "https://esm.sh/react@19.2.0",
             "react/jsx-runtime": "https://esm.sh/react@19.2.0/jsx-runtime",
+            "react-dom": "https://esm.sh/react-dom@19.2.0",
             "react-dom/": "https://esm.sh/react-dom@19.2.0/",
             "dexie": "https://esm.sh/dexie@4.0.8"
         }
@@ -33,6 +34,7 @@
             --text: #1a1a2e;
             --text-sec: #5a6376;
             --legend-h: 48px;
+            --toolbar-h: 0px;
         }
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
@@ -41,7 +43,7 @@
         .app-bar{background:linear-gradient(135deg,var(--primary),#1a2744);color:#fff;position:sticky;top:0;z-index:50;box-shadow:0 2px 6px rgba(0,0,0,.12)}
         .app-bar-main{display:flex;align-items:center;gap:16px;padding:10px 24px}
         .ab-brand{display:flex;flex-direction:column;min-width:0;line-height:1.25}
-        .ab-eyebrow{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent)}
+        .ab-eyebrow{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
         .ab-title{font-size:1rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .ab-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
         .ab-btn{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.22);padding:6px 13px;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s;white-space:nowrap}
@@ -82,7 +84,7 @@
         .ch-hdr h2{font-size:1.05rem;color:var(--primary);font-weight:700}
 
         /* ===== STAGE HDR (STICKY) ===== */
-        .stage-outer{position:sticky;top:var(--legend-h,48px);z-index:35;background:var(--primary);border-bottom:2px solid var(--accent);box-shadow:0 3px 8px rgba(0,0,0,.12)}
+        .stage-outer{position:sticky;top:calc(var(--legend-h,48px) + var(--toolbar-h,0px));z-index:35;background:var(--primary);border-bottom:2px solid var(--accent);box-shadow:0 3px 8px rgba(0,0,0,.12)}
         .scroll-hide{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
         .scroll-hide::-webkit-scrollbar{display:none}
 
@@ -129,8 +131,8 @@
         .row-fs-system>.ll{background:#dbeafe;color:#1565c0}
         .row-fs-system>.dc{background:#f0f7ff}
 
-        .row-lov>.ll{background:#ff6f00;color:#fff;border-right-color:rgba(255,255,255,.4)}
-        .row-lov>.dc{background:#ff6f00;color:#fff;font-weight:800;text-align:center;padding:6px 12px;font-size:.7rem;text-transform:uppercase;letter-spacing:2px}
+        .row-divider>.ll{background:#ff6f00;color:#fff;border-right-color:rgba(255,255,255,.4)}
+        .row-divider>.dc{background:#ff6f00;color:#fff;font-weight:800;text-align:center;padding:6px 12px;font-size:.72rem;text-transform:uppercase;letter-spacing:2px}
 
         .row-bs-human>.ll{background:#fce8c8;color:#e65100}
         .row-bs-human>.dc{background:#fdf6ee}
@@ -225,10 +227,99 @@
             .ch-hdr h2{font-size:.95rem}
         }
         @media print{
-            .tab-bar,.m-ov,.ab-actions{display:none}
+            .tab-bar,.m-ov,.ab-actions,.edit-toolbar,.menu-wrap,.add-col-c,.add-row-bar{display:none}
             .app-bar,.stage-outer{position:static}
             .ll{position:static}
         }
+
+        /* ===== EDIT MODE ===== */
+        .edit-toolbar{position:sticky;top:var(--legend-h,48px);z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 16px;background:#fff;border-bottom:1px solid var(--border);box-shadow:0 2px 4px rgba(0,0,0,.06)}
+        .tb-group{display:flex;align-items:center;gap:3px}
+        .tb-sep{width:1px;height:20px;background:var(--border);margin:0 5px}
+        .tb-label{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-sec);margin-right:3px}
+        .tb-btn{background:#f4f5f9;border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:.74rem;font-weight:600;cursor:pointer;color:var(--text-sec);font-family:inherit;line-height:1.1}
+        .tb-btn:hover:not(:disabled){background:#e8ecf1;color:var(--text)}
+        .tb-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+        .tb-btn:disabled{opacity:.4;cursor:not-allowed}
+        .tb-hint{font-size:.7rem;color:var(--text-sec);margin-left:auto}
+
+        /* dropdown menus */
+        .menu-wrap{position:relative;display:inline-block}
+        .menu-trigger{background:rgba(255,255,255,.9);border:1px solid var(--border);border-radius:5px;width:20px;height:20px;line-height:1;font-size:.85rem;font-weight:700;cursor:pointer;color:var(--text);padding:0;display:inline-flex;align-items:center;justify-content:center}
+        .menu-trigger:hover{background:#fff}
+        .menu-pop{position:absolute;z-index:130;top:100%;left:0;margin-top:3px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px;min-width:180px;text-align:left;color:var(--text)}
+        .menu-pop.right{left:auto;right:0}
+        .menu-portal{position:fixed;z-index:300;margin-top:0}
+        .menu-item{display:flex;align-items:center;gap:7px;width:100%;background:none;border:none;padding:7px 9px;border-radius:6px;font-size:.78rem;font-weight:500;color:var(--text);cursor:pointer;font-family:inherit;text-align:left}
+        .menu-item:hover{background:#f1f3f4}
+        .menu-item.danger{color:var(--red)}
+        .menu-item.danger:hover{background:#fee2e2}
+        .menu-head{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-sec);padding:6px 9px 3px}
+        .menu-sep{height:1px;background:var(--border-light);margin:5px 0}
+        .menu-select{width:calc(100% - 2px);margin:0 1px 4px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:.76rem}
+        .swatches{display:flex;flex-wrap:wrap;gap:5px;padding:4px 9px 6px}
+        .swatch{width:20px;height:20px;border-radius:5px;border:1px solid rgba(0,0,0,.15);cursor:pointer;padding:0}
+        .swatch:hover{outline:2px solid var(--accent);outline-offset:1px}
+        .sw-custom{position:relative;overflow:hidden;background:conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)}
+        .sw-input{position:absolute;inset:-4px;width:130%;height:130%;opacity:0;cursor:pointer;border:none;padding:0;background:none}
+
+        /* text-color control in the format toolbar */
+        .tb-color{position:relative;display:inline-block}
+        .tb-A{border-bottom:3px solid #c62828;line-height:1;padding-bottom:1px;font-weight:800}
+        .color-pop{position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:7px;display:flex;flex-wrap:wrap;gap:5px;width:120px;z-index:320}
+
+        /* header cell menus + editable titles */
+        .stg-c,.sub-c{position:relative}
+        .stg-c .menu-wrap,.sub-c .menu-wrap{position:absolute;top:4px;right:4px}
+        .row-menu{position:absolute;top:3px;right:3px;z-index:11}
+        .hdr-edit{outline:none;cursor:text}
+        .hdr-edit:focus{box-shadow:inset 0 0 0 2px var(--accent);border-radius:4px}
+
+        /* sub-stage header row */
+        .sub-c{background:#243049!important;color:#fff!important;font-weight:600!important;font-size:.73rem!important;text-align:center!important;vertical-align:middle!important;border:1px solid rgba(255,255,255,.12)!important}
+
+        /* add column / add row affordances */
+        .add-col-c{min-width:62px;width:62px;background:var(--primary)!important;text-align:center!important;border:1px solid rgba(255,255,255,.15)!important;vertical-align:middle!important}
+        .add-btn{background:rgba(255,255,255,.15);color:#fff;border:1px dashed rgba(255,255,255,.55);border-radius:6px;padding:5px 11px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit}
+        .add-btn:hover{background:rgba(255,255,255,.3)}
+        .add-row-bar{padding:6px 12px;background:#fafbfc;border:1px solid var(--border);border-top:none}
+        .add-row-btn{background:#fff;border:1px dashed var(--border);border-radius:6px;padding:5px 12px;font-size:.74rem;font-weight:600;color:var(--text-sec);cursor:pointer;font-family:inherit}
+        .add-row-btn:hover{background:#f1f3f4;color:var(--text)}
+
+        /* selected cell highlight */
+        .dc.cell-sel{box-shadow:inset 0 0 0 2px var(--accent)}
+
+        /* alignment */
+        .al-center{text-align:center!important}
+        .al-left{text-align:left!important}
+
+        /* tags-mode cell */
+        .cell-tags{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+        .tag-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:.68rem;font-weight:600}
+        .tag-x{cursor:pointer;font-weight:800;opacity:.55;font-size:.72rem}
+        .tag-x:hover{opacity:1}
+        .tag-add{display:inline-flex;gap:3px;align-items:center;margin-top:4px}
+        .tag-add input{border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:.7rem;font-family:inherit;width:74px;outline:none}
+        .tag-add input:focus{border-color:var(--accent)}
+        .tag-add-color{width:18px;height:18px;border-radius:4px;border:1px solid rgba(0,0,0,.25);cursor:pointer;padding:0}
+        .tag-add-go{background:var(--accent);color:#fff;border:none;border-radius:4px;font-size:.72rem;font-weight:800;padding:2px 7px;cursor:pointer;line-height:1.2}
+
+        /* bullets-mode cell */
+        .cell-bullets>div,.cell-bullets>p{padding-left:14px;position:relative;margin-bottom:3px}
+        .cell-bullets>div::before,.cell-bullets>p::before{content:'•';position:absolute;left:2px;color:var(--accent);font-weight:700}
+
+        /* boxes-mode cell (card-style bullet items) */
+        .cell-boxes>div,.cell-boxes>p{background:rgba(255,255,255,.6);border:1px solid rgba(0,0,0,.12);border-radius:5px;padding:5px 9px;margin-bottom:5px}
+        .cell-boxes>div:last-child,.cell-boxes>p:last-child{margin-bottom:0}
+
+        /* per-cell save / discard mini-toolbar */
+        .cell-tick{position:fixed;z-index:310;display:flex;gap:4px}
+        .ct-btn{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:#fff;cursor:pointer;font-weight:800;font-size:.85rem;box-shadow:0 2px 6px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
+        .ct-ok{color:var(--green)}.ct-ok:hover{background:#e9f7ec}
+        .ct-no{color:var(--red)}.ct-no:hover{background:#fdeaea}
+
+        .save-meta{font-size:.66rem;font-weight:500;opacity:.85;margin-left:4px}
+        @media(max-width:820px){.save-meta{display:none}}
     </style>
 </head>
 <body>
@@ -236,10 +327,155 @@
 <script type="text/babel" data-type="module">
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
+import { createPortal } from "react-dom";
 import Dexie from "dexie";
 
 const COL_W = 260;
 const LBL_W = 180;
+
+// ═══════════════════════════════════════
+// STRUCTURE HELPERS (columns / rows / cells)
+// ═══════════════════════════════════════
+// A "leaf" is a rendered data column. A stage with sub-stages contributes one
+// leaf per sub-stage; a stage with none contributes a single leaf (itself).
+const leafCount   = (stage) => Math.max((stage?.subStages?.length || 0), 1);
+const totalLeaves = (stages) => (stages || []).reduce((n, s) => n + leafCount(s), 0);
+const leafStart   = (stages, stageIdx) =>
+    (stages || []).slice(0, stageIdx).reduce((n, s) => n + leafCount(s), 0);
+
+const newCell = () => ({ mode: "text", html: "", align: "left" });
+const newRow  = (total) => ({
+    rowType: "row-operator",
+    laneLabel: "New row",
+    cells: Array.from({ length: Math.max(total, 1) }, newCell),
+});
+
+const rowWidth = (cells) => (cells || []).reduce((a, c) => a + (c.colspan || 1), 0);
+
+// Insert one leaf column at global leaf index `at`. If the position falls inside
+// a spanning cell, widen that cell; otherwise insert a fresh empty cell.
+function insertLeafIntoRow(cells, at) {
+    let pos = 0;
+    for (let i = 0; i < cells.length; i++) {
+        const w = cells[i].colspan || 1;
+        if (at < pos + w) {
+            const nc = cells.slice();
+            if (at === pos) nc.splice(i, 0, newCell());
+            else nc[i] = { ...nc[i], colspan: w + 1 };
+            return nc;
+        }
+        pos += w;
+    }
+    return [...cells, newCell()];
+}
+
+// Remove the leaf column at global leaf index `at`. Shrinks a spanning cell or
+// drops a single-width cell.
+function removeLeafFromRow(cells, at) {
+    let pos = 0;
+    for (let i = 0; i < cells.length; i++) {
+        const w = cells[i].colspan || 1;
+        if (at < pos + w) {
+            const nc = cells.slice();
+            if (w > 1) {
+                const cell = { ...nc[i], colspan: w - 1 };
+                if (cell.colspan === 1) delete cell.colspan;
+                nc[i] = cell;
+            } else nc.splice(i, 1);
+            return nc;
+        }
+        pos += w;
+    }
+    return cells;
+}
+
+// Pad/trim a row's cells so its total width matches `total` leaves.
+function normalizeRowCells(cells, total) {
+    let w = rowWidth(cells);
+    if (w === total) return cells;
+    const nc = cells.slice();
+    while (w < total) { nc.push(newCell()); w++; }
+    while (w > total && nc.length) {
+        const last = nc[nc.length - 1];
+        const lw = last.colspan || 1;
+        if (lw > 1) {
+            const c = { ...last, colspan: lw - 1 };
+            if (c.colspan === 1) delete c.colspan;
+            nc[nc.length - 1] = c;
+        } else nc.pop();
+        w--;
+    }
+    return nc;
+}
+
+// A divider row is always a single cell merged across every column.
+function collapseDivider(cells, total) {
+    const first = cells[0] || newCell();
+    const c = { mode: "text", html: first.html ?? "", align: first.align || "center" };
+    if (total > 1) c.colspan = total;
+    return [c];
+}
+// Expand a (former) divider back into one cell per column.
+function expandDivider(cells, total) {
+    const first = { ...(cells[0] || newCell()) };
+    delete first.colspan;
+    return normalizeRowCells([first], total);
+}
+
+// Normalize loaded data: ensure stages/cells carry the fields the editor needs.
+function hydrate(journeys) {
+    return (journeys || []).map((j) => {
+        const stages = (j.stages || []).map((s) => ({ ...s, subStages: s.subStages || [] }));
+        const total = totalLeaves(stages);
+        const subJourneys = (j.subJourneys || []).map((sj) => ({
+            ...sj,
+            rows: (sj.rows || []).map((r) => {
+                // Migrate the old "line of visibility" row to the general divider.
+                const rowType = r.rowType === "row-lov" ? DIVIDER_TYPE : r.rowType;
+                let cells = (r.cells || []).map((c) => ({
+                    mode: c.mode || "text",
+                    html: c.html ?? "",
+                    align: c.align || "left",
+                    ...(c.colspan ? { colspan: c.colspan } : {}),
+                    ...(c.tags ? { tags: c.tags } : {}),
+                }));
+                cells = normalizeRowCells(cells, total);
+                if (rowType === DIVIDER_TYPE) cells = collapseDivider(cells, total);
+                return { ...r, rowType, cells };
+            }),
+        }));
+        return { ...j, stages, subJourneys };
+    });
+}
+
+// Palettes
+const TAG_COLORS = [
+    { name: "blue",   bg: "#dbeafe", fg: "#1e40af" },
+    { name: "red",    bg: "#fecdd3", fg: "#991b1b" },
+    { name: "purple", bg: "#ede9fe", fg: "#5b21b6" },
+    { name: "orange", bg: "#ffedd5", fg: "#9a3412" },
+    { name: "green",  bg: "#d1fae5", fg: "#065f46" },
+    { name: "teal",   bg: "#ccfbf1", fg: "#115e59" },
+    { name: "pink",   bg: "#fce7f3", fg: "#9d174d" },
+    { name: "gray",   bg: "#f3f4f6", fg: "#374151" },
+];
+const ROW_COLORS = ["#ffffff", "#f5f5f5", "#dbeafe", "#fce8c8", "#e8dff5", "#fecdd3", "#d1fae5", "#fef3c7", "#ff6f00", "#1e293b"];
+const TEXT_COLORS = ["#1a1a2e", "#c62828", "#e8911a", "#2e7d32", "#1565c0", "#6a1b9a", "#5a6376", "#ffffff"];
+const DIVIDER_TYPE = "row-divider";
+const ROW_TYPES = [
+    ["row-operator", "Operator Actions"],
+    ["row-agencies", "Agencies"],
+    ["row-fs-human", "Frontstage · Human"],
+    ["row-fs-system", "Frontstage · System"],
+    [DIVIDER_TYPE, "Divider (merged)"],
+    ["row-bs-human", "Backstage · Human"],
+    ["row-bs-system", "Backstage · System"],
+    ["row-support", "Support Process"],
+    ["row-pain", "Pain Points"],
+    ["row-verbatim", "Verbatim"],
+    ["row-emotion", "Emotion"],
+    ["row-suggest", "Suggestions"],
+];
 
 // ═══════════════════════════════════════
 // PERSISTENCE (Dexie / IndexedDB)
@@ -302,14 +538,14 @@ const fmtDate = (ts) => {
 const LEGEND = [
     { label: "Operator Actions", color: "#fff", border: true },
     { label: "Frontstage (Visible)", color: "#f0f7ff" },
-    { label: "Line of Visibility", color: "#ff6f00" },
+    { label: "Divider (merged row)", color: "#ff6f00" },
     { label: "Backstage (Hidden)", color: "#fdf6ee" },
     { label: "Support Processes", color: "#f3f0f9" },
     { label: "Pain Points", color: "#fff5f5" },
     { label: "Suggestions", color: "#eff6ff" },
 ];
 
-function TopBar({ innerRef, currentName, onProjects, onExport, canExport, saveState }) {
+function TopBar({ innerRef, currentName, onProjects, onExport, canExport, saveState, lastSaved, editMode, onToggleEdit }) {
     const [keyOpen, setKeyOpen] = useState(false);
     return (
         <header className="app-bar" ref={innerRef}>
@@ -319,13 +555,17 @@ function TopBar({ innerRef, currentName, onProjects, onExport, canExport, saveSt
                     <span className="ab-title" title={currentName || ""}>{currentName || "No project loaded"}</span>
                 </div>
                 <div className="ab-actions">
-                    {saveState && saveState !== "idle" && (
-                        <span className={`save-state save-${saveState}`}>
-                            {saveState === "saving" ? "Saving…" : "Saved ✓"}
+                    {saveState === "saving" ? (
+                        <span className="save-state save-saving">Saving…</span>
+                    ) : lastSaved ? (
+                        <span className="save-state save-saved">
+                            Saved ✓<span className="save-meta">Last saved {fmtDate(lastSaved)}</span>
                         </span>
-                    )}
+                    ) : null}
                     <button className="ab-btn" aria-expanded={keyOpen}
                         onClick={() => setKeyOpen((o) => !o)}>Key {keyOpen ? "▴" : "▾"}</button>
+                    <button className={`ab-btn${editMode ? " primary" : ""}`} aria-pressed={editMode}
+                        onClick={onToggleEdit} disabled={!canExport}>{editMode ? "✓ Editing" : "✏️ Edit"}</button>
                     <button className="ab-btn" onClick={onProjects}>Projects</button>
                     <button className="ab-btn primary" onClick={onExport} disabled={!canExport}>Export</button>
                 </div>
@@ -474,33 +714,328 @@ function TabBar({ journeys, activeTab, setActiveTab, onLoad }) {
 }
 
 // ═══════════════════════════════════════
+// DROPDOWN MENU (click-away)
+// ═══════════════════════════════════════
+function Menu({ trigger, align, children }) {
+    const [open, setOpen] = useState(false);
+    const [pos, setPos] = useState(null);
+    const triggerRef = useRef(null);
+    const popRef = useRef(null);
+
+    // Position the popup (rendered in a body-level portal so it escapes the
+    // table's overflow:auto scroll containers and sticky stacking contexts).
+    const place = useCallback(() => {
+        const t = triggerRef.current;
+        if (!t) return;
+        const r = t.getBoundingClientRect();
+        setPos({ top: r.bottom + 3, left: r.left, right: window.innerWidth - r.right });
+    }, []);
+
+    useEffect(() => {
+        if (!open) return;
+        place();
+        const onDown = (e) => {
+            if (popRef.current?.contains(e.target) || triggerRef.current?.contains(e.target)) return;
+            setOpen(false);
+        };
+        document.addEventListener("mousedown", onDown);
+        window.addEventListener("scroll", place, true);
+        window.addEventListener("resize", place);
+        return () => {
+            document.removeEventListener("mousedown", onDown);
+            window.removeEventListener("scroll", place, true);
+            window.removeEventListener("resize", place);
+        };
+    }, [open, place]);
+
+    return (
+        <span className="menu-wrap" ref={triggerRef}>
+            <button className="menu-trigger" title="Options"
+                onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>{trigger || "⋮"}</button>
+            {open && pos && createPortal(
+                <div ref={popRef} className="menu-pop menu-portal"
+                    style={align === "right" ? { top: pos.top, right: pos.right } : { top: pos.top, left: pos.left }}
+                    onClick={(e) => e.stopPropagation()}>
+                    {typeof children === "function" ? children(() => setOpen(false)) : children}
+                </div>, document.body)}
+        </span>
+    );
+}
+
+// ═══════════════════════════════════════
+// TAG ADDER (inline, for tags-mode cells)
+// ═══════════════════════════════════════
+function TagAdder({ onAdd }) {
+    const [text, setText] = useState("");
+    const [ci, setCi] = useState(0);
+    const c = TAG_COLORS[ci];
+    const add = () => { const t = text.trim(); if (!t) return; onAdd({ text: t, bg: c.bg, fg: c.fg }); setText(""); };
+    return (
+        <div className="tag-add" contentEditable={false}>
+            <button className="tag-add-color" style={{ background: c.bg }} title={`color: ${c.name}`}
+                onClick={() => setCi((ci + 1) % TAG_COLORS.length)} />
+            <input value={text} placeholder="add tag…" onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
+            <button className="tag-add-go" onClick={add}>＋</button>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════
+// EDITABLE CELL (uncontrolled contentEditable + save/discard)
+// ═══════════════════════════════════════
+// We own the DOM after mount and only re-sync innerHTML from props when the
+// element is NOT focused. This avoids React resetting the caret to the start
+// while typing. Editing is a draft until committed (✓ / blur) or discarded (✕).
+function EditableCell({ html, editMode, className, style, colSpan, onCommit, onFocusCell, onDone }) {
+    const ref = useRef(null);
+    const baseline = useRef(html || "");
+    const [focused, setFocused] = useState(false);
+    const [pos, setPos] = useState(null);
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!el || document.activeElement === el) return;
+        const next = html || "";
+        if (el.innerHTML !== next) el.innerHTML = next;
+        baseline.current = next;
+    }, [html]);
+
+    const place = useCallback(() => {
+        const el = ref.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        setPos({ top: r.top + 4, left: Math.min(r.right - 62, window.innerWidth - 70) });
+    }, []);
+
+    useEffect(() => {
+        if (!focused) return;
+        place();
+        window.addEventListener("scroll", place, true);
+        window.addEventListener("resize", place);
+        return () => { window.removeEventListener("scroll", place, true); window.removeEventListener("resize", place); };
+    }, [focused, place]);
+
+    const handleFocus = () => {
+        baseline.current = ref.current?.innerHTML ?? "";
+        setFocused(true);
+        onFocusCell?.();
+    };
+    const handleBlur = () => {
+        setFocused(false);
+        onCommit(ref.current?.innerHTML ?? "");
+    };
+    // Buttons use mousedown+preventDefault to keep the caret in the cell;
+    // we then blur() to commit and onDone() to drop the selection entirely.
+    const save = (e) => { e.preventDefault(); ref.current?.blur(); onDone?.(); };
+    const discard = (e) => {
+        e.preventDefault();
+        if (ref.current) ref.current.innerHTML = baseline.current;
+        ref.current?.blur();
+        onDone?.();
+    };
+
+    return (
+        <>
+            <td ref={ref} className={className} style={style} colSpan={colSpan}
+                contentEditable={editMode} suppressContentEditableWarning
+                onFocus={handleFocus} onBlur={handleBlur} />
+            {focused && pos && createPortal(
+                <div className="cell-tick" style={{ top: pos.top, left: pos.left }}>
+                    <button className="ct-btn ct-ok" title="Save changes" onMouseDown={save}>✓</button>
+                    <button className="ct-btn ct-no" title="Discard changes" onMouseDown={discard}>✕</button>
+                </div>, document.body)}
+        </>
+    );
+}
+
+// ═══════════════════════════════════════
+// CELL
+// ═══════════════════════════════════════
+function Cell({ cell, editMode, selected, rowBg, onSelect, onEditHtml, onTagsChange, onDeselect }) {
+    const mode = cell.mode || "text";
+    const alignClass = (cell.align || "left") === "center" ? "al-center" : "al-left";
+    const cls = `dc ${alignClass}${cell.colspan ? " dc-span" : ""}${selected ? " cell-sel" : ""}`;
+    const style = rowBg ? { background: rowBg } : undefined;
+
+    if (mode === "tags") {
+        const tags = cell.tags || [];
+        return (
+            <td className={cls} colSpan={cell.colspan || undefined} style={style} onClick={onSelect}>
+                <div className="cell-tags" style={{ justifyContent: (cell.align || "left") === "center" ? "center" : "flex-start" }}>
+                    {tags.map((t, i) => (
+                        <span key={i} className="tag-chip" style={{ background: t.bg, color: t.fg }}>
+                            {t.text}
+                            {editMode && <span className="tag-x" title="remove"
+                                onClick={(e) => { e.stopPropagation(); onTagsChange(tags.filter((_, k) => k !== i)); }}>✕</span>}
+                        </span>
+                    ))}
+                    {!tags.length && !editMode && <span style={{ color: "var(--text-sec)" }}>—</span>}
+                </div>
+                {editMode && <TagAdder onAdd={(t) => onTagsChange([...tags, t])} />}
+            </td>
+        );
+    }
+
+    const modeClass = mode === "bullets" ? " cell-bullets" : mode === "boxes" ? " cell-boxes" : "";
+    return (
+        <EditableCell html={cell.html} editMode={editMode}
+            className={`${cls}${modeClass}`} colSpan={cell.colspan || undefined} style={style}
+            onCommit={onEditHtml} onFocusCell={onSelect} onDone={onDeselect} />
+    );
+}
+
+// ═══════════════════════════════════════
 // BLUEPRINT ROW
 // ═══════════════════════════════════════
-function BlueprintRow({ row, onCellEdit }) {
+function BlueprintRow({ row, editMode, total, selectedCellIdx, onSelect, onCellEdit, onCellTags, onRowAction, onDeselect }) {
+    const rowBg = row.customColor || null;
+    const isDivider = row.rowType === DIVIDER_TYPE;
     return (
         <tr className={row.rowType || ""}>
-            <td className="ll">{row.laneLabel}</td>
-            {row.cells.map((cell, ci) => (
-                <td key={ci}
-                    className={`dc${cell.colspan ? " dc-span" : ""}`}
-                    colSpan={cell.colspan || undefined}
-                    contentEditable
-                    suppressContentEditableWarning
-                    onBlur={(e) => onCellEdit(ci, e.currentTarget.innerHTML)}
-                    dangerouslySetInnerHTML={{ __html: cell.html }}
-                />
-            ))}
+            <td className="ll" style={rowBg ? { background: rowBg } : undefined}>
+                {editMode && (
+                    <span className="row-menu">
+                        <Menu trigger="⋮" align="left">
+                            {(close) => (
+                                <>
+                                    <button className="menu-item" onClick={() => { onRowAction("insertAbove"); close(); }}>↑ Insert row above</button>
+                                    <button className="menu-item" onClick={() => { onRowAction("insertBelow"); close(); }}>↓ Insert row below</button>
+                                    <div className="menu-sep" />
+                                    <div className="menu-head">Row type</div>
+                                    <select className="menu-select" value={row.rowType || ""} onChange={(e) => onRowAction("type", e.target.value)}>
+                                        {ROW_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                                    </select>
+                                    <div className="menu-head">Background</div>
+                                    <div className="swatches">
+                                        {ROW_COLORS.map((c) => (
+                                            <button key={c} className="swatch" style={{ background: c }} title={c}
+                                                onClick={() => onRowAction("color", c)} />
+                                        ))}
+                                        <label className="swatch sw-custom" title="Custom color…">
+                                            <input type="color" className="sw-input"
+                                                onChange={(e) => onRowAction("color", e.target.value)} />
+                                        </label>
+                                        <button className="swatch" title="clear override"
+                                            style={{ background: "repeating-linear-gradient(45deg,#fff,#fff 3px,#ddd 3px,#ddd 6px)" }}
+                                            onClick={() => onRowAction("color", null)} />
+                                    </div>
+                                    <div className="menu-sep" />
+                                    <button className="menu-item danger" onClick={() => { onRowAction("delete"); close(); }}>🗑 Delete row</button>
+                                </>
+                            )}
+                        </Menu>
+                    </span>
+                )}
+                <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
+                    onBlur={editMode ? (e) => onRowAction("label", e.currentTarget.textContent) : undefined}>
+                    {row.laneLabel}
+                </span>
+            </td>
+            {isDivider ? (
+                <EditableCell html={(row.cells[0] || {}).html || ""} editMode={editMode}
+                    className={`dc dc-span al-center${selectedCellIdx === 0 ? " cell-sel" : ""}`}
+                    colSpan={total} style={rowBg ? { background: rowBg } : undefined}
+                    onCommit={(html) => onCellEdit(0, html)} onFocusCell={() => onSelect(0)} onDone={onDeselect} />
+            ) : (
+                row.cells.map((cell, ci) => (
+                    <Cell key={ci} cell={cell} editMode={editMode} rowBg={rowBg}
+                        selected={ci === selectedCellIdx}
+                        onSelect={() => onSelect(ci)}
+                        onEditHtml={(html) => onCellEdit(ci, html)}
+                        onTagsChange={(tags) => onCellTags(ci, tags)}
+                        onDeselect={onDeselect} />
+                ))
+            )}
         </tr>
+    );
+}
+
+// ═══════════════════════════════════════
+// TEXT COLOR CONTROL (popover of swatches)
+// ═══════════════════════════════════════
+function TextColorControl({ disabled }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+    useEffect(() => {
+        if (!open) return;
+        const h = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+        document.addEventListener("mousedown", h);
+        return () => document.removeEventListener("mousedown", h);
+    }, [open]);
+    // mousedown + preventDefault keeps the cell's text selection while we recolor it.
+    const apply = (color) => (e) => {
+        e.preventDefault();
+        document.execCommand("styleWithCSS", false, true);
+        document.execCommand("foreColor", false, color);
+        document.execCommand("styleWithCSS", false, false);
+        setOpen(false);
+    };
+    return (
+        <div className="tb-color" ref={ref}>
+            <button className="tb-btn" disabled={disabled} title="Text color"
+                onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}><span className="tb-A">A</span></button>
+            {open && (
+                <div className="color-pop" onMouseDown={(e) => e.preventDefault()}>
+                    {TEXT_COLORS.map((c) => (
+                        <button key={c} className="swatch" style={{ background: c }} title={c} onMouseDown={apply(c)} />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════
+// FORMAT TOOLBAR (acts on the selected cell)
+// ═══════════════════════════════════════
+function FormatToolbar({ innerRef, cell, onMode, onAlign }) {
+    const disabled = !cell;
+    const mode = cell?.mode || "text";
+    const align = cell?.align || "left";
+    const exec = (cmd) => document.execCommand(cmd, false, null);
+    // B/I/U: keep focus in the cell (preventDefault) so execCommand hits its selection.
+    const fmt = (cmd) => (e) => { e.preventDefault(); exec(cmd); };
+    return (
+        <div className="edit-toolbar" ref={innerRef}>
+            <span className="tb-label">Cell</span>
+            <div className="tb-group">
+                <button className={`tb-btn${mode === "text" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("text")}>Text</button>
+                <button className={`tb-btn${mode === "bullets" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("bullets")}>• Bullets</button>
+                <button className={`tb-btn${mode === "boxes" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("boxes")}>▢ Boxes</button>
+                <button className={`tb-btn${mode === "tags" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("tags")}>Tags</button>
+            </div>
+            <div className="tb-sep" />
+            <div className="tb-group">
+                <button className={`tb-btn${align === "left" ? " active" : ""}`} disabled={disabled} onClick={() => onAlign("left")} title="Align left">⬅</button>
+                <button className={`tb-btn${align === "center" ? " active" : ""}`} disabled={disabled} onClick={() => onAlign("center")} title="Align center">⬄</button>
+            </div>
+            <div className="tb-sep" />
+            <div className="tb-group">
+                <button className="tb-btn" disabled={disabled || mode === "tags"} onMouseDown={fmt("bold")} style={{ fontWeight: 800 }}>B</button>
+                <button className="tb-btn" disabled={disabled || mode === "tags"} onMouseDown={fmt("italic")} style={{ fontStyle: "italic" }}>I</button>
+                <button className="tb-btn" disabled={disabled || mode === "tags"} onMouseDown={fmt("underline")} style={{ textDecoration: "underline" }}>U</button>
+                <TextColorControl disabled={disabled || mode === "tags"} />
+            </div>
+            <span className="tb-hint">
+                {disabled ? "Click a cell to format it" : "Text & bullets support ⌘/Ctrl + B / I / U"}
+            </span>
+        </div>
     );
 }
 
 // ═══════════════════════════════════════
 // JOURNEY VIEW
 // ═══════════════════════════════════════
-function JourneyView({ journey, jIdx, onCellEdit }) {
+function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
+        onCellEdit, onCellTags, onRowAction, onStageAction, onAddRow }) {
     const ref = useRef(null);
-    const numCols = journey.stages.length;
-    const tw = LBL_W + numCols * COL_W;
+    const stages = journey.stages;
+    const total = totalLeaves(stages);
+    const hasSub = stages.some((s) => (s.subStages?.length || 0) > 0);
+    const tw = LBL_W + total * COL_W;
+    const hdrW = tw + (editMode ? 62 : 0);
+    const onStage = (action, payload) => onStageAction(jIdx, action, payload);
 
     // scroll sync
     useEffect(() => {
@@ -522,7 +1057,7 @@ function JourneyView({ journey, jIdx, onCellEdit }) {
             el.addEventListener("scroll", h, { passive: true });
         });
         return () => hm.forEach((h, el) => el.removeEventListener("scroll", h));
-    }, [journey]);
+    }, [journey, editMode]);
 
     return (
         <div ref={ref}>
@@ -531,44 +1066,106 @@ function JourneyView({ journey, jIdx, onCellEdit }) {
                 <h2>{journey.title}</h2>
             </div>
 
-            {/* Stage header — sticky */}
+            {/* Stage header — sticky (two rows when sub-stages exist) */}
             <div className="stage-outer">
                 <div className="scroll-hide" data-ss="">
-                    <table className="bp" style={{ minWidth: tw }}>
-                        <tbody><tr>
-                            <td className="ll stg-ll">{journey.stageLabel}</td>
-                            {journey.stages.map((s, i) => (
-                                <td key={i} className="stg-c" style={{ width: COL_W, minWidth: COL_W }}>
-                                    {s.num != null && <span className="stage-num">{s.num}</span>}
-                                    {" "}{s.title}
+                    <table className="bp" style={{ minWidth: hdrW }}>
+                        <tbody>
+                            <tr>
+                                <td className="ll stg-ll" rowSpan={hasSub ? 2 : 1}>
+                                    <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
+                                        onBlur={editMode ? (e) => onStage("setStageLabel", { value: e.currentTarget.textContent }) : undefined}>
+                                        {journey.stageLabel}
+                                    </span>
                                 </td>
-                            ))}
-                        </tr></tbody>
+                                {stages.map((s, si) => {
+                                    const lc = leafCount(s);
+                                    const sHasSub = (s.subStages?.length || 0) > 0;
+                                    return (
+                                        <td key={si} className="stg-c" colSpan={lc}
+                                            rowSpan={hasSub && !sHasSub ? 2 : 1}
+                                            style={{ minWidth: lc * COL_W }}>
+                                            {editMode && (
+                                                <Menu trigger="⋮" align="right">
+                                                    {(close) => (
+                                                        <>
+                                                            <button className="menu-item" onClick={() => { onStage("addSubStage", { stageIdx: si }); close(); }}>＋ Add sub-stage</button>
+                                                            <button className="menu-item" onClick={() => { onStage("addStage", {}); close(); }}>＋ Add stage (at end)</button>
+                                                            <div className="menu-sep" />
+                                                            <button className="menu-item danger" onClick={() => { onStage("deleteStage", { stageIdx: si }); close(); }}>🗑 Delete stage</button>
+                                                        </>
+                                                    )}
+                                                </Menu>
+                                            )}
+                                            {s.num != null && <span className="stage-num">{s.num}</span>}{" "}
+                                            <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
+                                                onBlur={editMode ? (e) => onStage("renameStage", { stageIdx: si, value: e.currentTarget.textContent }) : undefined}>
+                                                {s.title}
+                                            </span>
+                                        </td>
+                                    );
+                                })}
+                                {editMode && (
+                                    <td className="add-col-c" rowSpan={hasSub ? 2 : 1}>
+                                        <button className="add-btn" title="Add stage" onClick={() => onStage("addStage", {})}>＋</button>
+                                    </td>
+                                )}
+                            </tr>
+                            {hasSub && (
+                                <tr>
+                                    {stages.map((s, si) => {
+                                        const subs = s.subStages || [];
+                                        if (!subs.length) return null;
+                                        return subs.map((ss, ssi) => (
+                                            <td key={si + "-" + ssi} className="sub-c" style={{ minWidth: COL_W }}>
+                                                {editMode && (
+                                                    <Menu trigger="⋮" align="right">
+                                                        {(close) => (
+                                                            <>
+                                                                <button className="menu-item" onClick={() => { onStage("addSubStage", { stageIdx: si }); close(); }}>＋ Add sub-stage</button>
+                                                                <div className="menu-sep" />
+                                                                <button className="menu-item danger" onClick={() => { onStage("deleteSubStage", { stageIdx: si, subIdx: ssi }); close(); }}>🗑 Delete sub-stage</button>
+                                                            </>
+                                                        )}
+                                                    </Menu>
+                                                )}
+                                                <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
+                                                    onBlur={editMode ? (e) => onStage("renameSubStage", { stageIdx: si, subIdx: ssi, value: e.currentTarget.textContent }) : undefined}>
+                                                    {ss.title}
+                                                </span>
+                                            </td>
+                                        ));
+                                    })}
+                                </tr>
+                            )}
+                        </tbody>
                     </table>
                 </div>
             </div>
 
-            {/* Sub-journeys */}
+            {/* Sub-journeys (rows only; section breaks use divider rows) */}
             {journey.subJourneys.map((sj, si) => (
                 <div key={si}>
-                    <div className="sj-scroll" data-ss="">
-                        <table className="bp" style={{ minWidth: tw }}>
-                            <tbody><tr>
-                                <td className="ll sj-ll">SUB-JOURNEY</td>
-                                <td colSpan={numCols} className="sj-tc">▼ {sj.title}</td>
-                            </tr></tbody>
-                        </table>
-                    </div>
                     <div className="bpw" data-ss="">
                         <table className="bp" style={{ minWidth: tw }}>
                             <tbody>
                                 {sj.rows.map((row, ri) => (
-                                    <BlueprintRow key={ri} row={row}
-                                        onCellEdit={(cellIdx, html) => onCellEdit(jIdx, si, ri, cellIdx, html)} />
+                                    <BlueprintRow key={ri} row={row} editMode={editMode} total={total}
+                                        selectedCellIdx={selected && selected.jIdx === jIdx && selected.sjIdx === si && selected.rowIdx === ri ? selected.cellIdx : null}
+                                        onSelect={(ci) => onSelect({ jIdx, sjIdx: si, rowIdx: ri, cellIdx: ci })}
+                                        onCellEdit={(ci, html) => onCellEdit(jIdx, si, ri, ci, html)}
+                                        onCellTags={(ci, tags) => onCellTags(jIdx, si, ri, ci, tags)}
+                                        onRowAction={(action, value) => onRowAction(jIdx, si, ri, action, value)}
+                                        onDeselect={onDeselect} />
                                 ))}
                             </tbody>
                         </table>
                     </div>
+                    {editMode && (
+                        <div className="add-row-bar">
+                            <button className="add-row-btn" onClick={() => onAddRow(jIdx, si)}>＋ Add row</button>
+                        </div>
+                    )}
                 </div>
             ))}
         </div>
@@ -587,8 +1184,13 @@ function App() {
     const [currentId, setCurrentId] = useState(null);
     const [ready, setReady] = useState(false);
     const [saveState, setSaveState] = useState("idle");
+    const [editMode, setEditMode] = useState(false);
+    const [selected, setSelected] = useState(null);
+    const [lastSaved, setLastSaved] = useState(null);
     const legendRef = useRef(null);
+    const toolbarRef = useRef(null);
     const saveTimer = useRef(null);
+    const lastSavedRef = useRef(null);
     // Mirror of `journeys` kept in sync synchronously so export/save always
     // read the latest value (contentEditable onBlur fires before button clicks).
     const journeysRef = useRef([]);
@@ -613,7 +1215,8 @@ function App() {
             const open = list.find((p) => p.id === last) || list[0];
             if (open) {
                 setCurrentId(open.id);
-                updateJourneys(open.journeys || []);
+                updateJourneys(hydrate(open.journeys || []));
+                setLastSaved(open.updatedAt || null);
                 localStorage.setItem(LAST_KEY, String(open.id));
             }
             setReady(true);
@@ -628,7 +1231,7 @@ function App() {
         saveTimer.current = setTimeout(() => {
             dbSaveJourneys(currentId, journeysRef.current)
                 .then(refreshProjects)
-                .then(() => setSaveState("saved"));
+                .then(() => { setSaveState("saved"); setLastSaved(Date.now()); });
         }, 600);
         return () => clearTimeout(saveTimer.current);
     }, [journeys, currentId, ready, refreshProjects]);
@@ -636,7 +1239,7 @@ function App() {
     // ── Load data (JSON array / exported project) ──
     const loadFromText = useCallback(async (text) => {
         const parsed = parseInput(text);
-        const data = parsed.journeys;
+        const data = hydrate(parsed.journeys);
         if (!data.length) throw new Error("No valid journey data found.");
         let id = currentId;
         if (id == null) {
@@ -651,30 +1254,150 @@ function App() {
         console.log(`%c✅ Loaded ${data.length} service journey(s)`, "color:#2e7d32;font-weight:bold;font-size:14px");
     }, [currentId, projects, refreshProjects, updateJourneys]);
 
-    // ── Cell edits → state (keyed by journey/sub-journey/row/cell) ──
-    const handleCellEdit = useCallback((jIdx, sjIdx, rowIdx, cellIdx, html) => {
+    // ── Immutable updaters ──
+    const editJourney = useCallback((jIdx, fn) => {
         updateJourneys((prev) => {
             const j = prev[jIdx];
-            const cur = j?.subJourneys?.[sjIdx]?.rows?.[rowIdx]?.cells?.[cellIdx];
-            if (!cur || cur.html === html) return prev;
+            if (!j) return prev;
+            const nj = fn(j);
+            if (nj === j) return prev;
             const next = prev.slice();
-            const nj = { ...j, subJourneys: j.subJourneys.slice() };
-            const nsj = { ...nj.subJourneys[sjIdx], rows: nj.subJourneys[sjIdx].rows.slice() };
-            const nrow = { ...nsj.rows[rowIdx], cells: nsj.rows[rowIdx].cells.slice() };
-            nrow.cells[cellIdx] = { ...nrow.cells[cellIdx], html };
-            nsj.rows[rowIdx] = nrow;
-            nj.subJourneys[sjIdx] = nsj;
             next[jIdx] = nj;
             return next;
         });
     }, [updateJourneys]);
+
+    // Mutate a single cell via `fn(cellCopy) -> cell`.
+    const editCell = useCallback((jIdx, sjIdx, rowIdx, cellIdx, fn) => {
+        editJourney(jIdx, (j) => {
+            const cur = j.subJourneys?.[sjIdx]?.rows?.[rowIdx]?.cells?.[cellIdx];
+            if (!cur) return j;
+            const nc = fn({ ...cur });
+            if (nc === cur) return j;
+            const sjs = j.subJourneys.slice();
+            const sj = { ...sjs[sjIdx], rows: sjs[sjIdx].rows.slice() };
+            const row = { ...sj.rows[rowIdx], cells: sj.rows[rowIdx].cells.slice() };
+            row.cells[cellIdx] = nc;
+            sj.rows[rowIdx] = row;
+            sjs[sjIdx] = sj;
+            return { ...j, subJourneys: sjs };
+        });
+    }, [editJourney]);
+
+    // ── Cell handlers ──
+    const handleCellEdit = useCallback((jIdx, sjIdx, rowIdx, cellIdx, html) =>
+        editCell(jIdx, sjIdx, rowIdx, cellIdx, (c) => (c.html === html ? c : { ...c, html })), [editCell]);
+    const handleCellTags = useCallback((jIdx, sjIdx, rowIdx, cellIdx, tags) =>
+        editCell(jIdx, sjIdx, rowIdx, cellIdx, (c) => ({ ...c, tags })), [editCell]);
+    const handleCellMode = useCallback((jIdx, sjIdx, rowIdx, cellIdx, mode) =>
+        editCell(jIdx, sjIdx, rowIdx, cellIdx, (c) => ({ ...c, mode, ...(mode === "tags" && !c.tags ? { tags: [] } : {}) })), [editCell]);
+    const handleCellAlign = useCallback((jIdx, sjIdx, rowIdx, cellIdx, align) =>
+        editCell(jIdx, sjIdx, rowIdx, cellIdx, (c) => ({ ...c, align })), [editCell]);
+
+    // ── Row handlers ──
+    const handleRowAction = useCallback((jIdx, sjIdx, rowIdx, action, value) => {
+        editJourney(jIdx, (j) => {
+            const total = totalLeaves(j.stages);
+            const sjs = j.subJourneys.slice();
+            const sj = { ...sjs[sjIdx], rows: sjs[sjIdx].rows.slice() };
+            const rows = sj.rows;
+            if (action === "delete") rows.splice(rowIdx, 1);
+            else if (action === "insertAbove") rows.splice(rowIdx, 0, newRow(total));
+            else if (action === "insertBelow") rows.splice(rowIdx + 1, 0, newRow(total));
+            else if (action === "type") {
+                const cur = rows[rowIdx];
+                const wasDivider = cur.rowType === DIVIDER_TYPE;
+                const willDivider = value === DIVIDER_TYPE;
+                let cells = cur.cells;
+                if (willDivider && !wasDivider) cells = collapseDivider(cells, total);
+                else if (!willDivider && wasDivider) cells = expandDivider(cells, total);
+                rows[rowIdx] = { ...cur, rowType: value, cells };
+            }
+            else if (action === "color") rows[rowIdx] = { ...rows[rowIdx], customColor: value || undefined };
+            else if (action === "label") {
+                if (rows[rowIdx].laneLabel === value) return j;
+                rows[rowIdx] = { ...rows[rowIdx], laneLabel: value };
+            } else return j;
+            sj.rows = rows;
+            sjs[sjIdx] = sj;
+            return { ...j, subJourneys: sjs };
+        });
+    }, [editJourney]);
+
+    const handleAddRow = useCallback((jIdx, sjIdx) => {
+        editJourney(jIdx, (j) => {
+            const sjs = j.subJourneys.slice();
+            sjs[sjIdx] = { ...sjs[sjIdx], rows: [...sjs[sjIdx].rows, newRow(totalLeaves(j.stages))] };
+            return { ...j, subJourneys: sjs };
+        });
+    }, [editJourney]);
+
+    // ── Stage / sub-stage (column) handlers ──
+    const handleStageAction = useCallback((jIdx, action, payload) => {
+        editJourney(jIdx, (j) => {
+            const stages = j.stages.map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
+            const mapRows = (fn) => j.subJourneys.map((sj) => ({
+                ...sj, rows: sj.rows.map((r) => ({ ...r, cells: fn(r.cells) })),
+            }));
+
+            if (action === "addStage") {
+                stages.push({ title: "New Stage", subStages: [] });
+                return { ...j, stages, subJourneys: mapRows((cells) => [...cells, newCell()]) };
+            }
+            if (action === "deleteStage") {
+                const { stageIdx } = payload;
+                if (stages.length <= 1) { alert("A journey needs at least one stage."); return j; }
+                const start = leafStart(j.stages, stageIdx);
+                const cnt = leafCount(j.stages[stageIdx]);
+                stages.splice(stageIdx, 1);
+                return { ...j, stages, subJourneys: mapRows((cells) => {
+                    let c = cells;
+                    for (let k = 0; k < cnt; k++) c = removeLeafFromRow(c, start);
+                    return c;
+                }) };
+            }
+            if (action === "addSubStage") {
+                const { stageIdx } = payload;
+                const before = stages[stageIdx].subStages.length;
+                stages[stageIdx].subStages.push({ title: "New" });
+                const oldL = Math.max(before, 1), newL = Math.max(before + 1, 1);
+                if (newL > oldL) {
+                    const gi = leafStart(j.stages, stageIdx) + oldL;
+                    return { ...j, stages, subJourneys: mapRows((cells) => insertLeafIntoRow(cells, gi)) };
+                }
+                return { ...j, stages };
+            }
+            if (action === "deleteSubStage") {
+                const { stageIdx, subIdx } = payload;
+                const before = stages[stageIdx].subStages.length;
+                stages[stageIdx].subStages.splice(subIdx, 1);
+                const oldL = Math.max(before, 1), newL = Math.max(before - 1, 1);
+                if (newL < oldL) {
+                    const gi = leafStart(j.stages, stageIdx) + Math.min(subIdx, oldL - 1);
+                    return { ...j, stages, subJourneys: mapRows((cells) => removeLeafFromRow(cells, gi)) };
+                }
+                return { ...j, stages };
+            }
+            if (action === "renameStage") { stages[payload.stageIdx] = { ...stages[payload.stageIdx], title: payload.value }; return { ...j, stages }; }
+            if (action === "renameSubStage") {
+                stages[payload.stageIdx].subStages[payload.subIdx] = { ...stages[payload.stageIdx].subStages[payload.subIdx], title: payload.value };
+                return { ...j, stages };
+            }
+            if (action === "setStageLabel") {
+                if (j.stageLabel === payload.value) return j;
+                return { ...j, stageLabel: payload.value };
+            }
+            return j;
+        });
+    }, [editJourney]);
 
     // ── Project actions ──
     const openProject = useCallback(async (id) => {
         const p = await dbGetProject(id);
         if (!p) return;
         setCurrentId(id);
-        updateJourneys(p.journeys || []);
+        updateJourneys(hydrate(p.journeys || []));
+        setLastSaved(p.updatedAt || null);
         setTab(0);
         localStorage.setItem(LAST_KEY, String(id));
         setProjModal(false);
@@ -688,7 +1411,7 @@ function App() {
             const fallback = remaining[0];
             if (fallback) {
                 setCurrentId(fallback.id);
-                updateJourneys(fallback.journeys || []);
+                updateJourneys(hydrate(fallback.journeys || []));
                 localStorage.setItem(LAST_KEY, String(fallback.id));
             } else {
                 setCurrentId(null);
@@ -729,6 +1452,7 @@ function App() {
             version: 1,
             name: currentName || "Service Journeys",
             exportedAt: new Date().toISOString(),
+            lastSavedAt: lastSavedRef.current ? new Date(lastSavedRef.current).toISOString() : null,
             journeys: data,
         };
         downloadFile(safeName(currentName) + ".json", JSON.stringify(payload, null, 2), "application/json");
@@ -752,18 +1476,51 @@ function App() {
         return () => ro.disconnect();
     }, []);
 
+    // Format-toolbar height → CSS var (so the sticky stage header sits below it)
+    useEffect(() => {
+        const root = document.documentElement;
+        const el = toolbarRef.current;
+        if (!editMode || !el) { root.style.setProperty("--toolbar-h", "0px"); return; }
+        const update = () => root.style.setProperty("--toolbar-h", el.offsetHeight + "px");
+        update();
+        const ro = new ResizeObserver(update);
+        ro.observe(el);
+        return () => { ro.disconnect(); root.style.setProperty("--toolbar-h", "0px"); };
+    }, [editMode]);
+
+    // Leaving edit mode clears the cell selection.
+    useEffect(() => { if (!editMode) setSelected(null); }, [editMode]);
+
+    // Mirror lastSaved into a ref so export reads the latest value.
+    useEffect(() => { lastSavedRef.current = lastSaved; }, [lastSaved]);
+
+    // The cell the format toolbar currently targets.
+    const selectedCell = selected
+        ? journeys[selected.jIdx]?.subJourneys?.[selected.sjIdx]?.rows?.[selected.rowIdx]?.cells?.[selected.cellIdx]
+        : null;
+
     return (
         <>
             <TopBar innerRef={legendRef} currentName={currentName}
                 onProjects={() => setProjModal(true)} onExport={exportProject}
-                canExport={journeys.length > 0} saveState={saveState} />
+                canExport={journeys.length > 0} saveState={saveState} lastSaved={lastSaved}
+                editMode={editMode} onToggleEdit={() => setEditMode((e) => !e)} />
+            {editMode && journeys.length > 0 && (
+                <FormatToolbar innerRef={toolbarRef} cell={selectedCell}
+                    onMode={(m) => selected && handleCellMode(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, m)}
+                    onAlign={(a) => selected && handleCellAlign(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, a)} />
+            )}
             <main className="main-content">
                 {journeys.length === 0 ? (
                     <EmptyState onLoad={() => setModal(true)} />
                 ) : (
                     journeys.map((j, i) => (
                         <div key={j.id + "-" + i} style={{ display: i === tab ? "block" : "none" }}>
-                            <JourneyView journey={j} jIdx={i} onCellEdit={handleCellEdit} />
+                            <JourneyView journey={j} jIdx={i} editMode={editMode}
+                                selected={selected} onSelect={setSelected} onDeselect={() => setSelected(null)}
+                                onCellEdit={handleCellEdit} onCellTags={handleCellTags}
+                                onRowAction={handleRowAction} onStageAction={handleStageAction}
+                                onAddRow={handleAddRow} />
                         </div>
                     ))
                 )}
