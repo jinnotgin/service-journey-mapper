@@ -326,13 +326,13 @@
             .pc-count,.pc-updated{display:none}
         }
         @media print{
-            .tab-bar,.m-ov,.ab-actions,.edit-toolbar,.menu-wrap,.add-col-c,.add-row-bar{display:none}
+            .tab-bar,.m-ov,.ab-actions,.cell-toolbar,.menu-wrap,.add-col-c,.add-row-bar{display:none}
             .app-bar,.stage-outer{position:static}
             .ll{position:static}
         }
 
         /* ===== EDIT MODE ===== */
-        .edit-toolbar{position:sticky;top:var(--appbar-h,52px);z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm)}
+        .cell-toolbar{position:fixed;z-index:320;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;padding:7px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);width:max-content;max-width:none;white-space:nowrap}
         .tb-group{display:flex;align-items:center;gap:3px}
         .tb-sep{width:1px;height:20px;background:var(--border);margin:0 5px}
         .tb-label{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-sec);margin-right:3px}
@@ -342,7 +342,7 @@
         .tb-btn:hover:not(:disabled){background:var(--bg);color:var(--text);border-color:var(--text-sec)}
         .tb-btn.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
         .tb-btn:disabled{opacity:.4;cursor:not-allowed}
-        .tb-hint{font-size:var(--fs-xs);color:var(--text-sec);margin-left:auto}
+        .tb-hint{font-size:var(--fs-xs);color:var(--text-sec);padding:0 4px;white-space:nowrap}
 
         /* dropdown menus */
         .menu-wrap{position:relative;display:inline-block}
@@ -375,9 +375,16 @@
         .stg-c,.sub-c{position:relative}
         .stg-c .menu-wrap,.sub-c .menu-wrap{position:absolute;top:4px;right:4px}
         .row-menu{position:absolute;top:3px;right:3px;z-index:11}
+        .stg-c>.menu-wrap,.sub-c>.menu-wrap,.row-menu{opacity:0;pointer-events:none;transition:opacity .14s ease-out}
+        .stg-c:hover>.menu-wrap,.stg-c:focus-within>.menu-wrap,
+        .sub-c:hover>.menu-wrap,.sub-c:focus-within>.menu-wrap,
+        .ll:hover .row-menu,.ll:focus-within .row-menu{opacity:1;pointer-events:auto}
         .hdr-edit{outline:none;cursor:text}
         .hdr-edit:focus{box-shadow:inset 0 0 0 2px var(--accent);border-radius:4px}
-        .drag-handle{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;border:1px solid oklch(100% 0 0 / .2);background:oklch(100% 0 0 / .08);color:inherit;cursor:grab;font-size:.66rem;line-height:1;vertical-align:middle;user-select:none;opacity:.78}
+        .drag-handle{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;border:1px solid oklch(100% 0 0 / .2);background:oklch(100% 0 0 / .08);color:inherit;cursor:grab;font-size:.66rem;line-height:1;vertical-align:middle;user-select:none;opacity:0;pointer-events:none;transition:opacity .14s ease-out,background .14s ease-out}
+        .stg-c:hover>.drag-handle,.stg-c:focus-within>.drag-handle,
+        .sub-c:hover>.drag-handle,.sub-c:focus-within>.drag-handle,
+        .ll:hover .row-drag,.ll:focus-within .row-drag{opacity:.78;pointer-events:auto}
         .drag-handle:hover{opacity:1;background:oklch(100% 0 0 / .16)}
         .drag-handle:active{cursor:grabbing}
         .row-drag{position:absolute;top:5px;left:5px;z-index:11;border-color:var(--border);background:oklch(99% .002 70 / .7);color:var(--text-sec)}
@@ -438,7 +445,7 @@
 <body>
 <div id="root"></div>
 <script type="text/babel" data-type="module">
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import Dexie from "dexie";
@@ -821,7 +828,7 @@ function buildIdeationPrompt() {
 function buildStandaloneHtml(payload) {
     const html = document.documentElement.cloneNode(true);
     html.querySelector("#sjm-embedded-project")?.remove();
-    html.querySelectorAll(".menu-portal,.cell-tick,.m-ov").forEach((el) => el.remove());
+    html.querySelectorAll(".menu-portal,.cell-tick,.cell-toolbar,.m-ov").forEach((el) => el.remove());
     const root = html.querySelector("#root");
     if (root) root.textContent = "";
 
@@ -1315,7 +1322,7 @@ function ProjectCard({ p, current, onOpen, onRename, onDelete }) {
             onClick={() => !editing && onOpen(p.id)}
             onKeyDown={(e) => { if (!editing && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onOpen(p.id); } }}>
             <div className="pc-main">
-                {current && <span className="pc-badge">Open in editor</span>}
+                {current && <span className="pc-badge">Last opened</span>}
                 {editing ? (
                     <input ref={inputRef} className="m-input pc-rename" value={draft}
                         onClick={(e) => e.stopPropagation()} onChange={(e) => setDraft(e.target.value)} onBlur={commit}
@@ -1479,7 +1486,7 @@ function TagAdder({ onAdd }) {
 // We own the DOM after mount and only re-sync innerHTML from props when the
 // element is NOT focused. This avoids React resetting the caret to the start
 // while typing. Editing is a draft until committed (✓ / blur) or discarded (✕).
-function EditableCell({ html, editMode, className, style, colSpan, onCommit, onFocusCell, onDone }) {
+function EditableCell({ html, editMode, className, style, colSpan, cellKey, onCommit, onFocusCell, onDone }) {
     const ref = useRef(null);
     const baseline = useRef(html || "");
     const [focused, setFocused] = useState(false);
@@ -1530,6 +1537,7 @@ function EditableCell({ html, editMode, className, style, colSpan, onCommit, onF
     const handleBlur = () => {
         setFocused(false);
         onCommit(ref.current?.innerHTML ?? "");
+        onDone?.();
     };
     // Buttons use mousedown+preventDefault to keep the caret in the cell;
     // we then blur() to commit and onDone() to drop the selection entirely.
@@ -1544,6 +1552,7 @@ function EditableCell({ html, editMode, className, style, colSpan, onCommit, onF
     return (
         <>
             <td ref={ref} className={className} style={style} colSpan={colSpan}
+                data-cell-key={cellKey}
                 contentEditable={editMode} suppressContentEditableWarning
                 onFocus={handleFocus} onBlur={handleBlur} />
             {focused && pos && createPortal(
@@ -1558,7 +1567,7 @@ function EditableCell({ html, editMode, className, style, colSpan, onCommit, onF
 // ═══════════════════════════════════════
 // CELL
 // ═══════════════════════════════════════
-function Cell({ cell, editMode, selected, rowBg, onSelect, onEditHtml, onTagsChange, onDeselect }) {
+function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, onTagsChange, onDeselect }) {
     const mode = cell.mode || "text";
     const alignClass = (cell.align || "left") === "center" ? "al-center" : "al-left";
     const cls = `dc ${alignClass}${cell.colspan ? " dc-span" : ""}${selected ? " cell-sel" : ""}`;
@@ -1567,18 +1576,19 @@ function Cell({ cell, editMode, selected, rowBg, onSelect, onEditHtml, onTagsCha
     if (mode === "tags") {
         const tags = cell.tags || [];
         return (
-            <td className={cls} colSpan={cell.colspan || undefined} style={style} onClick={onSelect}>
+            <td className={cls} colSpan={cell.colspan || undefined} style={style}
+                data-cell-key={cellKey} onClick={onSelect}>
                 <div className="cell-tags" style={{ justifyContent: (cell.align || "left") === "center" ? "center" : "flex-start" }}>
                     {tags.map((t, i) => (
                         <span key={i} className="tag-chip" style={{ background: t.bg, color: t.fg }}>
                             {t.text}
-                            {editMode && <span className="tag-x" title="remove"
+                            {editMode && selected && <span className="tag-x" title="remove"
                                 onClick={(e) => { e.stopPropagation(); onTagsChange(tags.filter((_, k) => k !== i)); }}>✕</span>}
                         </span>
                     ))}
                     {!tags.length && !editMode && <span style={{ color: "var(--text-sec)" }}>—</span>}
                 </div>
-                {editMode && <TagAdder onAdd={(t) => onTagsChange([...tags, t])} />}
+                {editMode && selected && <TagAdder onAdd={(t) => onTagsChange([...tags, t])} />}
             </td>
         );
     }
@@ -1587,14 +1597,14 @@ function Cell({ cell, editMode, selected, rowBg, onSelect, onEditHtml, onTagsCha
     return (
         <EditableCell html={cell.html} editMode={editMode}
             className={`${cls}${modeClass}`} colSpan={cell.colspan || undefined} style={style}
-            onCommit={onEditHtml} onFocusCell={onSelect} onDone={onDeselect} />
+            cellKey={cellKey} onCommit={onEditHtml} onFocusCell={onSelect} onDone={onDeselect} />
     );
 }
 
 // ═══════════════════════════════════════
 // BLUEPRINT ROW
 // ═══════════════════════════════════════
-function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, dragState, dropRowIdx,
+function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPrefix, dragState, dropRowIdx,
         onSelect, onCellEdit, onCellTags, onRowAction, onRowDragStart, onRowDragOver, onRowDrop, onDragEnd, onDeselect }) {
     const rowBg = row.customColor || null;
     const isDivider = row.rowType === DIVIDER_TYPE;
@@ -1649,11 +1659,13 @@ function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, dragState
                 <EditableCell html={(row.cells[0] || {}).html || ""} editMode={editMode}
                     className={`dc dc-span al-center${selectedCellIdx === 0 ? " cell-sel" : ""}`}
                     colSpan={total} style={rowBg ? { background: rowBg } : undefined}
+                    cellKey={`${cellKeyPrefix}-0`}
                     onCommit={(html) => onCellEdit(0, html)} onFocusCell={() => onSelect(0)} onDone={onDeselect} />
             ) : (
                 row.cells.map((cell, ci) => (
                     <Cell key={ci} cell={cell} editMode={editMode} rowBg={rowBg}
                         selected={ci === selectedCellIdx}
+                        cellKey={`${cellKeyPrefix}-${ci}`}
                         onSelect={() => onSelect(ci)}
                         onEditHtml={(html) => onCellEdit(ci, html)}
                         onTagsChange={(tags) => onCellTags(ci, tags)}
@@ -1702,48 +1714,88 @@ function TextColorControl({ disabled }) {
 // ═══════════════════════════════════════
 // FORMAT TOOLBAR (acts on the selected cell)
 // ═══════════════════════════════════════
-function FormatToolbar({ innerRef, cell, onMode, onAlign }) {
-    const disabled = !cell;
+function FormatToolbar({ cell, selectedKey, onMode, onAlign }) {
+    const toolbarRef = useRef(null);
+    const lastSizeRef = useRef({ width: 0, height: 0 });
+    const [pos, setPos] = useState(null);
+    const disabled = !cell || !selectedKey;
     const mode = cell?.mode || "text";
     const align = cell?.align || "left";
     const exec = (cmd) => document.execCommand(cmd, false, null);
+    const place = useCallback(() => {
+        if (!selectedKey) { setPos(null); return; }
+        const anchor = document.querySelector(`[data-cell-key="${selectedKey}"]`);
+        if (!anchor) { setPos(null); return; }
+        const r = anchor.getBoundingClientRect();
+        const margin = 8;
+        const gap = 8;
+        const measuredW = toolbarRef.current?.offsetWidth || 0;
+        const measuredH = toolbarRef.current?.offsetHeight || 0;
+        const w = measuredW || lastSizeRef.current.width;
+        const h = measuredH || lastSizeRef.current.height;
+        if (!w || !h) { setPos({ top: -9999, left: -9999, measuring: true }); return; }
+        if (measuredW && measuredH) lastSizeRef.current = { width: measuredW, height: measuredH };
+        let top = r.bottom + gap;
+        const centeredLeft = r.left + (r.width / 2) - (w / 2);
+        const maxLeft = Math.max(margin, window.innerWidth - w - margin);
+        const left = Math.max(margin, Math.min(centeredLeft, maxLeft));
+
+        if (top + h > window.innerHeight - margin) top = r.top - h - gap;
+        if (top < margin) top = Math.min(window.innerHeight - h - margin, r.bottom + gap);
+        setPos({ top, left, measuring: false });
+    }, [selectedKey]);
+
+    useEffect(() => {
+        if (disabled) { setPos(null); return; }
+        place();
+        const raf = window.requestAnimationFrame(place);
+        window.addEventListener("scroll", place, true);
+        window.addEventListener("resize", place);
+        return () => {
+            window.cancelAnimationFrame(raf);
+            window.removeEventListener("scroll", place, true);
+            window.removeEventListener("resize", place);
+        };
+    }, [disabled, place, mode, align]);
+
+    if (disabled || !pos) return null;
+
     // B/I/U: keep focus in the cell (preventDefault) so execCommand hits its selection.
     const fmt = (cmd) => (e) => { e.preventDefault(); exec(cmd); };
-    return (
-        <div className="edit-toolbar" ref={innerRef}>
+    const keepFocus = (fn) => (e) => { e.preventDefault(); fn(); };
+    return createPortal(
+        <div className="cell-toolbar" ref={toolbarRef} style={{ top: pos.top, left: pos.left, visibility: pos.measuring ? "hidden" : "visible" }}
+            onMouseDown={(e) => e.stopPropagation()}>
             <span className="tb-label">Cell</span>
             <div className="tb-group">
-                <button className={`tb-btn${mode === "text" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("text")}>Text</button>
-                <button className={`tb-btn${mode === "bullets" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("bullets")}>
+                <button className={`tb-btn${mode === "text" ? " active" : ""}`} onMouseDown={keepFocus(() => onMode("text"))}>Text</button>
+                <button className={`tb-btn${mode === "bullets" ? " active" : ""}`} onMouseDown={keepFocus(() => onMode("bullets"))}>
                     <LucideIcon name="list" />Bullets
                 </button>
-                <button className={`tb-btn${mode === "boxes" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("boxes")}>
+                <button className={`tb-btn${mode === "boxes" ? " active" : ""}`} onMouseDown={keepFocus(() => onMode("boxes"))}>
                     <LucideIcon name="square" />Boxes
                 </button>
-                <button className={`tb-btn${mode === "tags" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("tags")}>
+                <button className={`tb-btn${mode === "tags" ? " active" : ""}`} onMouseDown={keepFocus(() => onMode("tags"))}>
                     <LucideIcon name="tag" />Tags
                 </button>
             </div>
             <div className="tb-sep" />
             <div className="tb-group">
-                <button className={`tb-btn icon-only${align === "left" ? " active" : ""}`} disabled={disabled} onClick={() => onAlign("left")} title="Align left" aria-label="Align left" aria-pressed={align === "left"}>
+                <button className={`tb-btn icon-only${align === "left" ? " active" : ""}`} onMouseDown={keepFocus(() => onAlign("left"))} title="Align left" aria-label="Align left" aria-pressed={align === "left"}>
                     <LucideIcon name="alignLeft" />
                 </button>
-                <button className={`tb-btn icon-only${align === "center" ? " active" : ""}`} disabled={disabled} onClick={() => onAlign("center")} title="Align center" aria-label="Align center" aria-pressed={align === "center"}>
+                <button className={`tb-btn icon-only${align === "center" ? " active" : ""}`} onMouseDown={keepFocus(() => onAlign("center"))} title="Align center" aria-label="Align center" aria-pressed={align === "center"}>
                     <LucideIcon name="alignCenter" />
                 </button>
             </div>
             <div className="tb-sep" />
             <div className="tb-group">
-                <button className="tb-btn" disabled={disabled || mode === "tags"} onMouseDown={fmt("bold")} style={{ fontWeight: 800 }}>B</button>
-                <button className="tb-btn" disabled={disabled || mode === "tags"} onMouseDown={fmt("italic")} style={{ fontStyle: "italic" }}>I</button>
-                <button className="tb-btn" disabled={disabled || mode === "tags"} onMouseDown={fmt("underline")} style={{ textDecoration: "underline" }}>U</button>
-                <TextColorControl disabled={disabled || mode === "tags"} />
+                <button className="tb-btn" disabled={mode === "tags"} onMouseDown={fmt("bold")} style={{ fontWeight: 800 }}>B</button>
+                <button className="tb-btn" disabled={mode === "tags"} onMouseDown={fmt("italic")} style={{ fontStyle: "italic" }}>I</button>
+                <button className="tb-btn" disabled={mode === "tags"} onMouseDown={fmt("underline")} style={{ textDecoration: "underline" }}>U</button>
+                <TextColorControl disabled={mode === "tags"} />
             </div>
-            <span className="tb-hint">
-                {disabled ? "Click a cell to format it" : "Text & bullets support ⌘/Ctrl + B / I / U"}
-            </span>
-        </div>
+        </div>, document.body
     );
 }
 
@@ -1956,6 +2008,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                 {sj.rows.map((row, ri) => (
                                     <BlueprintRow key={ri} row={row} rowIdx={ri}
                                         editMode={editMode} total={total}
+                                        cellKeyPrefix={`cell-${jIdx}-${si}-${ri}`}
                                         dragState={dragState?.type === "row" && dragState.sjIdx === si ? dragState : null}
                                         dropRowIdx={dropTarget?.type === "row" && dropTarget.sjIdx === si ? dropTarget.rowIdx : null}
                                         selectedCellIdx={selected && selected.jIdx === jIdx && selected.sjIdx === si && selected.rowIdx === ri ? selected.cellIdx : null}
@@ -2012,7 +2065,6 @@ function App() {
     const [lastSaved, setLastSaved] = useState(null);
     const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
     const appBarRef = useRef(null);
-    const toolbarRef = useRef(null);
     const saveTimer = useRef(null);
     const lastSavedRef = useRef(null);
     const undoStackRef = useRef([]);
@@ -2587,20 +2639,18 @@ function App() {
         return () => ro.disconnect();
     }, []);
 
-    // Format-toolbar height → CSS var (so the sticky stage header sits below it)
-    useLayoutEffect(() => {
-        const root = document.documentElement;
-        const el = toolbarRef.current;
-        if (!editMode || !el) { root.style.setProperty("--toolbar-h", "0px"); return; }
-        const update = () => root.style.setProperty("--toolbar-h", el.offsetHeight + "px");
-        update();
-        const ro = new ResizeObserver(update);
-        ro.observe(el);
-        return () => { ro.disconnect(); root.style.setProperty("--toolbar-h", "0px"); };
-    }, [editMode, journeys.length, viewOnly]);
-
     // Leaving edit mode clears the cell selection.
     useEffect(() => { if (!editMode) setSelected(null); }, [editMode]);
+
+    useEffect(() => {
+        if (!editMode || !selected) return;
+        const clearWhenOutsideCellTools = (e) => {
+            if (e.target?.closest?.("[data-cell-key], .cell-toolbar, .cell-tick")) return;
+            setSelected(null);
+        };
+        document.addEventListener("mousedown", clearWhenOutsideCellTools);
+        return () => document.removeEventListener("mousedown", clearWhenOutsideCellTools);
+    }, [editMode, selected]);
 
     // Mirror lastSaved into a ref so export reads the latest value.
     useEffect(() => { lastSavedRef.current = lastSaved; }, [lastSaved]);
@@ -2630,6 +2680,9 @@ function App() {
     // The cell the format toolbar currently targets.
     const selectedCell = selected
         ? journeys[selected.jIdx]?.subJourneys?.[selected.sjIdx]?.rows?.[selected.rowIdx]?.cells?.[selected.cellIdx]
+        : null;
+    const selectedKey = selected
+        ? `cell-${selected.jIdx}-${selected.sjIdx}-${selected.rowIdx}-${selected.cellIdx}`
         : null;
 
     if (!ready) return null;
@@ -2661,7 +2714,7 @@ function App() {
                 canUndo={historyState.canUndo} canRedo={historyState.canRedo}
                 onUndo={undo} onRedo={redo} />
             {!viewOnly && editMode && journeys.length > 0 && (
-                <FormatToolbar innerRef={toolbarRef} cell={selectedCell}
+                <FormatToolbar cell={selectedCell} selectedKey={selectedKey}
                     onMode={(m) => selected && handleCellMode(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, m)}
                     onAlign={(a) => selected && handleCellAlign(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, a)} />
             )}
