@@ -128,7 +128,7 @@
         .btn-p{background:var(--accent);color:var(--accent-ink);border:1px solid oklch(12% .004 70 / .9);padding:10px 22px;border-radius:8px;font-size:var(--fs-sm);font-weight:700;cursor:pointer;transition:background .15s,box-shadow .15s,transform .15s;box-shadow:inset 0 1px 0 oklch(100% 0 0 / .1),0 1px 2px oklch(20% .006 70 / .12)}
         .btn-p:hover{background:var(--accent-strong);box-shadow:inset 0 1px 0 oklch(100% 0 0 / .08),0 2px 5px oklch(20% .006 70 / .16)}
         .btn-p:active{transform:translateY(1px);box-shadow:inset 0 1px 2px oklch(0% 0 0 / .18)}
-        .btn-p:disabled{opacity:.4;cursor:not-allowed}
+        .btn-p:disabled,.btn-s:disabled,.btn-danger:disabled{opacity:.4;cursor:not-allowed}
         .btn-s{background:var(--surface);color:var(--text);border:1px solid var(--border);padding:9px 16px;border-radius:8px;font-size:var(--fs-sm);font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
         .btn-s:hover{background:var(--surface-2);border-color:var(--text-sec)}
         .btn-danger{background:var(--red);color:oklch(98.5% .003 70);border:none;padding:10px 22px;border-radius:8px;font-size:var(--fs-sm);font-weight:700;cursor:pointer;transition:filter .15s}
@@ -273,6 +273,13 @@
         .m-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
         .m-file{margin-top:10px}
         .m-warn{margin-top:14px;padding:11px 13px;background:oklch(97% .025 85);border:1px solid oklch(84% .065 82);border-radius:8px;font-size:var(--fs-xs);color:oklch(42% .075 78);line-height:1.5}
+        .m-summary{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+        .m-summary-card{padding:11px 13px;background:var(--surface-2);border:1px solid var(--border-light);border-radius:8px;font-size:var(--fs-xs);line-height:1.5;color:var(--text-sec)}
+        .m-summary-card b{color:var(--text)}
+        .m-sheet-list{margin-top:6px;padding-left:18px;color:var(--text)}
+        .m-sheet-list li{margin-top:3px;overflow-wrap:anywhere}
+        .m-check{display:flex;align-items:flex-start;gap:8px;margin-top:10px;color:var(--text);font-size:var(--fs-xs)}
+        .m-check input{margin-top:2px;accent-color:var(--accent)}
         .m-ft{padding:14px 22px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:8px}
 
         /* ===== LIBRARY (home screen) ===== */
@@ -433,11 +440,26 @@
         .tag-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:var(--fs-2xs);font-weight:600}
         .tag-x{cursor:pointer;font-weight:700;opacity:.55;font-size:var(--fs-xs)}
         .tag-x:hover{opacity:1}
-        .tag-add{display:inline-flex;gap:3px;align-items:center;margin-top:4px}
+        .tag-add{display:inline-flex;flex-direction:column;gap:3px;margin-top:4px;position:relative}
+        .tag-add-row{display:inline-flex;gap:3px;align-items:center}
         .tag-add input{border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:var(--fs-xs);font-family:inherit;width:74px;outline:none}
         .tag-add input:focus{border-color:var(--accent)}
+        .tag-color-wrap{position:relative;display:inline-flex}
         .tag-add-color{width:18px;height:18px;border-radius:4px;border:1px solid oklch(0% 0 0 / .2);cursor:pointer;padding:0}
         .tag-add-go{background:var(--accent);color:var(--accent-ink);border:none;border-radius:4px;font-size:var(--fs-xs);font-weight:700;padding:2px 7px;cursor:pointer;line-height:1.2}
+        .tag-add-go:disabled{opacity:.4;cursor:not-allowed}
+        /* color picker popover */
+        .tag-color-pop{position:fixed;z-index:330;display:grid;grid-template-columns:repeat(4,18px);grid-auto-rows:18px;align-content:start;gap:5px;padding:7px;background:var(--surface);border:1px solid var(--border);border-radius:7px;box-shadow:var(--shadow-md)}
+        .tag-color-cell{width:18px;height:18px;border-radius:4px;border:1px solid oklch(0% 0 0 / .15);cursor:pointer;padding:0}
+        .tag-color-cell.sel{outline:2px solid var(--accent);outline-offset:1px}
+        /* autocomplete suggestions */
+        .tag-suggest{position:fixed;z-index:330;min-width:180px;max-width:240px;max-height:240px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:7px;box-shadow:var(--shadow-md);padding:4px;display:flex;flex-direction:column;gap:1px}
+        .tag-suggest-note{font-size:var(--fs-2xs);color:var(--text-sec);padding:3px 6px}
+        .tag-suggest-item{display:flex;align-items:center;justify-content:space-between;gap:6px;background:transparent;border:none;border-radius:5px;padding:4px 6px;cursor:pointer;text-align:left;width:100%}
+        .tag-suggest-item:hover{background:var(--bg)}
+        .tag-suggest-item.hi{background:oklch(92% .05 264);box-shadow:inset 2px 0 0 var(--accent)}
+        .tag-suggest-hint{font-size:var(--fs-2xs);color:var(--text-sec);white-space:nowrap}
+        .tag-suggest-new .tag-suggest-hint{color:var(--accent-strong)}
 
         /* bullets-mode cell */
         .cell-bullets>div,.cell-bullets>p{padding-left:14px;position:relative;margin-bottom:3px}
@@ -458,7 +480,7 @@
 <body>
 <div id="root"></div>
 <script type="text/babel" data-type="module">
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import Dexie from "dexie";
@@ -645,7 +667,35 @@ const TAG_COLORS = [
     { name: "teal",   bg: "#ccfbf1", fg: "#115e59" },
     { name: "pink",   bg: "#fce7f3", fg: "#9d174d" },
     { name: "gray",   bg: "#f3f4f6", fg: "#374151" },
+    { name: "yellow", bg: "#fef9c3", fg: "#854d0e" },
+    { name: "indigo", bg: "#e0e7ff", fg: "#3730a3" },
+    { name: "cyan",   bg: "#cffafe", fg: "#155e75" },
+    { name: "lime",   bg: "#ecfccb", fg: "#3f6212" },
 ];
+// Live mirror of all journeys, set by App, so deeply-nested tag inputs can
+// look up previously-used tags for autocomplete without prop-drilling.
+let __ALL_JOURNEYS = [];
+const setAllJourneys = (j) => { __ALL_JOURNEYS = j || []; };
+// Collect unique tags (keyed by case-insensitive text) across the whole
+// document, returning the first-seen color for each. Used for autocomplete.
+function collectUsedTags() {
+    const map = new Map();
+    for (const j of __ALL_JOURNEYS || []) {
+        for (const sj of j.subJourneys || []) {
+            for (const row of sj.rows || []) {
+                for (const cell of row.cells || []) {
+                    for (const t of cell.tags || []) {
+                        if (!t || !t.text) continue;
+                        const key = t.text.trim().toLowerCase();
+                        if (!key || map.has(key)) continue;
+                        map.set(key, { text: t.text.trim(), bg: t.bg, fg: t.fg });
+                    }
+                }
+            }
+        }
+    }
+    return [...map.values()];
+}
 const ROW_COLORS = ["#ffffff", "#f5f5f5", "#dbeafe", "#fce8c8", "#e8dff5", "#fecdd3", "#d1fae5", "#fef3c7", "#ff6f00", "#1e293b"];
 const TEXT_COLORS = ["#1a1a2e", "#c62828", "#e8911a", "#2e7d32", "#1565c0", "#6a1b9a", "#5a6376", "#ffffff"];
 const ROW_TYPES = [
@@ -698,6 +748,24 @@ function parseInput(text) {
     if (Array.isArray(obj)) return { journeys: obj };
     if (obj && Array.isArray(obj.journeys)) return { name: obj.name, journeys: obj.journeys };
     throw new Error("Expected a JSON array of journeys, or an object with a \"journeys\" array.");
+}
+
+function withUniqueSheetTitles(existingJourneys, incomingJourneys) {
+    const used = new Set((existingJourneys || []).map((j) => j?.title).filter(Boolean));
+    return (incomingJourneys || []).map((journey) => {
+        const title = journey?.title;
+        if (!title) return journey;
+        const match = title.match(/^(.*) \((\d+)\)$/);
+        const base = match ? match[1] : title;
+        let next = title;
+        let n = match ? Number(match[2]) + 1 : 1;
+        while (used.has(next)) {
+            next = `${base} (${n})`;
+            n++;
+        }
+        used.add(next);
+        return next === title ? journey : { ...journey, title: next };
+    });
 }
 
 function embeddedProject() {
@@ -1381,23 +1449,61 @@ function EmptyState({ onNew, onLoad, onPrompt }) {
 // ═══════════════════════════════════════
 // LOAD MODAL
 // ═══════════════════════════════════════
-function LoadModal({ onLoad, onClose, existingCount = 0 }) {
+function LoadModal({ onLoad, onClose, currentProjectName, existingJourneys = [] }) {
     const [text, setText] = useState("");
+    const [review, setReview] = useState(null);
+    const [confirmedProjectDetails, setConfirmedProjectDetails] = useState(false);
+    const existingCount = existingJourneys.length;
     const fileRef = useRef(null);
+    const bodyRef = useRef(null);
+
+    useEffect(() => {
+        if (!review) return;
+        bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" });
+    }, [review]);
 
     const handleFile = (e) => {
         const f = e.target.files[0];
         if (!f) return;
         const r = new FileReader();
-        r.onload = (ev) => setText(ev.target.result);
+        r.onload = (ev) => { setText(ev.target.result); setReview(null); setConfirmedProjectDetails(false); };
         r.readAsText(f);
     };
 
-    const handleSubmit = async (mode) => {
+    const getImportReview = () => {
+        const parsed = parseInput(text);
+        const data = hydrate(parsed.journeys);
+        if (!data.length) throw new Error("No valid journey data found.");
+        const nextProjectName = parsed.name?.trim() || null;
+        const sameProjectName = !currentProjectName || !nextProjectName || nextProjectName === currentProjectName;
+        const existingTitles = new Set(existingJourneys.map((j) => j?.title).filter(Boolean));
+        const affectedSheets = data
+            .map((j) => j?.title)
+            .filter((title) => title && existingTitles.has(title));
+        return { data, nextProjectName, sameProjectName, affectedSheets };
+    };
+
+    const handleReview = () => {
         if (!text.trim()) return;
-        try { await onLoad(text, mode); onClose(); }
+        try {
+            const nextReview = getImportReview();
+            setReview(nextReview);
+            setConfirmedProjectDetails(false);
+            if (!nextReview.affectedSheets.length && nextReview.sameProjectName) handleSubmit("append", nextReview);
+        }
         catch (err) { alert("Error parsing data:\n" + err.message); }
     };
+
+    const handleSubmit = async (mode, nextReview = review) => {
+        if (!text.trim()) return;
+        const importReview = nextReview || getImportReview();
+        try { await onLoad(text, mode, { updateProjectName: mode === "replace" && !!importReview.nextProjectName && importReview.sameProjectName }); onClose(); }
+        catch (err) { alert("Error parsing data:\n" + err.message); }
+    };
+
+    const needsChoice = review && review.affectedSheets.length > 0;
+    const needsProjectDetailsConfirm = review && !review.sameProjectName;
+    const canImport = review && (!needsProjectDetailsConfirm || confirmedProjectDetails);
 
     return (
         <div className="m-ov" onClick={onClose}>
@@ -1406,28 +1512,52 @@ function LoadModal({ onLoad, onClose, existingCount = 0 }) {
                     <h3>Load JSON Data</h3>
                     <button className="m-close" onClick={onClose}>✕</button>
                 </div>
-                <div className="m-body">
+                <div ref={bodyRef} className="m-body">
                     <p>Paste extracted JSON below, or upload a <code>.json</code> / <code>.txt</code> file. Exported project files are also accepted.</p>
-                    <textarea value={text} onChange={(e) => setText(e.target.value)} rows={14}
+                    <textarea value={text} onChange={(e) => { setText(e.target.value); setReview(null); setConfirmedProjectDetails(false); }} rows={14}
                         placeholder={'Paste JSON here…\n\nA JSON array of service journeys (each item = one tab).'} />
                     <div className="m-file">
                         <button className="btn-s" onClick={() => fileRef.current?.click()}>📁 Upload file</button>
                         <input ref={fileRef} type="file" accept=".json,.txt" onChange={handleFile} style={{ display: "none" }} />
                     </div>
-                    {existingCount > 0 && (
-                        <div className="m-warn">
-                            ⚠️ This project already has {existingCount} sheet{existingCount === 1 ? "" : "s"}.
-                            Choose <b>Add as new sheets</b> to keep them, or <b>Overwrite</b> to replace them all.
+                    {review && (needsChoice || needsProjectDetailsConfirm) && (
+                        <div className="m-summary">
+                            {needsChoice && (
+                                <div className="m-warn">
+                                    ⚠️ {review.affectedSheets.length} imported sheet{review.affectedSheets.length === 1 ? "" : "s"} match existing sheet title{review.affectedSheets.length === 1 ? "" : "s"}.
+                                    <b>Affected:</b>
+                                    <ul className="m-sheet-list">
+                                        {review.affectedSheets.map((title) => <li key={title}>{title}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+                            {needsProjectDetailsConfirm && (
+                                <div className="m-summary-card">
+                                    <b>Different project details</b><br />
+                                    Imported project name: {review.nextProjectName}
+                                    {currentProjectName && <> <br />Current project name: {currentProjectName}</>}
+                                    <label className="m-check">
+                                        <input type="checkbox" checked={confirmedProjectDetails} onChange={(e) => setConfirmedProjectDetails(e.target.checked)} />
+                                        Keep the current project details and add only the imported sheets.
+                                    </label>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
                 <div className="m-ft">
                     <button className="btn-s" onClick={onClose}>Cancel</button>
-                    {existingCount > 0 ? (
+                    {!review ? (
+                        <button className="btn-p" onClick={handleReview} disabled={!text.trim()}>Load Data</button>
+                    ) : needsChoice ? (
                         <>
-                            <button className="btn-s" onClick={() => handleSubmit("replace")} disabled={!text.trim()}>Overwrite</button>
-                            <button className="btn-p" onClick={() => handleSubmit("append")} disabled={!text.trim()}>Add as new sheets</button>
+                            <button className="btn-danger" onClick={() => handleSubmit("overwriteAffected")} disabled={!canImport}>Overwrite affected sheets</button>
+                            <button className="btn-p" onClick={() => handleSubmit("append")} disabled={!canImport}>Add as new sheets</button>
                         </>
+                    ) : needsProjectDetailsConfirm ? (
+                        <button className="btn-p" onClick={() => handleSubmit("append")} disabled={!canImport}>Add sheets</button>
+                    ) : existingCount > 0 ? (
+                        <button className="btn-p" onClick={() => handleSubmit("append")} disabled={!text.trim()}>Add sheets</button>
                     ) : (
                         <button className="btn-p" onClick={() => handleSubmit("replace")} disabled={!text.trim()}>Load Data</button>
                     )}
@@ -1637,18 +1767,181 @@ function Menu({ trigger, align, children }) {
 // ═══════════════════════════════════════
 // TAG ADDER (inline, for tags-mode cells)
 // ═══════════════════════════════════════
-function TagAdder({ onAdd }) {
+function TagAdder({ onAdd, existing = [] }) {
     const [text, setText] = useState("");
     const [ci, setCi] = useState(0);
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [open, setOpen] = useState(false);
+    const [hi, setHi] = useState(0);
+    const [pickerPos, setPickerPos] = useState(null);
+    const [suggestPos, setSuggestPos] = useState(null);
+    const rootRef = useRef(null);
+    const swatchRef = useRef(null);
+    const inputRef = useRef(null);
     const c = TAG_COLORS[ci];
-    const add = () => { const t = text.trim(); if (!t) return; onAdd({ text: t, bg: c.bg, fg: c.fg }); setText(""); };
+
+    const taken = useMemo(
+        () => new Set(existing.map((t) => (t.text || "").trim().toLowerCase())),
+        [existing]
+    );
+
+    // Previously-used tags across the doc that match the query and aren't
+    // already on this row. Empty query → show all available (capped).
+    const suggestions = useMemo(() => {
+        const q = text.trim().toLowerCase();
+        return collectUsedTags()
+            .filter((t) => !taken.has(t.text.toLowerCase()))
+            .filter((t) => !q || t.text.toLowerCase().includes(q))
+            .slice(0, 8);
+    }, [text, taken]);
+
+    const exactExists = useMemo(() => {
+        const q = text.trim().toLowerCase();
+        return !!q && taken.has(q);
+    }, [text, taken]);
+
+    // Unified, navigable option list: matching existing tags first, then a
+    // "create new" entry when the typed text isn't already a suggestion/taken.
+    const options = useMemo(() => {
+        const opts = suggestions.map((t) => ({ kind: "existing", tag: t, key: "e:" + t.text }));
+        const q = text.trim();
+        if (q && !exactExists && !suggestions.some((s) => s.text.toLowerCase() === q.toLowerCase())) {
+            opts.push({ kind: "new", text: q, key: "n:" + q });
+        }
+        return opts;
+    }, [suggestions, text, exactExists]);
+
+    // Keep highlight in range; default to the first option.
+    useEffect(() => { setHi(0); }, [text]);
+    useEffect(() => {
+        setHi((h) => (options.length ? Math.min(h, options.length - 1) : 0));
+    }, [options.length]);
+
+    // Position popovers (portaled to body) relative to their anchors, opening
+    // upward so they clear the cell toolbar that sits below the cell.
+    const placePicker = useCallback(() => {
+        const el = swatchRef.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        setPickerPos({ left: r.left, bottom: window.innerHeight - r.top + 6 });
+    }, []);
+    const placeSuggest = useCallback(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        setSuggestPos({ left: r.left, bottom: window.innerHeight - r.top + 6, minWidth: r.width });
+    }, []);
+
+    useEffect(() => {
+        if (!pickerOpen) return;
+        placePicker();
+        window.addEventListener("scroll", placePicker, true);
+        window.addEventListener("resize", placePicker);
+        return () => { window.removeEventListener("scroll", placePicker, true); window.removeEventListener("resize", placePicker); };
+    }, [pickerOpen, placePicker]);
+
+    useEffect(() => {
+        if (!open) return;
+        placeSuggest();
+        window.addEventListener("scroll", placeSuggest, true);
+        window.addEventListener("resize", placeSuggest);
+        return () => { window.removeEventListener("scroll", placeSuggest, true); window.removeEventListener("resize", placeSuggest); };
+    }, [open, placeSuggest]);
+
+    // Close popovers when clicking outside (root or the portaled popovers).
+    useEffect(() => {
+        if (!open && !pickerOpen) return;
+        const onDown = (e) => {
+            const t = e.target;
+            if (rootRef.current?.contains(t)) return;
+            if (t.closest?.(".tag-color-pop, .tag-suggest")) return;
+            setOpen(false); setPickerOpen(false);
+        };
+        document.addEventListener("mousedown", onDown);
+        return () => document.removeEventListener("mousedown", onDown);
+    }, [open, pickerOpen]);
+
+    const reset = () => { setText(""); setOpen(false); setHi(0); };
+
+    const addNew = () => {
+        const t = text.trim();
+        if (!t || taken.has(t.toLowerCase())) return;
+        // If the typed text matches a previously-used tag, reuse its color
+        // instead of the picker color so tag colors stay consistent.
+        const match = collectUsedTags().find((u) => u.text.toLowerCase() === t.toLowerCase());
+        if (match) onAdd({ text: match.text, bg: match.bg, fg: match.fg });
+        else onAdd({ text: t, bg: c.bg, fg: c.fg });
+        reset();
+    };
+    const addExisting = (tag) => {
+        if (taken.has(tag.text.toLowerCase())) return;
+        onAdd({ text: tag.text, bg: tag.bg, fg: tag.fg });
+        reset();
+    };
+    const commitOption = (opt) => {
+        if (!opt) { addNew(); return; }
+        if (opt.kind === "existing") addExisting(opt.tag);
+        else addNew();
+    };
+
+    const onKeyDown = (e) => {
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            if (options.length) { setOpen(true); setHi((h) => (h + 1) % options.length); }
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            if (options.length) { setOpen(true); setHi((h) => (h - 1 + options.length) % options.length); }
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (open && options.length) commitOption(options[hi]);
+            else addNew();
+        } else if (e.key === "Escape") {
+            setOpen(false); setPickerOpen(false);
+        }
+    };
+
     return (
-        <div className="tag-add" contentEditable={false}>
-            <button className="tag-add-color" style={{ background: c.bg }} title={`color: ${c.name}`}
-                onClick={() => setCi((ci + 1) % TAG_COLORS.length)} />
-            <input value={text} placeholder="add tag…" onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
-            <button className="tag-add-go" onClick={add}>＋</button>
+        <div className="tag-add" contentEditable={false} ref={rootRef}>
+            <div className="tag-add-row">
+                <button ref={swatchRef} className="tag-add-color" style={{ background: c.bg }}
+                    title={`color: ${c.name}`}
+                    onClick={() => { setPickerOpen((o) => !o); setOpen(false); }} />
+                <input ref={inputRef} value={text} placeholder="add tag…"
+                    onChange={(e) => { setText(e.target.value); setOpen(true); setPickerOpen(false); }}
+                    onFocus={() => { setOpen(true); setPickerOpen(false); }}
+                    onKeyDown={onKeyDown} />
+                <button className="tag-add-go" onClick={addNew} disabled={!text.trim() || exactExists}
+                    title={exactExists ? "tag already added" : "add new tag"}>＋</button>
+            </div>
+            {pickerOpen && pickerPos && createPortal(
+                <div className="tag-color-pop" style={{ left: pickerPos.left, bottom: pickerPos.bottom }}>
+                    {TAG_COLORS.map((col, i) => (
+                        <button key={col.name} className={`tag-color-cell${i === ci ? " sel" : ""}`}
+                            style={{ background: col.bg }} title={col.name}
+                            onMouseDown={(e) => { e.preventDefault(); setCi(i); setPickerOpen(false); }} />
+                    ))}
+                </div>, document.body)}
+            {open && suggestPos && (options.length > 0 || exactExists) && createPortal(
+                <div className="tag-suggest" style={{ left: suggestPos.left, bottom: suggestPos.bottom, minWidth: suggestPos.minWidth }}>
+                    {exactExists && (
+                        <div className="tag-suggest-note">already added to this cell</div>
+                    )}
+                    {options.map((opt, i) => opt.kind === "existing" ? (
+                        <button key={opt.key} className={`tag-suggest-item${i === hi ? " hi" : ""}`}
+                            onMouseEnter={() => setHi(i)}
+                            onMouseDown={(e) => { e.preventDefault(); addExisting(opt.tag); }}>
+                            <span className="tag-chip" style={{ background: opt.tag.bg, color: opt.tag.fg }}>{opt.tag.text}</span>
+                            <span className="tag-suggest-hint">existing</span>
+                        </button>
+                    ) : (
+                        <button key={opt.key} className={`tag-suggest-item tag-suggest-new${i === hi ? " hi" : ""}`}
+                            onMouseEnter={() => setHi(i)}
+                            onMouseDown={(e) => { e.preventDefault(); addNew(); }}>
+                            <span className="tag-chip" style={{ background: c.bg, color: c.fg }}>{opt.text}</span>
+                            <span className="tag-suggest-hint">create new</span>
+                        </button>
+                    ))}
+                </div>, document.body)}
         </div>
     );
 }
@@ -1761,7 +2054,7 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
                     ))}
                     {!tags.length && !editMode && <span style={{ color: "var(--text-sec)" }}>—</span>}
                 </div>
-                {editMode && selected && <TagAdder onAdd={(t) => onTagsChange([...tags, t])} />}
+                {editMode && selected && <TagAdder existing={tags} onAdd={(t) => onTagsChange([...tags, t])} />}
             </td>
         );
     }
@@ -2276,6 +2569,7 @@ function App() {
 
     const applyJourneys = useCallback((nextJourneys) => {
         journeysRef.current = nextJourneys;
+        setAllJourneys(nextJourneys);
         setJourneys(nextJourneys);
         setTab((cur) => nextJourneys.length ? Math.min(cur, nextJourneys.length - 1) : 0);
     }, []);
@@ -2429,7 +2723,7 @@ function App() {
     }, [journeys, currentId, ready, refreshProjects]);
 
     // ── Load data (JSON array / exported project) ──
-    const loadFromText = useCallback(async (text, mode = "replace") => {
+    const loadFromText = useCallback(async (text, mode = "replace", options = {}) => {
         const parsed = parseInput(text);
         const data = hydrate(parsed.journeys);
         if (!data.length) throw new Error("No valid journey data found.");
@@ -2449,11 +2743,28 @@ function App() {
             setView("project");
         } else if (mode === "append") {
             const at = journeysRef.current.length;
-            commitJourneys((prev) => [...prev, ...data]);
+            commitJourneys((prev) => [...prev, ...withUniqueSheetTitles(prev, data)]);
             setTab(at);
+        } else if (mode === "overwriteAffected") {
+            const byTitle = new Map(data.filter((j) => j.title).map((j) => [j.title, j]));
+            let firstChanged = -1;
+            commitJourneys((prev) => {
+                const existingTitles = new Set(prev.map((j) => j.title).filter(Boolean));
+                const replaced = prev.map((j, i) => {
+                    if (!byTitle.has(j.title)) return j;
+                    if (firstChanged < 0) firstChanged = i;
+                    return byTitle.get(j.title);
+                });
+                const newSheets = data.filter((j) => !j.title || !existingTitles.has(j.title));
+                return [...replaced, ...newSheets];
+            });
+            if (firstChanged >= 0) setTab(firstChanged);
         } else {
             commitJourneys(data);
             setTab(0);
+        }
+        if (options.updateProjectName && parsed.name?.trim() && id != null) {
+            await dbRenameProject(id, parsed.name.trim());
         }
         await refreshProjects();
         console.log(`%c✅ Loaded ${data.length} service journey(s)`, "color:#2e7d32;font-weight:bold;font-size:14px");
@@ -2918,7 +3229,7 @@ function App() {
                     onOpen={openProject} onNew={newProject}
                     onRename={renameProject} onDelete={deleteProject}
                     onLoad={() => setModal(true)} />
-                {modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} existingCount={0} />}
+                {modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} currentProjectName={currentName} existingJourneys={[]} />}
                 {confirmState && <ConfirmModal {...confirmState} onClose={() => setConfirmState(null)} />}
             </>
         );
@@ -2961,7 +3272,7 @@ function App() {
             <TabBar journeys={journeys} activeTab={tab} setActiveTab={setTab}
                 onNew={newBlankJourney} onLoad={() => setModal(true)}
                 onDelete={deleteJourney} viewOnly={viewOnly} />
-            {!viewOnly && modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} existingCount={journeys.length} />}
+            {!viewOnly && modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} currentProjectName={currentName} existingJourneys={journeys} />}
             {confirmState && <ConfirmModal {...confirmState} onClose={() => setConfirmState(null)} />}
         </>
     );
