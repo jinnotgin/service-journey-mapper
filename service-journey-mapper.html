@@ -1307,7 +1307,7 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                             <Menu trigger={promptCopied ? "Copied ✓" : "Export ▾"} align="right">
                                 {(close) => (
                                     <>
-                                        <button className="menu-item" onClick={() => { onStandaloneExport(); close(); }}>Download standalone HTML</button>
+                                        <button className="menu-item" onClick={() => { onStandaloneExport(); close(); }}>Export as read-only HTML</button>
                                         {hasMultipleSheets ? (
                                             <>
                                                 <div className="menu-divider" />
