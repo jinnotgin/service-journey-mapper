@@ -1489,7 +1489,7 @@ function LoadModal({ onLoad, onClose, currentProjectName, existingJourneys = [] 
             const nextReview = getImportReview();
             setReview(nextReview);
             setConfirmedProjectDetails(false);
-            if (!nextReview.affectedSheets.length && nextReview.sameProjectName) handleSubmit("append", nextReview);
+            if (!nextReview.affectedSheets.length && (nextReview.sameProjectName || existingCount === 0)) handleSubmit("replace", nextReview);
         }
         catch (err) { alert("Error parsing data:\n" + err.message); }
     };
