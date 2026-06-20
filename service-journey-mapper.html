@@ -92,7 +92,7 @@
         .history-btn{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:7px;background:transparent;cursor:pointer;padding:0;transition:background .15s,border-color .15s,opacity .15s}
         .history-btn:hover:not(:disabled){background:var(--surface-2);border-color:var(--border)}
         .history-btn:disabled{cursor:not-allowed;opacity:.34}
-        .history-btn img{width:15px;height:15px;display:block}
+        .history-btn svg{width:15px;height:15px;display:block;stroke:currentColor}
         /* segmented Edit | View toggle */
         .ab-seg{display:flex;padding:2px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2)}
         .ab-seg button{background:transparent;color:var(--text-sec);border:none;padding:5px 13px;border-radius:7px;font-size:var(--fs-xs);font-weight:650;cursor:pointer;font-family:inherit;min-height:30px;transition:background .15s,color .15s}
@@ -276,26 +276,29 @@
         .m-ft{padding:14px 22px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:8px}
 
         /* ===== LIBRARY (home screen) ===== */
-        .lib{max-width:980px;margin:0 auto;padding:44px 24px 80px}
-        .lib-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
-        .lib-eyebrow{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--accent-strong);margin-bottom:6px}
-        .lib-head h1{font-size:var(--fs-2xl);font-weight:700;letter-spacing:-.02em;color:var(--text)}
-        .lib-head p{font-size:var(--fs-sm);color:var(--text-sec);margin-top:6px;max-width:48ch;line-height:1.55}
+        .lib{max-width:1120px;margin:0 auto;padding:48px 24px 86px}
+        .lib-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:28px;margin-bottom:26px}
+        .lib-eyebrow{font-size:var(--fs-xs);font-weight:700;color:oklch(42% .08 220);margin-bottom:8px}
+        .lib-head h1{font-size:34px;font-weight:800;letter-spacing:0;color:var(--text);line-height:1.08}
+        .lib-head p{font-size:var(--fs-sm);color:var(--text-sec);margin-top:10px;max-width:56ch;line-height:1.6}
         .lib-actions{display:flex;gap:8px;flex-shrink:0}
-        .project-list{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow-sm)}
-        .project-row{width:100%;display:grid;grid-template-columns:minmax(0,1fr) 110px 155px 38px;align-items:center;gap:16px;text-align:left;background:var(--surface);border:0;border-bottom:1px solid var(--border-light);padding:14px 14px 14px 18px;cursor:pointer;font-family:inherit;color:var(--text);transition:background .15s}
+        .lib-actions .btn-s,.lib-actions .btn-p{min-height:40px}
+        .project-list{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:0 12px 30px oklch(30% .012 70 / .08)}
+        .project-row{width:100%;display:grid;grid-template-columns:minmax(0,1fr) 118px 168px 38px;align-items:center;gap:18px;text-align:left;background:var(--surface);border:0;border-bottom:1px solid var(--border-light);padding:17px 18px 17px 20px;cursor:pointer;font-family:inherit;color:var(--text);transition:background .15s,box-shadow .15s}
         .project-row:last-child{border-bottom:0}
-        .project-row:hover{background:var(--surface-2)}
-        .project-row.current{background:oklch(97% .004 70)}
-        .project-row.add{grid-template-columns:1fr;justify-items:center;color:var(--text-sec);border-top:1px dashed var(--border);font-weight:650}
-        .project-row.add:hover{color:var(--text);background:var(--surface-2)}
+        .project-row:hover{background:oklch(97% .006 70);box-shadow:inset 3px 0 0 oklch(55% .12 220)}
+        .project-row.current{background:oklch(97.5% .012 220)}
+        .project-row.current:hover{background:oklch(96.5% .015 220)}
+        .project-row.add{grid-template-columns:1fr;justify-items:center;color:var(--text-sec);border-top:1px dashed var(--border);font-weight:700;background:oklch(98.5% .003 70);padding:15px 18px}
+        .project-row.add:hover{color:var(--text);background:var(--surface-2);box-shadow:none}
         .pc-main{min-width:0}
-        .pc-name{font-weight:700;font-size:var(--fs-md);color:var(--text);letter-spacing:-.01em;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
-        .pc-badge{display:inline-block;background:var(--accent-soft);color:var(--accent-strong);font-size:var(--fs-2xs);font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+        .pc-name{font-weight:760;font-size:var(--fs-md);color:var(--text);letter-spacing:0;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
+        .pc-badge{display:inline-flex;align-items:center;background:oklch(92.5% .04 220);color:oklch(34% .1 220);font-size:var(--fs-2xs);font-weight:800;padding:3px 7px;border-radius:6px;text-transform:none;letter-spacing:0;margin-bottom:6px}
         .pc-count,.pc-updated{font-size:var(--fs-xs);color:var(--text-sec);white-space:nowrap}
+        .pc-updated{font-variant-numeric:tabular-nums}
         .pc-menu{display:flex;justify-content:flex-end}
         .pc-add-label{font-size:var(--fs-sm)}
-        .lib-empty{text-align:center;padding:60px 20px;color:var(--text-sec)}
+        .lib-empty{text-align:center;padding:60px 20px;color:var(--text-sec);border:1px dashed var(--border);border-radius:8px;background:var(--surface);box-shadow:var(--shadow-sm)}
         .icon-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-sec);transition:background .15s}
         .icon-btn:hover{background:var(--surface-2);color:var(--text)}
         .icon-btn.danger:hover{background:oklch(95% .03 20);color:var(--red);border-color:oklch(85% .06 20)}
@@ -315,7 +318,10 @@
             .ch-hdr{padding:12px 16px 10px}
             .ch-hdr h2{font-size:var(--fs-lg)}
             .lib{padding:28px 16px 80px}
-            .lib-head h1{font-size:var(--fs-xl)}
+            .lib-head{grid-template-columns:1fr;align-items:start;gap:14px}
+            .lib-head h1{font-size:26px}
+            .lib-actions{width:100%}
+            .lib-actions .btn-s,.lib-actions .btn-p{flex:1}
             .project-row{grid-template-columns:minmax(0,1fr) 38px;gap:10px}
             .pc-count,.pc-updated{display:none}
         }
@@ -330,7 +336,9 @@
         .tb-group{display:flex;align-items:center;gap:3px}
         .tb-sep{width:1px;height:20px;background:var(--border);margin:0 5px}
         .tb-label{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-sec);margin-right:3px}
-        .tb-btn{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;color:var(--text-sec);font-family:inherit;line-height:1.1}
+        .tb-btn{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;color:var(--text-sec);font-family:inherit;line-height:1.1;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:30px}
+        .tb-btn svg{width:15px;height:15px;display:block;stroke:currentColor;flex:0 0 auto}
+        .tb-btn.icon-only{width:32px;padding:0}
         .tb-btn:hover:not(:disabled){background:var(--bg);color:var(--text);border-color:var(--text-sec)}
         .tb-btn.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
         .tb-btn:disabled{opacity:.4;cursor:not-allowed}
@@ -1045,6 +1053,50 @@ function buildExampleProject() {
 // ═══════════════════════════════════════
 // TOP APP BAR
 // ═══════════════════════════════════════
+const LUCIDE_PATHS = {
+    alignCenter: [
+        <path key="1" d="M17 12H7" />,
+        <path key="2" d="M19 18H5" />,
+        <path key="3" d="M21 6H3" />
+    ],
+    alignLeft: [
+        <path key="1" d="M15 12H3" />,
+        <path key="2" d="M17 18H3" />,
+        <path key="3" d="M21 6H3" />
+    ],
+    list: [
+        <path key="1" d="M8 6h13" />,
+        <path key="2" d="M8 12h13" />,
+        <path key="3" d="M8 18h13" />,
+        <path key="4" d="M3 6h.01" />,
+        <path key="5" d="M3 12h.01" />,
+        <path key="6" d="M3 18h.01" />
+    ],
+    redo2: [
+        <path key="1" d="m15 14 5-5-5-5" />,
+        <path key="2" d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5 5.5 5.5 0 0 0 9.5 20H13" />
+    ],
+    square: [
+        <rect key="1" width="18" height="18" x="3" y="3" rx="2" />
+    ],
+    tag: [
+        <path key="1" d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />,
+        <circle key="2" cx="7.5" cy="7.5" r=".5" fill="currentColor" />
+    ],
+    undo2: [
+        <path key="1" d="M9 14 4 9l5-5" />,
+        <path key="2" d="M4 9h10.5A5.5 5.5 0 0 1 20 14.5 5.5 5.5 0 0 1 14.5 20H11" />
+    ]
+};
+
+function LucideIcon({ name }) {
+    return (
+        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            {LUCIDE_PATHS[name]}
+        </svg>
+    );
+}
+
 function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadExport, onStandaloneExport, onPromptExport, canExport, saveState, lastSaved,
         viewOnly,
         editMode, onSetEdit, canUndo, canRedo, onUndo, onRedo }) {
@@ -1072,10 +1124,10 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadE
                     {!viewOnly && (
                         <div className="history-actions" aria-label="History controls">
                             <button className="history-btn" onClick={onUndo} disabled={!canUndo} title="Undo (⌘/Ctrl+Z)" aria-label="Undo">
-                                <img src="https://cdn.jsdelivr.net/npm/lucide-static@1.21.0/icons/undo-2.svg" alt="" aria-hidden="true" />
+                                <LucideIcon name="undo2" />
                             </button>
                             <button className="history-btn" onClick={onRedo} disabled={!canRedo} title="Redo (⌘/Ctrl+Shift+Z)" aria-label="Redo">
-                                <img src="https://cdn.jsdelivr.net/npm/lucide-static@1.21.0/icons/redo-2.svg" alt="" aria-hidden="true" />
+                                <LucideIcon name="redo2" />
                             </button>
                         </div>
                     )}
@@ -1263,7 +1315,7 @@ function ProjectCard({ p, current, onOpen, onRename, onDelete }) {
             onClick={() => !editing && onOpen(p.id)}
             onKeyDown={(e) => { if (!editing && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onOpen(p.id); } }}>
             <div className="pc-main">
-                {current && <span className="pc-badge">Current</span>}
+                {current && <span className="pc-badge">Open in editor</span>}
                 {editing ? (
                     <input ref={inputRef} className="m-input pc-rename" value={draft}
                         onClick={(e) => e.stopPropagation()} onChange={(e) => setDraft(e.target.value)} onBlur={commit}
@@ -1296,9 +1348,9 @@ function LibraryScreen({ projects, currentId, onOpen, onNew, onRename, onDelete,
         <div className="lib">
             <div className="lib-head">
                 <div>
-                    <div className="lib-eyebrow">Service Journey Mapper</div>
-                    <h1>Your projects</h1>
-                    <p>Each project holds its own set of journey maps, saved privately in this browser. Open one to keep working, or start something new.</p>
+                    <div className="lib-eyebrow">Local AI-assisted mapping workspace</div>
+                    <h1>Service Journey Mapper</h1>
+                    <p>Create and refine service journey maps, work with any AI model to assist with mapping, and keep projects saved locally in this browser.</p>
                 </div>
                 <div className="lib-actions">
                     <button className="btn-s" onClick={onLoad}>Load JSON</button>
@@ -1662,14 +1714,24 @@ function FormatToolbar({ innerRef, cell, onMode, onAlign }) {
             <span className="tb-label">Cell</span>
             <div className="tb-group">
                 <button className={`tb-btn${mode === "text" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("text")}>Text</button>
-                <button className={`tb-btn${mode === "bullets" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("bullets")}>• Bullets</button>
-                <button className={`tb-btn${mode === "boxes" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("boxes")}>▢ Boxes</button>
-                <button className={`tb-btn${mode === "tags" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("tags")}>Tags</button>
+                <button className={`tb-btn${mode === "bullets" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("bullets")}>
+                    <LucideIcon name="list" />Bullets
+                </button>
+                <button className={`tb-btn${mode === "boxes" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("boxes")}>
+                    <LucideIcon name="square" />Boxes
+                </button>
+                <button className={`tb-btn${mode === "tags" ? " active" : ""}`} disabled={disabled} onClick={() => onMode("tags")}>
+                    <LucideIcon name="tag" />Tags
+                </button>
             </div>
             <div className="tb-sep" />
             <div className="tb-group">
-                <button className={`tb-btn${align === "left" ? " active" : ""}`} disabled={disabled} onClick={() => onAlign("left")} title="Align left">⬅</button>
-                <button className={`tb-btn${align === "center" ? " active" : ""}`} disabled={disabled} onClick={() => onAlign("center")} title="Align center">⬄</button>
+                <button className={`tb-btn icon-only${align === "left" ? " active" : ""}`} disabled={disabled} onClick={() => onAlign("left")} title="Align left" aria-label="Align left" aria-pressed={align === "left"}>
+                    <LucideIcon name="alignLeft" />
+                </button>
+                <button className={`tb-btn icon-only${align === "center" ? " active" : ""}`} disabled={disabled} onClick={() => onAlign("center")} title="Align center" aria-label="Align center" aria-pressed={align === "center"}>
+                    <LucideIcon name="alignCenter" />
+                </button>
             </div>
             <div className="tb-sep" />
             <div className="tb-group">
