@@ -2014,13 +2014,16 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, onCo
         ref.current?.blur();
         onDone?.();
     };
+    const handleKeyDown = (e) => {
+        if (e.key === "Escape") discard(e);
+    };
 
     return (
         <>
             <td ref={ref} className={className} style={style} colSpan={colSpan}
                 data-cell-key={cellKey}
                 contentEditable={editMode} suppressContentEditableWarning
-                onFocus={handleFocus} onBlur={handleBlur} />
+                onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} />
             {focused && pos && createPortal(
                 <div className="cell-tick" style={{ top: pos.top, left: pos.left }}>
                     <button className="ct-btn ct-ok" title="Save changes" onMouseDown={save}>✓</button>
