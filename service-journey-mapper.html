@@ -232,7 +232,7 @@
         .emotion-text{font-size:var(--fs-xs);font-weight:600}
         .emotion-neg{color:var(--red)}.emotion-pos{color:var(--green)}.emotion-neu{color:var(--gold)}
 
-        .stage-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--surface);color:var(--text);border:1px solid var(--border);font-weight:700;font-size:var(--fs-sm)}
+        .stage-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--accent-strong);color:var(--accent-ink);border:1px solid var(--accent-strong);font-weight:700;font-size:var(--fs-sm)}
 
         /* ===== EDITABLE ===== */
         td[contenteditable="true"]{cursor:text;outline:none;transition:box-shadow .12s,background .12s}
@@ -342,7 +342,7 @@
         .menu-trigger:hover{background:var(--surface)}
         .menu-pop{position:absolute;z-index:130;top:100%;left:0;margin-top:3px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-md);padding:6px;min-width:184px;text-align:left;color:var(--text)}
         .menu-pop.right{left:auto;right:0}
-        .menu-portal{position:fixed;z-index:300;margin-top:0}
+        .menu-portal{position:fixed;z-index:300;margin-top:0;max-width:calc(100vw - 16px)}
         .menu-item{display:flex;align-items:center;gap:7px;width:100%;background:none;border:none;padding:8px 10px;border-radius:7px;font-size:var(--fs-sm);font-weight:500;color:var(--text);cursor:pointer;font-family:inherit;text-align:left}
         .menu-item:hover{background:var(--surface-2)}
         .menu-item:disabled{opacity:.38;cursor:not-allowed}
@@ -1394,7 +1394,7 @@ function Menu({ trigger, align, children }) {
                 onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>{trigger || "⋮"}</button>
             {open && pos && createPortal(
                 <div ref={popRef} className="menu-pop menu-portal"
-                    style={align === "right" ? { top: pos.top, right: pos.right } : { top: pos.top, left: pos.left }}
+                    style={align === "right" ? { top: pos.top, right: pos.right, left: "auto" } : { top: pos.top, left: pos.left }}
                     onClick={(e) => e.stopPropagation()}>
                     {typeof children === "function" ? children(() => setOpen(false)) : children}
                 </div>, document.body)}
