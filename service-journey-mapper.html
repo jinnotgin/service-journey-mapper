@@ -1922,10 +1922,12 @@ function FormatToolbar({ cell, selectedKey, onMode, onAlign }) {
         if (disabled) { setPos(null); return; }
         place();
         const raf = window.requestAnimationFrame(place);
+        const raf2 = window.requestAnimationFrame(() => window.requestAnimationFrame(place));
         window.addEventListener("scroll", place, true);
         window.addEventListener("resize", place);
         return () => {
             window.cancelAnimationFrame(raf);
+            window.cancelAnimationFrame(raf2);
             window.removeEventListener("scroll", place, true);
             window.removeEventListener("resize", place);
         };
