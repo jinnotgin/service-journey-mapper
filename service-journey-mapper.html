@@ -84,6 +84,12 @@
         .empty-state p{color:var(--text-sec);max-width:400px;font-size:.88rem}
         .empty-hint{font-size:.76rem;color:var(--text-sec);margin-top:4px}
         .empty-hint code{background:#e8ecf1;padding:2px 6px;border-radius:4px;font-family:Menlo,Consolas,monospace;font-size:.7rem}
+        .ideate-card{margin-top:28px;max-width:460px;width:100%;background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px 24px;text-align:left;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+        .ideate-title{font-size:.95rem;font-weight:700;color:var(--primary);margin-bottom:6px}
+        .ideate-desc{color:var(--text-sec);font-size:.82rem;line-height:1.5;margin-bottom:12px}
+        .ideate-steps{margin:0 0 16px;padding-left:20px;color:var(--text-sec);font-size:.8rem;line-height:1.6}
+        .ideate-steps b{color:var(--text)}
+        .ideate-card .btn-p{width:100%}
 
         /* ===== BUTTONS ===== */
         .btn-p{background:var(--accent);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:.86rem;font-weight:600;cursor:pointer;transition:background .15s}
@@ -629,22 +635,11 @@ function downloadFile(filename, text, type) {
     a.remove(); URL.revokeObjectURL(url);
 }
 
-function buildPromptExport(payload) {
+// Shared schema + structural-rules block used by both the "edit" prompt
+// (export) and the "ideate from scratch" prompt (empty state).
+function promptSchemaLines() {
     const rowTypes = ROW_TYPES.map(([value, label]) => `${value} (${label})`).join(", ");
-    const json = JSON.stringify(payload, null, 2);
-    const out = [
-        "You are editing a Service Journey Mapper project JSON file.",
-        "",
-        "Return only the edited JSON object. Do not wrap it in Markdown. Do not include commentary before or after the JSON.",
-        "Apply the user's requested changes to the JSON below. If the user has not provided a specific change, improve the blueprint conservatively while preserving existing meaning.",
-        "",
-        "Goal:",
-        "- Improve or modify the service blueprint data while preserving the app's JSON schema.",
-        "- Keep the output directly importable by Service Journey Mapper.",
-        "- Preserve existing ids unless the edit clearly creates a new journey.",
-        "- Preserve the wrapper object shape, including type, version, name, exportedAt, lastSavedAt, and journeys.",
-        "- If you add content, place it in the appropriate row/cell rather than inventing unsupported fields.",
-        "",
+    return [
         "Allowed JSON schema:",
         "- Root object:",
         "  - type: must be \"service-journey-mapper\".",
@@ -690,14 +685,71 @@ function buildPromptExport(payload) {
         "- Frontstage rows describe what the user directly sees or touches.",
         "- Backstage and Support Process rows describe internal work, systems, or teams.",
         "- Pain Points are problems. Suggestions are potential improvements. Verbatim rows are evidence and should not be rewritten as universal facts.",
+    ];
+}
+
+const finishPrompt = (lines) => lines.join("\n").replace(/\n{4,}/g, "\n\n\n").trim() + "\n";
+
+function buildPromptExport(payload) {
+    const json = JSON.stringify(payload, null, 2);
+    return finishPrompt([
+        "You are editing a Service Journey Mapper project JSON file.",
+        "",
+        "Return only the edited JSON object. Do not wrap it in Markdown. Do not include commentary before or after the JSON.",
+        "Apply the user's requested changes to the JSON below. If the user has not provided a specific change, improve the blueprint conservatively while preserving existing meaning.",
+        "",
+        "Goal:",
+        "- Improve or modify the service blueprint data while preserving the app's JSON schema.",
+        "- Keep the output directly importable by Service Journey Mapper.",
+        "- Preserve existing ids unless the edit clearly creates a new journey.",
+        "- Preserve the wrapper object shape, including type, version, name, exportedAt, lastSavedAt, and journeys.",
+        "- If you add content, place it in the appropriate row/cell rather than inventing unsupported fields.",
+        "",
+        ...promptSchemaLines(),
         "",
         "Current JSON to edit:",
         "```json",
         json,
         "```",
-    ];
+    ]);
+}
 
-    return out.join("\n").replace(/\n{4,}/g, "\n\n\n").trim() + "\n";
+// Prompt for ideating a brand-new blueprint with an LLM (no existing data).
+function buildIdeationPrompt() {
+    return finishPrompt([
+        "You are a service design expert helping me build a service blueprint / journey map in Service Journey Mapper.",
+        "",
+        "First, here is the service I want to map (replace this with your own description):",
+        "",
+        "<<< DESCRIBE YOUR SERVICE HERE >>>",
+        "- What is the service? Who are the users/customers?",
+        "- What is the end-to-end journey, from the user's first trigger to completion?",
+        "- Which agencies, teams, or systems are involved?",
+        "- Any known pain points, channels (online/counter/phone), or goals to highlight?",
+        "",
+        "Your task:",
+        "- Design a complete, realistic service blueprint for the service described above.",
+        "- Break the journey into stages (e.g. Discover, Apply, Process, Receive). Add sub-stages where a stage has distinct steps.",
+        "- For each part of the journey, fill in the relevant rows: the parties involved, frontstage (what the user sees/does), backstage and support processes (internal work and systems), pain points, and suggestions.",
+        "- Use a Line of Visibility divider to separate frontstage from backstage where helpful.",
+        "- Be concrete and specific. Prefer short, scannable phrases in cells over long paragraphs.",
+        "",
+        "Output:",
+        "- Return ONLY a single JSON object that matches the schema below. No Markdown, no commentary before or after.",
+        "- Set type to \"service-journey-mapper\", version to 1, a descriptive name, exportedAt to the current ISO timestamp, lastSavedAt to null, and one Journey in journeys.",
+        "- Give every journey, stage, and id sensible values. ids can be any unique strings.",
+        "",
+        ...promptSchemaLines(),
+        "",
+        "Worked example — a small but complete project in exactly the format you should return:",
+        "```json",
+        JSON.stringify(buildExampleProject(), null, 2),
+        "```",
+        "",
+        "Notice in the example: bullets/boxes cells store each line as a separate <div>…</div> in html; tags cells use the tags array with html \"\"; the divider row has one cell spanning all columns; and every other row has exactly one cell per leaf column. Follow this structure, but replace the content with the service I describe above.",
+        "",
+        "When you are done: copy the JSON the model returns, then in Service Journey Mapper click \"Load JSON Data\" and paste it in.",
+    ]);
 }
 
 function buildStandaloneHtml(payload) {
@@ -719,14 +771,38 @@ function buildStandaloneHtml(payload) {
     return "<!DOCTYPE html>\n" + html.outerHTML;
 }
 
+async function copyTextToClipboard(text) {
+    if (navigator.clipboard?.writeText) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return;
+        } catch (err) {
+            console.warn("Clipboard API failed, falling back to execCommand.", err);
+        }
+    }
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+}
+
 const safeName = (s) => (s || "export").replace(/[^a-z0-9_-]+/gi, "_").replace(/^_+|_+$/g, "") || "export";
 const defaultName = (projects) => `Project ${(projects?.length || 0) + 1}`;
 const blankJourneyTitle = (count) => `Untitled eService Journey${count > 0 ? ` ${count + 1}` : ""}`;
 const fmtDate = (ts) => {
     if (!ts) return "—";
     const d = new Date(ts);
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " +
-        d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const dayDiff = Math.round((startOfDay(new Date()) - startOfDay(d)) / 86400000);
+    if (dayDiff === 0) return time;
+    if (dayDiff === 1) return "yesterday " + time;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " + time;
 };
 
 function InlineTitleEdit({ value, fallback, className, inputClassName, disabled, onCommit }) {
@@ -805,6 +881,87 @@ function createBlankJourney(index = 0) {
             ],
         }],
     }])[0];
+}
+
+// A small but complete worked example, used to anchor the AI ideation prompt.
+// Derived from the blank-journey template so its row structure always matches
+// what the app produces; cells are filled with realistic sample content.
+function buildExampleProject() {
+    const j = createBlankJourney(0);
+    j.id = "example-journey";
+    j.badge = "EXAMPLE";
+    j.title = "Apply for a Parking Permit";
+    const C = TAG_COLORS.reduce((m, t) => (m[t.name] = t, m), {});
+    const tag = (text, color) => ({ text, bg: C[color].bg, fg: C[color].fg });
+    const bullets = (...items) => items.filter(Boolean).map((t) => `<div>${t}</div>`).join("");
+    // One entry per stage: Find Service / Submit Request / Receive Outcome.
+    const fill = {
+        "row-parties": [
+            [tag("Resident", "blue")],
+            [tag("Resident", "blue"), tag("Licensing Officer", "green")],
+            [tag("Licensing Officer", "green")],
+        ],
+        "row-operator": [
+            bullets("Searches online for permit info"),
+            bullets("Completes the form", "Pays the application fee"),
+            bullets("Receives permit confirmation"),
+        ],
+        "row-fs-human": [
+            bullets("Helpline answers enquiries"),
+            bullets("Counter staff assist walk-ins"),
+            bullets("Officer calls to confirm collection"),
+        ],
+        "row-fs-system": [
+            bullets("Gov website &amp; search results"),
+            bullets("Online form + payment gateway"),
+            bullets("Email / SMS confirmation"),
+        ],
+        "row-bs-human": [
+            bullets("Content team maintains info pages"),
+            bullets("Officer reviews the application"),
+            bullets("Officer approves &amp; issues the permit"),
+        ],
+        "row-bs-system": [
+            bullets("CMS / knowledge base"),
+            bullets("Case system validates the address"),
+            bullets("Permit database updated"),
+        ],
+        "row-support": [
+            bullets("SEO &amp; content governance"),
+            bullets("Payment reconciliation"),
+            bullets("Records retention &amp; audit"),
+        ],
+        "row-pain": [
+            bullets("Hard to find the right page"),
+            bullets("Unclear which documents are required"),
+            bullets("No status updates while waiting"),
+        ],
+        "row-emotion": ["😕 Confused", "😟 Anxious", "😀 Relieved"],
+        "row-suggest": [
+            bullets("Improve search &amp; signposting"),
+            bullets("Add an inline document checklist"),
+            bullets("Send proactive status notifications"),
+        ],
+    };
+    j.subJourneys[0].rows = j.subJourneys[0].rows.map((r) => {
+        if (r.rowType === DIVIDER_TYPE) return r;
+        const content = fill[r.rowType];
+        if (!content) return r;
+        const cells = r.cells.map((c, i) => (
+            c.mode === "tags"
+                ? { ...c, html: "", tags: content[i] || [] }
+                : { ...c, html: content[i] || "" }
+        ));
+        return { ...r, cells };
+    });
+    return {
+        type: "service-journey-mapper",
+        version: 1,
+        name: "Example — Apply for a Parking Permit",
+        exportedAt: new Date().toISOString(),
+        lastSavedAt: null,
+        journeys: [j],
+    };
 }
 
 // ═══════════════════════════════════════
@@ -900,7 +1057,13 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onProjects, onDownload
 // ═══════════════════════════════════════
 // EMPTY STATE
 // ═══════════════════════════════════════
-function EmptyState({ onNew, onLoad }) {
+function EmptyState({ onNew, onLoad, onPrompt }) {
+    const [promptCopied, setPromptCopied] = useState(false);
+    const copyPrompt = async () => {
+        await onPrompt();
+        setPromptCopied(true);
+        window.setTimeout(() => setPromptCopied(false), 2200);
+    };
     return (
         <div className="empty-state">
             <div className="empty-icon">📋</div>
@@ -910,6 +1073,21 @@ function EmptyState({ onNew, onLoad }) {
                 <button className="btn-p" onClick={onNew}>+ New Blank Journey</button>
                 <button className="btn-p" onClick={onLoad}>📂 Load JSON Data</button>
                 <div className="empty-hint">Or run <code>window.loadJSON(text)</code> in the browser console</div>
+            </div>
+            <div className="ideate-card">
+                <div className="ideate-title">✨ Ideate with an AI assistant</div>
+                <p className="ideate-desc">
+                    New to service blueprints? Copy a ready-made prompt — it includes the data schema and
+                    design guidance so an LLM (Claude, ChatGPT, etc.) can draft a full journey map for you.
+                </p>
+                <ol className="ideate-steps">
+                    <li>Copy the prompt below.</li>
+                    <li>Paste it into your AI assistant and describe your service where prompted.</li>
+                    <li>Copy the JSON it returns, then click <b>Load JSON Data</b> above.</li>
+                </ol>
+                <button className="btn-p" onClick={copyPrompt}>
+                    {promptCopied ? "✓ Prompt copied — paste into your AI" : "📋 Copy AI ideation prompt"}
+                </button>
             </div>
         </div>
     );
@@ -1510,7 +1688,10 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                 </>
                                             )}
                                             <span style={{ display: "inline-flex", alignItems: "flex-start", justifyContent: "center", gap: "6px", textAlign: "left" }}>
-                                                {s.num != null && <span className="stage-num" style={{ flexShrink: 0 }}>{s.num}</span>}
+                                                {(s.num != null || editMode) && <span className="stage-num" style={{ flexShrink: 0 }}
+                                                    contentEditable={editMode} suppressContentEditableWarning
+                                                    title={editMode ? "Edit number" : undefined}
+                                                    onBlur={editMode ? (e) => onStage("renumberStage", { stageIdx: si, value: e.currentTarget.textContent }) : undefined}>{s.num}</span>}
                                                 <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
                                                     onBlur={editMode ? (e) => onStage("renameStage", { stageIdx: si, value: e.currentTarget.textContent }) : undefined}>
                                                     {s.title}
@@ -1943,6 +2124,11 @@ function App() {
                 };
             }
             if (action === "renameStage") { stages[payload.stageIdx] = { ...stages[payload.stageIdx], title: payload.value }; return { ...j, stages }; }
+            if (action === "renumberStage") {
+                const raw = (payload.value ?? "").trim();
+                stages[payload.stageIdx] = { ...stages[payload.stageIdx], num: raw === "" ? null : (Number.isFinite(Number(raw)) ? Number(raw) : raw) };
+                return { ...j, stages };
+            }
             if (action === "renameSubStage") {
                 stages[payload.stageIdx].subStages[payload.subIdx] = { ...stages[payload.stageIdx].subStages[payload.subIdx], title: payload.value };
                 return { ...j, stages };
@@ -2090,25 +2276,12 @@ function App() {
     const copyPromptExport = useCallback(async () => {
         const payload = currentExportPayload();
         if (!payload) return;
-        const prompt = buildPromptExport(payload);
-        if (navigator.clipboard?.writeText) {
-            try {
-                await navigator.clipboard.writeText(prompt);
-                return;
-            } catch (err) {
-                console.warn("Clipboard API failed, falling back to execCommand.", err);
-            }
-        }
-        const ta = document.createElement("textarea");
-        ta.value = prompt;
-        ta.setAttribute("readonly", "");
-        ta.style.position = "fixed";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        ta.remove();
+        await copyTextToClipboard(buildPromptExport(payload));
     }, [currentExportPayload]);
+
+    const copyIdeationPrompt = useCallback(async () => {
+        await copyTextToClipboard(buildIdeationPrompt());
+    }, []);
 
     // Expose to console
     useEffect(() => {
@@ -2116,13 +2289,15 @@ function App() {
         window.exportProject = exportProject;
         window.exportStandaloneHtml = exportStandaloneHtml;
         window.exportPrompt = copyPromptExport;
+        window.ideationPrompt = copyIdeationPrompt;
         return () => {
             delete window.loadJSON;
             delete window.exportProject;
             delete window.exportStandaloneHtml;
             delete window.exportPrompt;
+            delete window.ideationPrompt;
         };
-    }, [loadFromText, exportProject, exportStandaloneHtml, copyPromptExport]);
+    }, [loadFromText, exportProject, exportStandaloneHtml, copyPromptExport, copyIdeationPrompt]);
 
     // Legend height → CSS var
     useEffect(() => {
@@ -2199,7 +2374,7 @@ function App() {
             )}
             <main className="main-content">
                 {journeys.length === 0 ? (
-                    <EmptyState onNew={newBlankJourney} onLoad={() => setModal(true)} />
+                    <EmptyState onNew={newBlankJourney} onLoad={() => setModal(true)} onPrompt={copyIdeationPrompt} />
                 ) : (
                     journeys.map((j, i) => (
                         <div key={j.id + "-" + i} style={{ display: i === tab ? "block" : "none" }}>
