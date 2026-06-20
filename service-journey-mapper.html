@@ -357,6 +357,8 @@
         .menu-item:disabled:hover{background:none}
         .menu-item.danger{color:var(--red)}
         .menu-item.danger:hover{background:oklch(95% .03 20)}
+        .menu-label{padding:7px 10px 4px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+        .menu-divider{height:1px;margin:5px 0;background:var(--line)}
         .menu-head{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-sec);padding:6px 10px 3px}
         .menu-sep{height:1px;background:var(--border-light);margin:5px 0}
         .menu-select{width:calc(100% - 2px);margin:0 1px 4px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:var(--fs-xs)}
@@ -1218,12 +1220,12 @@ function LucideIcon({ name }) {
     );
 }
 
-function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadExport, onStandaloneExport, onPromptExport, canExport, saveState, lastSaved,
+function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadSheet, onDownloadProject, onStandaloneExport, onPromptSheet, onPromptProject, canExport, hasMultipleSheets, saveState, lastSaved,
         viewOnly,
         editMode, onSetEdit, canUndo, canRedo, onUndo, onRedo }) {
     const [promptCopied, setPromptCopied] = useState(false);
-    const copyPrompt = async (close) => {
-        await onPromptExport();
+    const copyPrompt = async (close, scope) => {
+        await (scope === "project" ? onPromptProject() : onPromptSheet());
         setPromptCopied(true);
         window.setTimeout(() => setPromptCopied(false), 1800);
         close();
@@ -1275,8 +1277,23 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadE
                                 {(close) => (
                                     <>
                                         <button className="menu-item" onClick={() => { onStandaloneExport(); close(); }}>Download standalone HTML</button>
-                                        <button className="menu-item" onClick={() => copyPrompt(close)}>Copy as prompt</button>
-                                        <button className="menu-item" onClick={() => { onDownloadExport(); close(); }}>Export as JSON</button>
+                                        {hasMultipleSheets ? (
+                                            <>
+                                                <div className="menu-divider" />
+                                                <div className="menu-label">Sheet</div>
+                                                <button className="menu-item" onClick={() => copyPrompt(close, "sheet")}>Copy sheet as prompt</button>
+                                                <button className="menu-item" onClick={() => { onDownloadSheet(); close(); }}>Export sheet JSON</button>
+                                                <div className="menu-divider" />
+                                                <div className="menu-label">Project</div>
+                                                <button className="menu-item" onClick={() => copyPrompt(close, "project")}>Copy project as prompt</button>
+                                                <button className="menu-item" onClick={() => { onDownloadProject(); close(); }}>Export project JSON</button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button className="menu-item" onClick={() => copyPrompt(close, "project")}>Copy as prompt</button>
+                                                <button className="menu-item" onClick={() => { onDownloadProject(); close(); }}>Export as JSON</button>
+                                            </>
+                                        )}
                                     </>
                                 )}
                             </Menu>
@@ -2709,39 +2726,56 @@ function App() {
         });
     }, [commitJourneys]);
 
-    const currentExportPayload = useCallback(() => {
+    const currentExportPayload = useCallback((scope = "project") => {
         const data = journeysRef.current;
         if (!data.length) return null;
+        const activeJourney = data[Math.min(tab, data.length - 1)];
+        const journeysToExport = scope === "sheet" && activeJourney ? [activeJourney] : data;
+        const exportName = scope === "sheet" && activeJourney?.title
+            ? `${currentName || "Service Journeys"} - ${activeJourney.title}`
+            : currentName || "Service Journeys";
         return {
             type: "service-journey-mapper",
             version: 1,
-            name: currentName || "Service Journeys",
+            name: exportName,
             exportedAt: new Date().toISOString(),
             lastSavedAt: lastSavedRef.current ? new Date(lastSavedRef.current).toISOString() : null,
-            journeys: data,
+            journeys: journeysToExport,
         };
-    }, [currentName]);
+    }, [currentName, tab]);
 
     // ── Export full project state ──
     const exportProject = useCallback(() => {
-        const payload = currentExportPayload();
+        const payload = currentExportPayload("project");
         if (!payload) return;
         const savedAt = filenameTimestamp(lastSavedRef.current);
         const filename = [safeName(currentName), savedAt].filter(Boolean).join("_") + ".json";
         downloadFile(filename, JSON.stringify(payload, null, 2), "application/json");
     }, [currentExportPayload, currentName]);
 
+    const exportCurrentSheet = useCallback(() => {
+        const payload = currentExportPayload("sheet");
+        if (!payload) return;
+        const savedAt = filenameTimestamp(lastSavedRef.current);
+        const sheetName = payload.journeys[0]?.title || "Sheet";
+        const filename = [safeName(currentName), safeName(sheetName), savedAt].filter(Boolean).join("_") + ".json";
+        downloadFile(filename, JSON.stringify(payload, null, 2), "application/json");
+    }, [currentExportPayload, currentName]);
+
     const exportStandaloneHtml = useCallback(() => {
-        const payload = currentExportPayload();
+        const payload = currentExportPayload("project");
         if (!payload) return;
         downloadFile(safeName(currentName) + ".html", buildStandaloneHtml(payload), "text/html");
     }, [currentExportPayload, currentName]);
 
-    const copyPromptExport = useCallback(async () => {
-        const payload = currentExportPayload();
+    const copyPromptExport = useCallback(async (scope = "project") => {
+        const payload = currentExportPayload(scope);
         if (!payload) return;
         await copyTextToClipboard(buildPromptExport(payload));
     }, [currentExportPayload]);
+
+    const copyPromptCurrentSheet = useCallback(() => copyPromptExport("sheet"), [copyPromptExport]);
+    const copyPromptProject = useCallback(() => copyPromptExport("project"), [copyPromptExport]);
 
     const copyIdeationPrompt = useCallback(async () => {
         await copyTextToClipboard(buildIdeationPrompt());
@@ -2751,17 +2785,21 @@ function App() {
     useEffect(() => {
         window.loadJSON = loadFromText;
         window.exportProject = exportProject;
+        window.exportCurrentSheet = exportCurrentSheet;
         window.exportStandaloneHtml = exportStandaloneHtml;
         window.exportPrompt = copyPromptExport;
+        window.exportSheetPrompt = copyPromptCurrentSheet;
         window.ideationPrompt = copyIdeationPrompt;
         return () => {
             delete window.loadJSON;
             delete window.exportProject;
+            delete window.exportCurrentSheet;
             delete window.exportStandaloneHtml;
             delete window.exportPrompt;
+            delete window.exportSheetPrompt;
             delete window.ideationPrompt;
         };
-    }, [loadFromText, exportProject, exportStandaloneHtml, copyPromptExport, copyIdeationPrompt]);
+    }, [loadFromText, exportProject, exportCurrentSheet, exportStandaloneHtml, copyPromptExport, copyPromptCurrentSheet, copyIdeationPrompt]);
 
     // App bar height → CSS var
     useEffect(() => {
@@ -2841,9 +2879,10 @@ function App() {
             <TopBar innerRef={appBarRef} currentName={currentName}
                 onRenameCurrent={renameCurrentProject}
                 onLibrary={goLibrary}
-                onDownloadExport={exportProject} onStandaloneExport={exportStandaloneHtml}
-                onPromptExport={copyPromptExport}
-                canExport={journeys.length > 0} saveState={saveState} lastSaved={lastSaved}
+                onDownloadSheet={exportCurrentSheet} onDownloadProject={exportProject}
+                onStandaloneExport={exportStandaloneHtml}
+                onPromptSheet={copyPromptCurrentSheet} onPromptProject={copyPromptProject}
+                canExport={journeys.length > 0} hasMultipleSheets={journeys.length > 1} saveState={saveState} lastSaved={lastSaved}
                 viewOnly={viewOnly}
                 editMode={editMode} onSetEdit={(v) => setEditMode(v)}
                 canUndo={historyState.canUndo} canRedo={historyState.canRedo}
