@@ -2221,13 +2221,17 @@ function FormatToolbar({ cell, selectedKey, onMode, onAlign }) {
         const raf2 = window.requestAnimationFrame(() => window.requestAnimationFrame(place));
         window.addEventListener("scroll", place, true);
         window.addEventListener("resize", place);
+        const anchor = document.querySelector(`[data-cell-key="${selectedKey}"]`);
+        const ro = anchor ? new ResizeObserver(place) : null;
+        if (ro) ro.observe(anchor);
         return () => {
             window.cancelAnimationFrame(raf);
             window.cancelAnimationFrame(raf2);
             window.removeEventListener("scroll", place, true);
             window.removeEventListener("resize", place);
+            if (ro) ro.disconnect();
         };
-    }, [disabled, place, mode, align]);
+    }, [disabled, place, mode, align, selectedKey]);
 
     if (disabled || !pos) return null;
 
