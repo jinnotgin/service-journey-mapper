@@ -470,10 +470,6 @@
         .cell-boxes>div:last-child,.cell-boxes>p:last-child{margin-bottom:0}
 
         /* per-cell save / discard mini-toolbar */
-        .cell-tick{position:fixed;z-index:310;display:flex;gap:4px}
-        .ct-btn{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-weight:700;font-size:var(--fs-md);box-shadow:var(--shadow-md);display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
-        .ct-ok{color:var(--green)}.ct-ok:hover{background:oklch(95% .04 150)}
-        .ct-no{color:var(--red)}.ct-no:hover{background:oklch(95% .03 20)}
 
     </style>
 </head>
@@ -924,7 +920,7 @@ function buildIdeationPrompt() {
 function buildStandaloneHtml(payload) {
     const html = document.documentElement.cloneNode(true);
     html.querySelector("#sjm-embedded-project")?.remove();
-    html.querySelectorAll(".menu-portal,.cell-tick,.cell-toolbar,.m-ov").forEach((el) => el.remove());
+    html.querySelectorAll(".menu-portal,.cell-toolbar,.m-ov").forEach((el) => el.remove());
     const root = html.querySelector("#root");
     if (root) root.textContent = "";
 
@@ -1973,85 +1969,33 @@ function TagAdder({ onAdd, existing = [] }) {
 // ═══════════════════════════════════════
 // We own the DOM after mount and only re-sync innerHTML from props when the
 // element is NOT focused. This avoids React resetting the caret to the start
-// while typing. Editing is a draft until committed (✓ / blur) or discarded (✕).
+// while typing. The edit commits when the cell loses focus (click away, or
+// Escape to finish via the keyboard).
 function EditableCell({ html, editMode, className, style, colSpan, cellKey, onCommit, onFocusCell, onDone }) {
     const ref = useRef(null);
-    const baseline = useRef(html || "");
-    const [focused, setFocused] = useState(false);
-    const [pos, setPos] = useState(null);
 
     useEffect(() => {
         const el = ref.current;
         if (!el || document.activeElement === el) return;
         const next = html || "";
         if (el.innerHTML !== next) el.innerHTML = next;
-        baseline.current = next;
     }, [html]);
 
-    const place = useCallback(() => {
-        const el = ref.current;
-        if (!el) return;
-        const r = el.getBoundingClientRect();
-        const groupWidth = 56;
-        const groupHeight = 26;
-        const margin = 8;
-        const verticalGap = 8;
-
-        let top = r.top - groupHeight - verticalGap;
-        let left = r.right - groupWidth;
-
-        if (top < margin) top = r.top + 4;
-        if (top + groupHeight > window.innerHeight - margin) {
-            top = Math.max(margin, window.innerHeight - groupHeight - margin);
-        }
-
-        left = Math.max(margin, Math.min(left, window.innerWidth - groupWidth - margin));
-        setPos({ top, left });
-    }, []);
-
-    useEffect(() => {
-        if (!focused) return;
-        place();
-        window.addEventListener("scroll", place, true);
-        window.addEventListener("resize", place);
-        return () => { window.removeEventListener("scroll", place, true); window.removeEventListener("resize", place); };
-    }, [focused, place]);
-
-    const handleFocus = () => {
-        baseline.current = ref.current?.innerHTML ?? "";
-        setFocused(true);
-        onFocusCell?.();
-    };
+    const handleFocus = () => { onFocusCell?.(); };
     const handleBlur = () => {
-        setFocused(false);
         onCommit(ref.current?.innerHTML ?? "");
         onDone?.();
     };
-    // Buttons use mousedown+preventDefault to keep the caret in the cell;
-    // we then blur() to commit and onDone() to drop the selection entirely.
-    const save = (e) => { e.preventDefault(); ref.current?.blur(); onDone?.(); };
-    const discard = (e) => {
-        e.preventDefault();
-        if (ref.current) ref.current.innerHTML = baseline.current;
-        ref.current?.blur();
-        onDone?.();
-    };
     const handleKeyDown = (e) => {
-        if (e.key === "Escape") discard(e);
+        // Escape just finishes editing (blur commits); it does not discard.
+        if (e.key === "Escape") { e.preventDefault(); ref.current?.blur(); }
     };
 
     return (
-        <>
-            <td ref={ref} className={className} style={style} colSpan={colSpan}
-                data-cell-key={cellKey}
-                contentEditable={editMode} suppressContentEditableWarning
-                onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} />
-            {focused && pos && createPortal(
-                <div className="cell-tick" style={{ top: pos.top, left: pos.left }}>
-                    <button className="ct-btn ct-ok" title="Save changes" onMouseDown={save}>✓</button>
-                    <button className="ct-btn ct-no" title="Discard changes" onMouseDown={discard}>✕</button>
-                </div>, document.body)}
-        </>
+        <td ref={ref} className={className} style={style} colSpan={colSpan}
+            data-cell-key={cellKey}
+            contentEditable={editMode} suppressContentEditableWarning
+            onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} />
     );
 }
 
@@ -3212,7 +3156,7 @@ function App() {
     useEffect(() => {
         if (!editMode || !selected) return;
         const clearWhenOutsideCellTools = (e) => {
-            if (e.target?.closest?.("[data-cell-key], .cell-toolbar, .cell-tick, .tag-color-pop, .tag-suggest")) return;
+            if (e.target?.closest?.("[data-cell-key], .cell-toolbar, .tag-color-pop, .tag-suggest")) return;
             setSelected(null);
         };
         document.addEventListener("mousedown", clearWhenOutsideCellTools);
