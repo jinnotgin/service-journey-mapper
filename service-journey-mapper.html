@@ -84,12 +84,15 @@
         .ch-hdr .inline-title-input{width:min(900px,100%);min-width:min(720px,calc(100vw - 80px))}
         .ch-title-input{background:var(--surface);border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);padding:2px 6px}
         .ab-status{font-size:var(--fs-xs);font-weight:600;white-space:nowrap;flex-shrink:0;color:var(--text-sec)}
-        .ab-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:auto}
-        .ab-cluster{display:flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
+        .ab-actions{display:flex;align-items:center;gap:12px;flex-shrink:0;margin-left:auto}
         .ab-btn{background:transparent;color:var(--text);border:1px solid transparent;padding:6px 10px;border-radius:7px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s,border-color .15s,color .15s;white-space:nowrap;min-height:32px}
         .ab-btn:hover{background:var(--surface-2);border-color:var(--border)}
         .ab-btn:disabled{opacity:.4;cursor:not-allowed}
-        .ab-icon-btn{width:32px;padding:6px 0;font-size:var(--fs-lg)}
+        .history-actions{display:inline-flex;align-items:center;gap:1px}
+        .history-btn{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:7px;background:transparent;cursor:pointer;padding:0;transition:background .15s,border-color .15s,opacity .15s}
+        .history-btn:hover:not(:disabled){background:var(--surface-2);border-color:var(--border)}
+        .history-btn:disabled{cursor:not-allowed;opacity:.34}
+        .history-btn img{width:15px;height:15px;display:block}
         /* segmented Edit | View toggle */
         .ab-seg{display:flex;padding:2px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2)}
         .ab-seg button{background:transparent;color:var(--text-sec);border:none;padding:5px 13px;border-radius:7px;font-size:var(--fs-xs);font-weight:650;cursor:pointer;font-family:inherit;min-height:30px;transition:background .15s,color .15s}
@@ -98,7 +101,7 @@
         .ab-actions .menu-wrap{display:flex}
         .ab-actions .menu-trigger{width:auto;height:auto;min-height:32px;background:var(--surface);border-color:var(--border);color:var(--text);padding:6px 13px;border-radius:8px;font-size:var(--fs-xs);font-weight:700;white-space:nowrap;box-shadow:0 1px 1px oklch(20% .006 70 / .06)}
         .ab-actions .menu-trigger:hover{background:var(--surface-2)}
-        .save-state{display:inline-flex;align-items:center;gap:5px}
+        .save-state{display:inline-flex;align-items:center;gap:6px}
         .save-dot{width:7px;height:7px;border-radius:999px;display:inline-block;background:var(--green)}
         .save-saving{color:oklch(82% .05 80)}
         .save-saved{color:var(--text-sec)}
@@ -308,9 +311,7 @@
             .app-bar-main{padding:8px 14px;gap:7px}
             .ab-brand{max-width:100%}
             .ab-brand .inline-title-input,.ch-hdr .inline-title-input{width:100%;min-width:0}
-            .ab-cluster{gap:2px}
             .ab-btn{padding:5px 8px}
-            .ab-icon-btn{width:30px}
             .ch-hdr{padding:12px 16px 10px}
             .ch-hdr h2{font-size:var(--fs-lg)}
             .lib{padding:28px 16px 80px}
@@ -1069,9 +1070,13 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadE
                 <div className="ab-spacer" />
                 <div className="ab-actions">
                     {!viewOnly && (
-                        <div className="ab-cluster" aria-label="History controls">
-                            <button className="ab-btn ab-icon-btn" onClick={onUndo} disabled={!canUndo} title="Undo (⌘/Ctrl+Z)" aria-label="Undo">↶</button>
-                            <button className="ab-btn ab-icon-btn" onClick={onRedo} disabled={!canRedo} title="Redo (⌘/Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+                        <div className="history-actions" aria-label="History controls">
+                            <button className="history-btn" onClick={onUndo} disabled={!canUndo} title="Undo (⌘/Ctrl+Z)" aria-label="Undo">
+                                <img src="https://cdn.jsdelivr.net/npm/lucide-static@1.21.0/icons/undo-2.svg" alt="" aria-hidden="true" />
+                            </button>
+                            <button className="history-btn" onClick={onRedo} disabled={!canRedo} title="Redo (⌘/Ctrl+Shift+Z)" aria-label="Redo">
+                                <img src="https://cdn.jsdelivr.net/npm/lucide-static@1.21.0/icons/redo-2.svg" alt="" aria-hidden="true" />
+                            </button>
                         </div>
                     )}
                     {!viewOnly && <div className="ab-status" aria-live="polite">
