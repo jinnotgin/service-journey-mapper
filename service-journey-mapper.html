@@ -1988,7 +1988,14 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, onCo
     };
     const handleKeyDown = (e) => {
         // Escape just finishes editing (blur commits); it does not discard.
-        if (e.key === "Escape") { e.preventDefault(); ref.current?.blur(); }
+        if (e.key === "Escape") { e.preventDefault(); ref.current?.blur(); return; }
+        // Own the B/I/U shortcuts so they apply our formatting (matching the
+        // toolbar) instead of relying on the browser's default contentEditable
+        // handling, which can vary by browser/markup.
+        if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+            const cmd = { b: "bold", i: "italic", u: "underline" }[e.key.toLowerCase()];
+            if (cmd) { e.preventDefault(); document.execCommand(cmd, false, null); }
+        }
     };
 
     return (
@@ -2204,36 +2211,40 @@ function FormatToolbar({ cell, selectedKey, onMode, onAlign }) {
     // B/I/U: keep focus in the cell (preventDefault) so execCommand hits its selection.
     const fmt = (cmd) => (e) => { e.preventDefault(); exec(cmd); };
     const keepFocus = (fn) => (e) => { e.preventDefault(); fn(); };
+    // Show ⌘/⌥ on Mac, Ctrl/Alt elsewhere. The handler accepts both either way.
+    const isMac = /Mac/i.test(navigator.platform || navigator.userAgent);
+    const modAlt = isMac ? "⌘⌥" : "Ctrl+Alt+";
+    const modCmd = isMac ? "⌘" : "Ctrl+";
     return createPortal(
         <div className="cell-toolbar" ref={toolbarRef} style={{ top: pos.top, left: pos.left, visibility: pos.measuring ? "hidden" : "visible" }}
             onMouseDown={(e) => e.stopPropagation()}>
             <span className="tb-label">Cell</span>
             <div className="tb-group">
-                <button className={`tb-btn${mode === "text" ? " active" : ""}`} onMouseDown={keepFocus(() => onMode("text"))}>Text</button>
-                <button className={`tb-btn${mode === "bullets" ? " active" : ""}`} onMouseDown={keepFocus(() => onMode("bullets"))}>
+                <button className={`tb-btn${mode === "text" ? " active" : ""}`} title={`Text mode (${modAlt}1)`} onMouseDown={keepFocus(() => onMode("text"))}>Text</button>
+                <button className={`tb-btn${mode === "bullets" ? " active" : ""}`} title={`Bullets mode (${modAlt}2)`} onMouseDown={keepFocus(() => onMode("bullets"))}>
                     <LucideIcon name="list" />Bullets
                 </button>
-                <button className={`tb-btn${mode === "boxes" ? " active" : ""}`} onMouseDown={keepFocus(() => onMode("boxes"))}>
+                <button className={`tb-btn${mode === "boxes" ? " active" : ""}`} title={`Boxes mode (${modAlt}3)`} onMouseDown={keepFocus(() => onMode("boxes"))}>
                     <LucideIcon name="square" />Boxes
                 </button>
-                <button className={`tb-btn${mode === "tags" ? " active" : ""}`} onMouseDown={keepFocus(() => onMode("tags"))}>
+                <button className={`tb-btn${mode === "tags" ? " active" : ""}`} title={`Tags mode (${modAlt}4)`} onMouseDown={keepFocus(() => onMode("tags"))}>
                     <LucideIcon name="tag" />Tags
                 </button>
             </div>
             <div className="tb-sep" />
             <div className="tb-group">
-                <button className={`tb-btn icon-only${align === "left" ? " active" : ""}`} onMouseDown={keepFocus(() => onAlign("left"))} title="Align left" aria-label="Align left" aria-pressed={align === "left"}>
+                <button className={`tb-btn icon-only${align === "left" ? " active" : ""}`} onMouseDown={keepFocus(() => onAlign("left"))} title={`Align left (${modAlt}L)`} aria-label="Align left" aria-pressed={align === "left"}>
                     <LucideIcon name="alignLeft" />
                 </button>
-                <button className={`tb-btn icon-only${align === "center" ? " active" : ""}`} onMouseDown={keepFocus(() => onAlign("center"))} title="Align center" aria-label="Align center" aria-pressed={align === "center"}>
+                <button className={`tb-btn icon-only${align === "center" ? " active" : ""}`} onMouseDown={keepFocus(() => onAlign("center"))} title={`Align center (${modAlt}E)`} aria-label="Align center" aria-pressed={align === "center"}>
                     <LucideIcon name="alignCenter" />
                 </button>
             </div>
             <div className="tb-sep" />
             <div className="tb-group">
-                <button className="tb-btn" disabled={mode === "tags"} onMouseDown={fmt("bold")} style={{ fontWeight: 800 }}>B</button>
-                <button className="tb-btn" disabled={mode === "tags"} onMouseDown={fmt("italic")} style={{ fontStyle: "italic" }}>I</button>
-                <button className="tb-btn" disabled={mode === "tags"} onMouseDown={fmt("underline")} style={{ textDecoration: "underline" }}>U</button>
+                <button className="tb-btn" disabled={mode === "tags"} title={`Bold (${modCmd}B)`} onMouseDown={fmt("bold")} style={{ fontWeight: 800 }}>B</button>
+                <button className="tb-btn" disabled={mode === "tags"} title={`Italic (${modCmd}I)`} onMouseDown={fmt("italic")} style={{ fontStyle: "italic" }}>I</button>
+                <button className="tb-btn" disabled={mode === "tags"} title={`Underline (${modCmd}U)`} onMouseDown={fmt("underline")} style={{ textDecoration: "underline" }}>U</button>
                 <TextColorControl disabled={mode === "tags"} />
             </div>
         </div>, document.body
@@ -3187,6 +3198,29 @@ function App() {
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
     }, [redo, undo]);
+
+    // App-level cell mode / align shortcuts (Ctrl+Alt+…).
+    // These fire when a cell is selected in edit mode, even if the cell itself
+    // doesn't have keyboard focus (e.g. tags mode).
+    useEffect(() => {
+        const onKeyDown = (e) => {
+            if (!editMode || !selected) return;
+            if (!(e.metaKey || e.ctrlKey) || !e.altKey) return;
+            // Use e.code (physical key) — on macOS the Alt/Option key rewrites
+            // e.key (⌥1 → "¡", ⌥L → "¬"), so e.key lookups would never match.
+            const modeMap = { Digit1: "text", Digit2: "bullets", Digit3: "boxes", Digit4: "tags" };
+            const alignMap = { KeyL: "left", KeyE: "center" };
+            if (modeMap[e.code]) {
+                e.preventDefault();
+                handleCellMode(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, modeMap[e.code]);
+            } else if (alignMap[e.code]) {
+                e.preventDefault();
+                handleCellAlign(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, alignMap[e.code]);
+            }
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [editMode, selected, handleCellMode, handleCellAlign]);
 
     // The cell the format toolbar currently targets.
     const selectedCell = selected
