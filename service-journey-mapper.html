@@ -186,7 +186,7 @@
         .emotion-text{font-size:.72rem;font-weight:600}
         .emotion-neg{color:var(--red)}.emotion-pos{color:var(--green)}.emotion-neu{color:var(--gold)}
 
-        .stage-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;font-size:.8rem;margin-right:6px}
+        .stage-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;font-size:.8rem}
 
         /* ===== EDITABLE ===== */
         td[contenteditable="true"]{cursor:text;outline:none;transition:box-shadow .15s}
@@ -1501,7 +1501,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                     {(close) => (
                                                         <>
                                                             <button className="menu-item" onClick={() => { onStage("addSubStage", { stageIdx: si }); close(); }}>＋ Add sub-stage</button>
-                                                            <button className="menu-item" onClick={() => { onStage("addStage", {}); close(); }}>＋ Add stage (at end)</button>
+                                                            <button className="menu-item" onClick={() => { onStage("addStage", { stageIdx: si }); close(); }}>＋ Add stage</button>
                                                             <div className="menu-sep" />
                                                             <button className="menu-item danger" onClick={() => { onStage("deleteStage", { stageIdx: si }); close(); }}>🗑 Delete stage</button>
                                                         </>
@@ -1509,10 +1509,12 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                 </Menu>
                                                 </>
                                             )}
-                                            {s.num != null && <span className="stage-num">{s.num}</span>}{" "}
-                                            <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
-                                                onBlur={editMode ? (e) => onStage("renameStage", { stageIdx: si, value: e.currentTarget.textContent }) : undefined}>
-                                                {s.title}
+                                            <span style={{ display: "inline-flex", alignItems: "flex-start", justifyContent: "center", gap: "6px", textAlign: "left" }}>
+                                                {s.num != null && <span className="stage-num" style={{ flexShrink: 0 }}>{s.num}</span>}
+                                                <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
+                                                    onBlur={editMode ? (e) => onStage("renameStage", { stageIdx: si, value: e.currentTarget.textContent }) : undefined}>
+                                                    {s.title}
+                                                </span>
                                             </span>
                                         </td>
                                     );
@@ -1859,8 +1861,14 @@ function App() {
             }));
 
             if (action === "addStage") {
-                stages.push({ num: nextStageNum(stages), title: "New Stage", subStages: [] });
-                return { ...j, stages, subJourneys: mapRows((cells) => [...cells, newCell()]) };
+                const insertAt = payload.stageIdx != null ? payload.stageIdx + 1 : stages.length;
+                const leafIdx = leafStart(j.stages, payload.stageIdx != null ? payload.stageIdx : j.stages.length - 1) + leafCount(j.stages[payload.stageIdx != null ? payload.stageIdx : j.stages.length - 1]);
+                stages.splice(insertAt, 0, { num: nextStageNum(stages), title: "New Stage", subStages: [] });
+                return { ...j, stages, subJourneys: mapRows((cells) => {
+                    const c = cells.slice();
+                    c.splice(leafIdx, 0, newCell());
+                    return c;
+                }) };
             }
             if (action === "deleteStage") {
                 const { stageIdx } = payload;
