@@ -1502,7 +1502,7 @@ function LoadModal({ onLoad, onClose, currentProjectName, existingJourneys = [] 
     };
 
     const needsChoice = review && review.affectedSheets.length > 0;
-    const needsProjectDetailsConfirm = review && !review.sameProjectName;
+    const needsProjectDetailsConfirm = review && !review.sameProjectName && existingCount > 0;
     const canImport = review && (!needsProjectDetailsConfirm || confirmedProjectDetails);
 
     return (
