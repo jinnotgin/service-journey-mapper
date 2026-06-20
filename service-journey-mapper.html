@@ -149,7 +149,7 @@
         .sj-scroll::-webkit-scrollbar{display:none}
 
         /* ===== BP TABLE ===== */
-        .bp{border-collapse:collapse;table-layout:fixed}
+        .bp{border-collapse:collapse;table-layout:fixed;width:max-content}
         .bp td{border:1px solid var(--border-light);padding:11px 13px;vertical-align:top;text-align:left;font-size:var(--fs-sm)}
 
         /* Lane label */
@@ -792,13 +792,13 @@ function buildIdeationPrompt() {
     return finishPrompt([
         "You are a service design expert helping me build a service blueprint / journey map in Service Journey Mapper.",
         "",
-        "First, here is the service I want to map (replace this with your own description):",
-        "",
-        "<<< DESCRIBE YOUR SERVICE HERE >>>",
+        "First, the user will describe the service they want to map — either directly or by providing supporting context such as documents, research notes, journey map images, or transcripts. From the context provided, infer the answers to the following:",
         "- What is the service? Who are the users/customers?",
         "- What is the end-to-end journey, from the user's first trigger to completion?",
         "- Which agencies, teams, or systems are involved?",
         "- Any known pain points, channels (online/counter/phone), or goals to highlight?",
+        "",
+        "If any of these cannot be reasonably inferred from what the user has provided, ask the user to clarify before generating the blueprint. Do not guess at critical details that would change the structure of the journey.",
         "",
         "Your task:",
         "- Design a complete, realistic service blueprint for the service described above.",
@@ -807,6 +807,11 @@ function buildIdeationPrompt() {
         "- Use a Line of Visibility divider to separate frontstage from backstage where helpful.",
         "- Be concrete and specific. Prefer short, scannable phrases in cells over long paragraphs.",
         "",
+        "Row granularity rules:",
+        "- For human interaction rows (Frontstage · Human, Backstage · Human), create a **separate row for each distinct role** (e.g. one row for \"Helpline Staff\", another for \"Counter Staff\", another for \"Licensing Officer\"). Use the laneLabel to name the role, prefixed with \"FS Human:\" or \"BS Human:\" as appropriate.",
+        "- For system and tool rows (Frontstage · System, Backstage · System), create a **separate row for each distinct system, platform, or tool**. Digital systems (e.g. CRM, case management, payment gateway) each get their own row. Non-digital or manual tools (e.g. paper forms, iPad checklists, offline notes, Excel spreadsheets) also each get their own row. Use the laneLabel to name the system or tool, prefixed with \"System:\" or \"Manual Tool:\" or \"Comm Tool:\" as appropriate.",
+        "- Parties, Operator Actions, Support Process, Pain Points, Emotion, Verbatim, and Suggestions rows may remain as single combined rows spanning all relevant actors.",
+        "",
         "Output:",
         "- Return ONLY a single JSON object that matches the schema below. No Markdown, no commentary before or after.",
         "- Set type to \"service-journey-mapper\", version to 1, a descriptive name, exportedAt to the current ISO timestamp, lastSavedAt to null, and one Journey in journeys.",
@@ -814,12 +819,20 @@ function buildIdeationPrompt() {
         "",
         ...promptSchemaLines(),
         "",
-        "Worked example — a small but complete project in exactly the format you should return:",
+        "Worked example — a small but complete project in exactly the format you should return. This example has 4 leaf columns: \"Find Service\" (no sub-stages = 1 leaf), \"Submit Request\" (2 sub-stages = 2 leaves), and \"Receive Outcome\" (no sub-stages = 1 leaf). Every non-divider row has cells whose widths sum to 4.",
         "```json",
         JSON.stringify(buildExampleProject(), null, 2),
         "```",
         "",
-        "Notice in the example: bullets/boxes cells store each line as a separate <div>…</div> in html; tags cells use the tags array with html \"\"; the divider row has one cell spanning all columns; and every other row has exactly one cell per leaf column. Follow this structure, but replace the content with the service I describe above.",
+        "Notice in the example:",
+        "- Stage 2 \"Submit Request\" has two sub-stages (\"Fill Form\" and \"Make Payment\"), making the total leaf column count 4 (1 + 2 + 1). Every non-divider row has cells whose widths sum to 4, and the divider has colspan 4.",
+        "- Each distinct human role gets its own row (e.g. \"FS Human: Helpline Staff\", \"FS Human: Counter Staff\", \"FS Human: Licensing Officer\") rather than combining all humans into one row.",
+        "- Each distinct system or tool gets its own row (e.g. \"System: Gov Website\", \"System: Online Form\", \"System: Payment Gateway\", \"Comm Tool: Email & SMS\").",
+        "- Non-digital tools also get their own rows (e.g. \"Manual Tool: Paper Form\" for a frontstage walk-in form, \"Manual Tool: Paper Logbook\" for a backstage cash ledger).",
+        "- Bullets/boxes cells store each line as a separate `<div>…</div>` in html; tags cells use the tags array with html \"\"; the divider row has one cell spanning all columns.",
+        "- Parties, Operator Actions, Support Process, Pain Points, Emotion, and Suggestions remain as single combined rows.",
+        "",
+        "Follow this structure, but replace the content with the service described or inferred from the user's input.",
         "",
         "When you are done: copy the JSON the model returns, then in Service Journey Mapper click \"Load JSON Data\" and paste it in.",
     ]);
@@ -984,69 +997,163 @@ function buildExampleProject() {
     j.id = "example-journey";
     j.badge = "EXAMPLE";
     j.title = "Apply for a Parking Permit";
+    j.stages = [
+        { num: 1, title: "Find Service", subStages: [] },
+        { num: 2, title: "Submit Request", subStages: [{ title: "Fill Form" }, { title: "Make Payment" }] },
+        { num: 3, title: "Receive Outcome", subStages: [] },
+    ];
     const C = TAG_COLORS.reduce((m, t) => (m[t.name] = t, m), {});
     const tag = (text, color) => ({ text, bg: C[color].bg, fg: C[color].fg });
     const bullets = (...items) => items.filter(Boolean).map((t) => `<div>${t}</div>`).join("");
-    // One entry per stage: Find Service / Submit Request / Receive Outcome.
-    const fill = {
-        "row-parties": [
-            [tag("Resident", "blue")],
-            [tag("Resident", "blue"), tag("Licensing Officer", "green")],
-            [tag("Licensing Officer", "green")],
-        ],
-        "row-operator": [
-            bullets("Searches online for permit info"),
-            bullets("Completes the form", "Pays the application fee"),
-            bullets("Receives permit confirmation"),
-        ],
-        "row-fs-human": [
-            bullets("Helpline answers enquiries"),
-            bullets("Counter staff assist walk-ins"),
-            bullets("Officer calls to confirm collection"),
-        ],
-        "row-fs-system": [
-            bullets("Gov website &amp; search results"),
-            bullets("Online form + payment gateway"),
-            bullets("Email / SMS confirmation"),
-        ],
-        "row-bs-human": [
-            bullets("Content team maintains info pages"),
-            bullets("Officer reviews the application"),
-            bullets("Officer approves &amp; issues the permit"),
-        ],
-        "row-bs-system": [
-            bullets("CMS / knowledge base"),
-            bullets("Case system validates the address"),
-            bullets("Permit database updated"),
-        ],
-        "row-support": [
-            bullets("SEO &amp; content governance"),
-            bullets("Payment reconciliation"),
-            bullets("Records retention &amp; audit"),
-        ],
-        "row-pain": [
-            bullets("Hard to find the right page"),
-            bullets("Unclear which documents are required"),
-            bullets("No status updates while waiting"),
-        ],
-        "row-emotion": ["😕 Confused", "😟 Anxious", "😀 Relieved"],
-        "row-suggest": [
-            bullets("Improve search &amp; signposting"),
-            bullets("Add an inline document checklist"),
-            bullets("Send proactive status notifications"),
-        ],
-    };
-    j.subJourneys[0].rows = j.subJourneys[0].rows.map((r) => {
-        if (r.rowType === DIVIDER_TYPE) return r;
-        const content = fill[r.rowType];
-        if (!content) return r;
-        const cells = r.cells.map((c, i) => (
-            c.mode === "tags"
-                ? { ...c, html: "", tags: content[i] || [] }
-                : { ...c, html: content[i] || "" }
-        ));
-        return { ...r, cells };
-    });
+    const textCells = (mode, values, align = "left") => values.map((html) => ({ mode, html, align }));
+    const tagCells = (values) => values.map((tags) => ({ mode: "tags", html: "", align: "left", tags }));
+    j.subJourneys[0].rows = [
+        {
+            rowType: "row-parties",
+            laneLabel: "Parties",
+            cells: tagCells([
+                [tag("Resident", "blue")],
+                [tag("Resident", "blue"), tag("Counter Staff", "green")],
+                [tag("Resident", "blue")],
+                [tag("Resident", "blue"), tag("Licensing Officer", "orange")],
+            ]),
+        },
+        {
+            rowType: "row-operator",
+            laneLabel: "User Actions",
+            cells: textCells("bullets", [
+                bullets("Searches online for permit info"),
+                bullets("Completes online or paper form"),
+                bullets("Pays the application fee"),
+                bullets("Receives permit confirmation"),
+            ]),
+        },
+        {
+            rowType: "row-fs-human",
+            laneLabel: "FS Human: Helpline Staff",
+            cells: textCells("bullets", [
+                bullets("Answers phone enquiries"),
+                "",
+                "",
+                "",
+            ]),
+        },
+        {
+            rowType: "row-fs-human",
+            laneLabel: "FS Human: Counter Staff",
+            cells: textCells("bullets", [
+                "",
+                bullets("Assists walk-in applicants with paper form"),
+                bullets("Collects fee at counter"),
+                "",
+            ]),
+        },
+        {
+            rowType: "row-fs-human",
+            laneLabel: "FS Human: Licensing Officer",
+            cells: textCells("bullets", ["", "", "", bullets("Calls resident to confirm collection")]),
+        },
+        {
+            rowType: "row-fs-system",
+            laneLabel: "System: Gov Website",
+            cells: textCells("bullets", [bullets("Gov website &amp; search results"), "", "", ""]),
+        },
+        {
+            rowType: "row-fs-system",
+            laneLabel: "System: Online Form",
+            cells: textCells("bullets", ["", bullets("Digital form with field validation"), "", ""]),
+        },
+        {
+            rowType: "row-fs-system",
+            laneLabel: "System: Payment Gateway",
+            cells: textCells("bullets", ["", "", bullets("Processes card / PayNow payment"), ""]),
+        },
+        {
+            rowType: "row-fs-system",
+            laneLabel: "Manual Tool: Paper Form",
+            cells: textCells("bullets", ["", bullets("Walk-in applicant fills hardcopy form"), "", ""]),
+        },
+        {
+            rowType: "row-fs-system",
+            laneLabel: "Comm Tool: Email & SMS",
+            cells: textCells("bullets", ["", "", bullets("Payment receipt via email"), bullets("Email / SMS permit confirmation")]),
+        },
+        {
+            rowType: DIVIDER_TYPE,
+            laneLabel: "Line of Visibility",
+            cells: [{ mode: "text", html: "━━━━━━━━ BELOW THIS LINE: BACKSTAGE ACTIONS NOT VISIBLE TO CUSTOMERS ━━━━━━━━", align: "center", colspan: 4 }],
+        },
+        {
+            rowType: "row-bs-human",
+            laneLabel: "BS Human: Content Team",
+            cells: textCells("bullets", [bullets("Maintains info pages"), "", "", ""]),
+        },
+        {
+            rowType: "row-bs-human",
+            laneLabel: "BS Human: Data Entry Clerk",
+            cells: textCells("bullets", ["", bullets("Keys in paper form data to case system"), "", ""]),
+        },
+        {
+            rowType: "row-bs-human",
+            laneLabel: "BS Human: Licensing Officer",
+            cells: textCells("bullets", ["", "", "", bullets("Reviews application", "Approves &amp; issues the permit")]),
+        },
+        {
+            rowType: "row-bs-system",
+            laneLabel: "System: CMS / Knowledge Base",
+            cells: textCells("bullets", [bullets("CMS / knowledge base"), "", "", ""]),
+        },
+        {
+            rowType: "row-bs-system",
+            laneLabel: "System: Case Management",
+            cells: textCells("bullets", ["", bullets("Validates the address"), "", ""]),
+        },
+        {
+            rowType: "row-bs-system",
+            laneLabel: "System: Permit Database",
+            cells: textCells("bullets", ["", "", "", bullets("Permit record created &amp; stored")]),
+        },
+        {
+            rowType: "row-bs-system",
+            laneLabel: "Manual Tool: Paper Logbook",
+            cells: textCells("bullets", ["", "", bullets("Counter staff logs cash payment in hardcopy ledger"), ""]),
+        },
+        {
+            rowType: "row-support",
+            laneLabel: "Support Process",
+            cells: textCells("bullets", [
+                bullets("SEO &amp; content governance"),
+                bullets("Form version control"),
+                bullets("Payment reconciliation"),
+                bullets("Records retention &amp; audit"),
+            ]),
+        },
+        {
+            rowType: "row-pain",
+            laneLabel: "Pain Points",
+            cells: textCells("boxes", [
+                bullets("Hard to find the right page"),
+                bullets("Unclear which documents are required", "Paper forms require manual re-keying"),
+                bullets("Cash payments logged in paper ledger, error-prone"),
+                bullets("No status updates while waiting"),
+            ]),
+        },
+        {
+            rowType: "row-emotion",
+            laneLabel: "Emotion",
+            cells: textCells("text", ["Confused", "Anxious", "Neutral", "Relieved"], "center"),
+        },
+        {
+            rowType: "row-suggest",
+            laneLabel: "Opportunities",
+            cells: textCells("boxes", [
+                bullets("Improve search &amp; signposting"),
+                bullets("Add an inline document checklist", "Digitise paper form channel"),
+                bullets("Replace paper ledger with digital POS"),
+                bullets("Send proactive status notifications"),
+            ]),
+        },
+    ];
     return {
         type: "service-journey-mapper",
         version: 1,
@@ -1799,6 +1906,16 @@ function FormatToolbar({ cell, selectedKey, onMode, onAlign }) {
     );
 }
 
+function BlueprintColGroup({ total, includeAddColumn = false }) {
+    return (
+        <colgroup>
+            <col style={{ width: LBL_W }} />
+            {Array.from({ length: total }, (_, i) => <col key={i} style={{ width: COL_W }} />)}
+            {includeAddColumn && <col style={{ width: 62 }} />}
+        </colgroup>
+    );
+}
+
 // ═══════════════════════════════════════
 // JOURNEY VIEW
 // ═══════════════════════════════════════
@@ -1905,6 +2022,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
             <div className="stage-outer">
                 <div className="scroll-hide" data-ss="">
                     <table className="bp" style={{ minWidth: hdrW }}>
+                        <BlueprintColGroup total={total} includeAddColumn={editMode} />
                         <tbody>
                             <tr>
                                 <td className="ll stg-ll" rowSpan={hasSub ? 2 : 1}>
@@ -2004,6 +2122,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                 <div key={si}>
                     <div className="bpw" data-ss="">
                         <table className="bp" style={{ minWidth: tw }}>
+                            <BlueprintColGroup total={total} />
                             <tbody>
                                 {sj.rows.map((row, ri) => (
                                     <BlueprintRow key={ri} row={row} rowIdx={ri}
