@@ -2701,6 +2701,9 @@ function App() {
     useEffect(() => {
         if (viewOnly) return;
         const onPopState = () => {
+            // Browser back doesn't blur the focused cell (popstate is same-document),
+            // so flush any in-flight cell draft into state before we swap views.
+            document.activeElement?.blur?.();
             (async () => {
                 const routedId = routeProjectId();
                 if (routedId == null) {
