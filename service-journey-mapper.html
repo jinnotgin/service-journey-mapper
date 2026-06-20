@@ -2730,7 +2730,8 @@ function App() {
         const parsed = parseInput(text);
         const data = hydrate(parsed.journeys);
         if (!data.length) throw new Error("No valid journey data found.");
-        let id = currentId;
+        const baseId = options.forceNew ? null : currentId;
+        let id = baseId;
         if (id == null) {
             const name = parsed.name || defaultName(projects);
             id = await dbCreateProject(name, data);
@@ -2738,7 +2739,7 @@ function App() {
             localStorage.setItem(LAST_KEY, String(id));
             writeRoute(id);
         }
-        if (currentId == null) {
+        if (baseId == null) {
             replaceJourneys(data);
             clearHistory();
             setTab(0);
@@ -3232,7 +3233,7 @@ function App() {
                     onOpen={openProject} onNew={newProject}
                     onRename={renameProject} onDelete={deleteProject}
                     onLoad={() => setModal(true)} />
-                {modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} currentProjectName={currentName} existingJourneys={[]} />}
+                {modal && <LoadModal onLoad={(text, mode, opts) => loadFromText(text, mode, { ...opts, forceNew: true })} onClose={() => setModal(false)} currentProjectName={currentName} existingJourneys={[]} />}
                 {confirmState && <ConfirmModal {...confirmState} onClose={() => setConfirmState(null)} />}
             </>
         );
