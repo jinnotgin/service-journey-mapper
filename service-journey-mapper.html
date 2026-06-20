@@ -3183,7 +3183,7 @@ function App() {
     useEffect(() => {
         if (!editMode || !selected) return;
         const clearWhenOutsideCellTools = (e) => {
-            if (e.target?.closest?.("[data-cell-key], .cell-toolbar, .cell-tick")) return;
+            if (e.target?.closest?.("[data-cell-key], .cell-toolbar, .cell-tick, .tag-color-pop, .tag-suggest")) return;
             setSelected(null);
         };
         document.addEventListener("mousedown", clearWhenOutsideCellTools);
