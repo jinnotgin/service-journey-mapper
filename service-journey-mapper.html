@@ -430,7 +430,7 @@
 <body>
 <div id="root"></div>
 <script type="text/babel" data-type="module">
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import Dexie from "dexie";
@@ -2526,7 +2526,7 @@ function App() {
     }, []);
 
     // Format-toolbar height → CSS var (so the sticky stage header sits below it)
-    useEffect(() => {
+    useLayoutEffect(() => {
         const root = document.documentElement;
         const el = toolbarRef.current;
         if (!editMode || !el) { root.style.setProperty("--toolbar-h", "0px"); return; }
@@ -2535,7 +2535,7 @@ function App() {
         const ro = new ResizeObserver(update);
         ro.observe(el);
         return () => { ro.disconnect(); root.style.setProperty("--toolbar-h", "0px"); };
-    }, [editMode]);
+    }, [editMode, journeys.length, viewOnly]);
 
     // Leaving edit mode clears the cell selection.
     useEffect(() => { if (!editMode) setSelected(null); }, [editMode]);
