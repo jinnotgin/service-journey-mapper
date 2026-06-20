@@ -18,7 +18,7 @@
     </script>
 
 
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@8.0.2/babel.min.js"></script>
     <style>
         :root {
             /* Type scale — one calm progression, applied everywhere */
@@ -299,6 +299,13 @@
         .pc-menu{display:flex;justify-content:flex-end}
         .pc-add-label{font-size:var(--fs-sm)}
         .lib-empty{text-align:center;padding:60px 20px;color:var(--text-sec);border:1px dashed var(--border);border-radius:8px;background:var(--surface);box-shadow:var(--shadow-sm)}
+        .lib-footer{margin-top:26px;display:flex;align-items:center;justify-content:space-between;gap:18px;color:var(--text-sec);font-size:var(--fs-xs)}
+        .lib-footer a{color:inherit;font-weight:inherit;text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+        .lib-footer-left,.lib-privacy{display:flex;align-items:center;gap:8px}
+        .lib-separator{width:1px;height:12px;background:var(--border)}
+        .lib-version{color:inherit;font-variant-numeric:tabular-nums}
+        .lib-privacy{justify-content:flex-end;color:inherit;font-weight:inherit}
+        .lib-privacy svg{width:14px;height:14px;stroke:currentColor;flex:0 0 auto}
         .icon-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-sec);transition:background .15s}
         .icon-btn:hover{background:var(--surface-2);color:var(--text)}
         .icon-btn.danger:hover{background:oklch(95% .03 20);color:var(--red);border-color:oklch(85% .06 20)}
@@ -324,6 +331,8 @@
             .lib-actions .btn-s,.lib-actions .btn-p{flex:1}
             .project-row{grid-template-columns:minmax(0,1fr) 38px;gap:10px}
             .pc-count,.pc-updated{display:none}
+            .lib-footer{align-items:flex-start;flex-direction:column;gap:10px}
+            .lib-privacy{justify-content:flex-start}
         }
         @media print{
             .tab-bar,.m-ov,.ab-actions,.cell-toolbar,.menu-wrap,.add-col-c,.add-row-bar{display:none}
@@ -346,12 +355,14 @@
 
         /* dropdown menus */
         .menu-wrap{position:relative;display:inline-block}
-        .menu-trigger{background:oklch(99% .002 70 / .92);border:1px solid var(--border);border-radius:5px;width:20px;height:20px;line-height:1;font-size:var(--fs-md);font-weight:700;cursor:pointer;color:var(--text);padding:0;display:inline-flex;align-items:center;justify-content:center}
+        .menu-trigger{background:oklch(99% .002 70 / .92);border:1px solid var(--border);border-radius:6px;width:24px;height:24px;line-height:1;cursor:pointer;color:var(--text-sec);padding:0;display:inline-flex;align-items:center;justify-content:center}
+        .menu-trigger svg{width:15px;height:15px;stroke:currentColor}
         .menu-trigger:hover{background:var(--surface)}
         .menu-pop{position:absolute;z-index:130;top:100%;left:0;margin-top:3px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-md);padding:6px;min-width:184px;text-align:left;color:var(--text)}
         .menu-pop.right{left:auto;right:0}
         .menu-portal{position:fixed;z-index:300;margin-top:0;max-width:calc(100vw - 16px)}
         .menu-item{display:flex;align-items:center;gap:7px;width:100%;background:none;border:none;padding:8px 10px;border-radius:7px;font-size:var(--fs-sm);font-weight:500;color:var(--text);cursor:pointer;font-family:inherit;text-align:left}
+        .menu-item svg{width:15px;height:15px;stroke:currentColor;flex:0 0 auto}
         .menu-item:hover{background:var(--surface-2)}
         .menu-item:disabled{opacity:.38;cursor:not-allowed}
         .menu-item:disabled:hover{background:none}
@@ -1195,6 +1206,15 @@ const LUCIDE_PATHS = {
         <path key="5" d="M3 12h.01" />,
         <path key="6" d="M3 18h.01" />
     ],
+    moreVertical: [
+        <circle key="1" cx="12" cy="12" r="1" fill="currentColor" />,
+        <circle key="2" cx="12" cy="5" r="1" fill="currentColor" />,
+        <circle key="3" cx="12" cy="19" r="1" fill="currentColor" />
+    ],
+    pencil: [
+        <path key="1" d="M21.17 6.17a2.12 2.12 0 0 0-3-3L3 18.34V22h3.66z" />,
+        <path key="2" d="m15 5 4 4" />
+    ],
     redo2: [
         <path key="1" d="m15 14 5-5-5-5" />,
         <path key="2" d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5 5.5 5.5 0 0 0 9.5 20H13" />
@@ -1202,9 +1222,20 @@ const LUCIDE_PATHS = {
     square: [
         <rect key="1" width="18" height="18" x="3" y="3" rx="2" />
     ],
+    shieldCheck: [
+        <path key="1" d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />,
+        <path key="2" d="m9 12 2 2 4-4" />
+    ],
     tag: [
         <path key="1" d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />,
         <circle key="2" cx="7.5" cy="7.5" r=".5" fill="currentColor" />
+    ],
+    trash2: [
+        <path key="1" d="M3 6h18" />,
+        <path key="2" d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />,
+        <path key="3" d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />,
+        <path key="4" d="M10 11v6" />,
+        <path key="5" d="M14 11v6" />
     ],
     undo2: [
         <path key="1" d="M9 14 4 9l5-5" />,
@@ -1468,11 +1499,11 @@ function ProjectCard({ p, current, onOpen, onRename, onDelete }) {
             <div className="pc-count">{count} journey{count === 1 ? "" : "s"}</div>
             <div className="pc-updated">Modified {fmtDate(p.updatedAt)}</div>
             <div className="pc-menu" onClick={(e) => e.stopPropagation()}>
-                <Menu trigger="⋮" align="right">
+                <Menu align="right">
                     {(close) => (
                         <>
-                            <button className="menu-item" onClick={() => { startRename(); close(); }}>✎ Rename</button>
-                            <button className="menu-item danger" onClick={() => { onDelete(p.id, p.name); close(); }}>🗑 Delete</button>
+                            <button className="menu-item" onClick={() => { startRename(); close(); }}><LucideIcon name="pencil" />Rename</button>
+                            <button className="menu-item danger" onClick={() => { onDelete(p.id, p.name); close(); }}><LucideIcon name="trash2" />Delete</button>
                         </>
                     )}
                 </Menu>
@@ -1508,6 +1539,17 @@ function LibraryScreen({ projects, currentId, onOpen, onNew, onRename, onDelete,
                     </button>
                 </div>
             )}
+            <footer className="lib-footer">
+                <div className="lib-footer-left">
+                    <span>Made by <a href="https://itsjin.com" target="_blank" rel="noreferrer">Jin</a></span>
+                    <span className="lib-separator" aria-hidden="true" />
+                    <span className="lib-version">v2</span>
+                </div>
+                <div className="lib-privacy">
+                    <LucideIcon name="shieldCheck" />
+                    <span>Private by default. All data is saved in this browser only.</span>
+                </div>
+            </footer>
         </div>
     );
 }
@@ -1580,8 +1622,8 @@ function Menu({ trigger, align, children }) {
 
     return (
         <span className="menu-wrap" ref={triggerRef}>
-            <button className="menu-trigger" title="Options"
-                onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>{trigger || "⋮"}</button>
+            <button className="menu-trigger" title="Options" aria-label="Options"
+                onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>{trigger || <LucideIcon name="moreVertical" />}</button>
             {open && pos && createPortal(
                 <div ref={popRef} className="menu-pop menu-portal"
                     style={align === "right" ? { top: pos.top, right: pos.right, left: "auto" } : { top: pos.top, left: pos.left }}
@@ -1749,7 +1791,7 @@ function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPr
                     <span className="drag-handle row-drag" draggable title="Drag to reorder row"
                         onDragStart={(e) => onRowDragStart(e, rowIdx)} onDragEnd={onDragEnd}>⠿</span>
                     <span className="row-menu">
-                        <Menu trigger="⋮" align="left">
+                        <Menu align="left">
                             {(close) => (
                                 <>
                                     <button className="menu-item" onClick={() => { onRowAction("insertAbove"); close(); }}>↑ Insert row above</button>
@@ -1774,7 +1816,7 @@ function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPr
                                             onClick={() => onRowAction("color", null)} />
                                     </div>
                                     <div className="menu-sep" />
-                                    <button className="menu-item danger" onClick={() => { onRowAction("delete"); close(); }}>🗑 Delete row</button>
+                                    <button className="menu-item danger" onClick={() => { onRowAction("delete"); close(); }}><LucideIcon name="trash2" />Delete row</button>
                                 </>
                             )}
                         </Menu>
@@ -2069,13 +2111,13 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                 <span className="drag-handle stg-drag" draggable title="Drag to reorder stage"
                                                     onDragStart={(e) => startDrag(e, { type: "stage", stageIdx: si })}
                                                     onDragEnd={clearDrag}>⠿</span>
-                                                <Menu trigger="⋮" align="right">
+                                                <Menu align="right">
                                                     {(close) => (
                                                         <>
                                                             <button className="menu-item" onClick={() => { onStage("addSubStage", { stageIdx: si }); close(); }}>＋ Add sub-stage</button>
                                                             <button className="menu-item" onClick={() => { onStage("addStage", { stageIdx: si }); close(); }}>＋ Add stage</button>
                                                             <div className="menu-sep" />
-                                                            <button className="menu-item danger" onClick={() => { onStage("deleteStage", { stageIdx: si }); close(); }}>🗑 Delete stage</button>
+                                                            <button className="menu-item danger" onClick={() => { onStage("deleteStage", { stageIdx: si }); close(); }}><LucideIcon name="trash2" />Delete stage</button>
                                                         </>
                                                     )}
                                                 </Menu>
@@ -2116,12 +2158,12 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                     <span className="drag-handle sub-drag" draggable title="Drag within this stage"
                                                         onDragStart={(e) => startDrag(e, { type: "subStage", stageIdx: si, subIdx: ssi })}
                                                         onDragEnd={clearDrag}>⠿</span>
-                                                    <Menu trigger="⋮" align="right">
+                                                    <Menu align="right">
                                                         {(close) => (
                                                             <>
                                                                 <button className="menu-item" onClick={() => { onStage("addSubStage", { stageIdx: si }); close(); }}>＋ Add sub-stage</button>
                                                                 <div className="menu-sep" />
-                                                                <button className="menu-item danger" onClick={() => { onStage("deleteSubStage", { stageIdx: si, subIdx: ssi }); close(); }}>🗑 Delete sub-stage</button>
+                                                                <button className="menu-item danger" onClick={() => { onStage("deleteSubStage", { stageIdx: si, subIdx: ssi }); close(); }}><LucideIcon name="trash2" />Delete sub-stage</button>
                                                             </>
                                                         )}
                                                     </Menu>
