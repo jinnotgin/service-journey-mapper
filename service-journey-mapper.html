@@ -878,6 +878,13 @@ async function copyTextToClipboard(text) {
 }
 
 const safeName = (s) => (s || "export").replace(/[^a-z0-9_-]+/gi, "_").replace(/^_+|_+$/g, "") || "export";
+const filenameTimestamp = (ts) => {
+    if (!ts) return null;
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return null;
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+};
 const defaultName = (projects) => `Project ${(projects?.length || 0) + 1}`;
 const blankJourneyTitle = (count) => `Untitled eService Journey${count > 0 ? ` ${count + 1}` : ""}`;
 const ROUTE_PROJECT_PARAM = "project";
@@ -2186,6 +2193,7 @@ function App() {
     const appBarRef = useRef(null);
     const saveTimer = useRef(null);
     const lastSavedRef = useRef(null);
+    const skipNextSaveRef = useRef(false);
     const undoStackRef = useRef([]);
     const redoStackRef = useRef([]);
     // Mirror of `journeys` kept in sync synchronously so export/save always
@@ -2211,7 +2219,8 @@ function App() {
         setTab((cur) => nextJourneys.length ? Math.min(cur, nextJourneys.length - 1) : 0);
     }, []);
 
-    const replaceJourneys = useCallback((next) => {
+    const replaceJourneys = useCallback((next, { skipSave = false } = {}) => {
+        if (skipSave) skipNextSaveRef.current = true;
         applyJourneys(typeof next === "function" ? next(journeysRef.current) : next);
     }, [applyJourneys]);
 
@@ -2264,7 +2273,7 @@ function App() {
                 setViewOnly(true);
                 setView("project");
                 setEditMode(false);
-                replaceJourneys(hydrate(embedded.journeys || []));
+                replaceJourneys(hydrate(embedded.journeys || []), { skipSave: true });
                 clearHistory();
                 setLastSaved(embedded.lastSavedAt ? new Date(embedded.lastSavedAt).getTime() : null);
                 setSaveState("idle");
@@ -2280,7 +2289,7 @@ function App() {
                 const p = await dbGetProject(routedId);
                 if (p) {
                     setCurrentId(routedId);
-                    replaceJourneys(hydrate(p.journeys || []));
+                    replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
                     clearHistory();
                     setLastSaved(p.updatedAt || null);
                     setTab(0);
@@ -2319,7 +2328,7 @@ function App() {
                     return;
                 }
                 setCurrentId(routedId);
-                replaceJourneys(hydrate(p.journeys || []));
+                replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
                 clearHistory();
                 setLastSaved(p.updatedAt || null);
                 setTab(0);
@@ -2337,6 +2346,11 @@ function App() {
     // ── Autosave current project (debounced) ──
     useEffect(() => {
         if (!ready || currentId == null) return;
+        if (skipNextSaveRef.current) {
+            skipNextSaveRef.current = false;
+            setSaveState("saved");
+            return;
+        }
         setSaveState("saving");
         clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(() => {
@@ -2577,7 +2591,7 @@ function App() {
         const p = await dbGetProject(id);
         if (!p) return;
         setCurrentId(id);
-        replaceJourneys(hydrate(p.journeys || []));
+        replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
         clearHistory();
         setLastSaved(p.updatedAt || null);
         setTab(0);
@@ -2712,7 +2726,9 @@ function App() {
     const exportProject = useCallback(() => {
         const payload = currentExportPayload();
         if (!payload) return;
-        downloadFile(safeName(currentName) + ".json", JSON.stringify(payload, null, 2), "application/json");
+        const savedAt = filenameTimestamp(lastSavedRef.current);
+        const filename = [safeName(currentName), savedAt].filter(Boolean).join("_") + ".json";
+        downloadFile(filename, JSON.stringify(payload, null, 2), "application/json");
     }, [currentExportPayload, currentName]);
 
     const exportStandaloneHtml = useCallback(() => {
