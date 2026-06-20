@@ -21,161 +21,196 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
         :root {
-            --primary: #2c3e6b;
-            --accent: #e8911a;
-            --red: #c62828;
-            --green: #2e7d32;
-            --blue: #1565c0;
-            --purple: #6a1b9a;
-            --gold: #e65100;
-            --bg: #f4f5f9;
-            --border: #d0d5dd;
-            --border-light: #e8ecf1;
-            --text: #1a1a2e;
-            --text-sec: #5a6376;
+            /* Type scale — one calm progression, applied everywhere */
+            --fs-2xs: 11px;
+            --fs-xs:  12px;
+            --fs-sm:  13px;
+            --fs-md:  14px;
+            --fs-lg:  16px;
+            --fs-xl:  20px;
+            --fs-2xl: 26px;
+            /* Neutral-dark ramp — a cool charcoal so the accent can carry the color */
+            --ink-bar:     oklch(25% .014 262);
+            --ink-stage:   oklch(32% .016 262);
+            --ink-sub:     oklch(40% .016 262);
+            --ink-divider: oklch(49% .015 262);
+            /* Accent — a single clean azure; white text on fills */
+            --accent:        oklch(57% .14 248);
+            --accent-strong: oklch(51% .15 250);
+            --accent-ink:    oklch(99% 0 0);
+            --accent-soft:   oklch(57% .14 248 / .12);
+            --accent-line:   oklch(57% .14 248 / .5);
+            --accent-ring:   oklch(57% .14 248 / .42);
+            /* Legacy alias — kept so existing references stay valid */
+            --primary: var(--ink-stage);
+            --red: #c0322f;
+            --green: #2f7d4f;
+            --blue: #2563a8;
+            --purple: #6d4aa0;
+            --gold: #b5651d;
+            --bg: oklch(97.5% .004 256);
+            --surface: #ffffff;
+            --surface-2: oklch(98.5% .004 256);
+            --border: oklch(89% .008 256);
+            --border-light: oklch(94% .006 256);
+            --text: oklch(29% .02 264);
+            --text-sec: oklch(53% .018 260);
+            --shadow-sm: 0 1px 2px rgba(20,28,48,.05), 0 1px 3px rgba(20,28,48,.07);
+            --shadow-md: 0 6px 22px rgba(20,28,48,.12);
+            --shadow-lg: 0 18px 50px rgba(20,28,48,.22);
+            --radius: 10px;
             --legend-h: 48px;
             --toolbar-h: 0px;
         }
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+        body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:var(--fs-md);line-height:1.5;-webkit-font-smoothing:antialiased}
 
-        /* ===== TOP APP BAR ===== */
-        .app-bar{background:oklch(30% .065 263);color:#f7f8fc;position:sticky;top:0;z-index:50;box-shadow:0 1px 0 rgba(255,255,255,.08),0 8px 18px rgba(23,32,56,.16)}
-        .app-bar-main{display:grid;grid-template-columns:minmax(230px,1fr) auto auto;align-items:center;gap:14px;padding:8px 20px;min-height:52px}
+        /* ===== TOP APP BAR =====
+           Left → right: [Back] | [Project title] ……… [Saved] [Undo/Redo] [Edit·View] [Export] */
+        .app-bar{background:var(--ink-bar);color:oklch(96% .004 262);position:sticky;top:0;z-index:50;box-shadow:0 1px 0 rgba(255,255,255,.05),0 6px 16px rgba(12,16,28,.18)}
+        .app-bar-main{display:flex;align-items:center;gap:12px;padding:0 16px;min-height:52px}
+        .ab-back{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);color:oklch(90% .008 262);border:1px solid rgba(255,255,255,.1);padding:6px 12px;border-radius:8px;font-size:var(--fs-sm);font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;transition:background .15s,border-color .15s}
+        .ab-back:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2)}
+        .ab-divider{width:1px;height:24px;background:rgba(255,255,255,.12);flex-shrink:0}
         .ab-brand{display:flex;flex-direction:column;min-width:0;line-height:1.15}
-        .ab-eyebrow{font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:oklch(75% .15 71);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-        .ab-title{font-size:.95rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .ab-eyebrow{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:oklch(72% .02 262);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+        .ab-title{font-size:var(--fs-lg);font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .ab-spacer{flex:1 1 auto;min-width:8px}
         .inline-title{cursor:default}
-        .inline-title.editable{cursor:text}
-        .inline-title-input{font:inherit;font-weight:inherit;color:inherit;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);border-radius:5px;padding:1px 5px;min-width:60px;max-width:100%;outline:none}
+        .inline-title.editable{cursor:text;border-radius:5px;transition:background .12s,box-shadow .12s}
+        .inline-title.editable:hover{background:var(--accent-soft);box-shadow:0 0 0 4px var(--accent-soft)}
+        .inline-title.editable::after{content:"✎";font-size:.72em;margin-left:7px;opacity:0;transition:opacity .12s;vertical-align:baseline;color:var(--accent)}
+        .inline-title.editable:hover::after{opacity:.85}
+        .inline-title-input{font:inherit;font-weight:inherit;color:inherit;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.4);border-radius:5px;padding:1px 5px;min-width:60px;max-width:100%;outline:none}
         .ab-brand .inline-title-input{width:100%}
         .ch-hdr .inline-title-input{width:min(720px,100%)}
-        .ch-title-input{background:#fff;border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,145,26,.15);padding:2px 6px}
-        .ab-status{justify-self:end;font-size:.72rem;font-weight:700;white-space:nowrap;min-width:0}
-        .ab-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
-        .ab-cluster{display:flex;align-items:center;gap:4px;padding:2px;border:1px solid rgba(255,255,255,.12);border-radius:9px;background:rgba(255,255,255,.05)}
-        .ab-btn{background:transparent;color:#f7f8fc;border:1px solid transparent;padding:6px 10px;border-radius:7px;font-size:.76rem;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s,border-color .15s,color .15s;white-space:nowrap;min-height:32px}
+        .ch-title-input{background:#fff;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);padding:2px 6px}
+        .ab-status{font-size:var(--fs-xs);font-weight:600;white-space:nowrap;flex-shrink:0}
+        .ab-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+        .ab-cluster{display:flex;align-items:center;gap:3px;padding:2px;border:1px solid rgba(255,255,255,.1);border-radius:9px;background:rgba(255,255,255,.04)}
+        .ab-btn{background:transparent;color:oklch(93% .005 262);border:1px solid transparent;padding:6px 11px;border-radius:7px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s,border-color .15s,color .15s;white-space:nowrap;min-height:32px}
         .ab-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.14)}
         .ab-btn:disabled{opacity:.4;cursor:not-allowed}
-        .ab-icon-btn{width:32px;padding:6px 0;font-size:.9rem}
-        .ab-btn.primary{background:oklch(68% .17 64);border-color:oklch(68% .17 64);color:#24160a}
-        .ab-btn.primary:hover{background:oklch(73% .17 64);border-color:oklch(73% .17 64)}
-        .ab-btn.editing{background:rgba(232,145,26,.2);border-color:rgba(232,145,26,.55);color:oklch(86% .13 75)}
-        .ab-btn[aria-expanded="true"]{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.24)}
+        .ab-icon-btn{width:32px;padding:6px 0;font-size:var(--fs-lg)}
+        /* segmented Edit | View toggle */
+        .ab-seg{display:flex;padding:2px;border:1px solid rgba(255,255,255,.1);border-radius:9px;background:rgba(255,255,255,.04)}
+        .ab-seg button{background:transparent;color:oklch(80% .008 262);border:none;padding:5px 13px;border-radius:7px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;font-family:inherit;min-height:30px;transition:background .15s,color .15s}
+        .ab-seg button:hover{color:#fff}
+        .ab-seg button.on{background:var(--accent);color:var(--accent-ink)}
         .ab-actions .menu-wrap{display:flex}
-        .ab-actions .menu-trigger{width:auto;height:auto;min-height:32px;background:oklch(68% .17 64);border-color:oklch(68% .17 64);color:#24160a;padding:6px 12px;border-radius:7px;font-size:.76rem;font-weight:800;white-space:nowrap}
-        .ab-actions .menu-trigger:hover{background:oklch(73% .17 64)}
+        .ab-actions .menu-trigger{width:auto;height:auto;min-height:32px;background:var(--accent);border-color:var(--accent);color:var(--accent-ink);padding:6px 13px;border-radius:8px;font-size:var(--fs-xs);font-weight:700;white-space:nowrap}
+        .ab-actions .menu-trigger:hover{background:var(--accent-strong)}
         .save-state{display:inline-flex;align-items:center;gap:5px}
-        .save-saving{color:oklch(86% .12 78)}
-        .save-saved{color:oklch(83% .12 145)}
-
-        /* ===== COLOR KEY (collapsible) ===== */
-        .ab-key{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:10px 24px;background:#fff;color:var(--text-sec);border-top:1px solid rgba(0,0,0,.08)}
-        .legend-item{display:flex;align-items:center;gap:5px;font-size:.74rem;color:var(--text-sec)}
-        .legend-swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0}
+        .save-saving{color:oklch(82% .05 80)}
+        .save-saved{color:oklch(78% .1 150)}
 
         /* ===== MAIN ===== */
         .main-content{padding-bottom:50px;min-height:60vh}
 
         /* ===== EMPTY ===== */
-        .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:55vh;gap:10px;text-align:center;padding:40px 20px}
-        .empty-icon{font-size:4rem}
-        .empty-state h2{font-size:1.25rem;color:var(--primary)}
-        .empty-state p{color:var(--text-sec);max-width:400px;font-size:.88rem}
-        .empty-hint{font-size:.76rem;color:var(--text-sec);margin-top:4px}
-        .empty-hint code{background:#e8ecf1;padding:2px 6px;border-radius:4px;font-family:Menlo,Consolas,monospace;font-size:.7rem}
-        .ideate-card{margin-top:28px;max-width:460px;width:100%;background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px 24px;text-align:left;box-shadow:0 1px 3px rgba(15,23,42,.06)}
-        .ideate-title{font-size:.95rem;font-weight:700;color:var(--primary);margin-bottom:6px}
-        .ideate-desc{color:var(--text-sec);font-size:.82rem;line-height:1.5;margin-bottom:12px}
-        .ideate-steps{margin:0 0 16px;padding-left:20px;color:var(--text-sec);font-size:.8rem;line-height:1.6}
+        .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:55vh;gap:8px;text-align:center;padding:48px 20px}
+        .empty-icon{font-size:2.6rem;opacity:.9}
+        .empty-state h2{font-size:var(--fs-xl);color:var(--text);font-weight:700;letter-spacing:-.01em}
+        .empty-state p{color:var(--text-sec);max-width:42ch;font-size:var(--fs-sm);line-height:1.55}
+        .empty-actions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+        .ideate-card{margin-top:30px;max-width:470px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;text-align:left;box-shadow:var(--shadow-sm)}
+        .ideate-title{font-size:var(--fs-md);font-weight:700;color:var(--text);margin-bottom:6px}
+        .ideate-desc{color:var(--text-sec);font-size:var(--fs-sm);line-height:1.55;margin-bottom:12px}
+        .ideate-steps{margin:0 0 16px;padding-left:20px;color:var(--text-sec);font-size:var(--fs-sm);line-height:1.65}
         .ideate-steps b{color:var(--text)}
         .ideate-card .btn-p{width:100%}
 
         /* ===== BUTTONS ===== */
-        .btn-p{background:var(--accent);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:.86rem;font-weight:600;cursor:pointer;transition:background .15s}
-        .btn-p:hover{background:#cf7e14}
+        .btn-p{background:var(--accent);color:var(--accent-ink);border:none;padding:10px 22px;border-radius:8px;font-size:var(--fs-sm);font-weight:700;cursor:pointer;transition:background .15s}
+        .btn-p:hover{background:var(--accent-strong)}
         .btn-p:disabled{opacity:.4;cursor:not-allowed}
-        .btn-s{background:#fff;color:var(--text);border:1px solid var(--border);padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:500;cursor:pointer;transition:background .15s}
-        .btn-s:hover{background:#f1f3f4}
+        .btn-s{background:var(--surface);color:var(--text);border:1px solid var(--border);padding:9px 16px;border-radius:8px;font-size:var(--fs-sm);font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+        .btn-s:hover{background:var(--surface-2);border-color:var(--text-sec)}
+        .btn-danger{background:var(--red);color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:var(--fs-sm);font-weight:700;cursor:pointer;transition:filter .15s}
+        .btn-danger:hover{filter:brightness(.93)}
+        .pc-rename{font-size:var(--fs-md);font-weight:700;padding:6px 9px}
 
         /* ===== CHAPTER HDR ===== */
-        .ch-hdr{padding:12px 28px 10px;background:oklch(97% .006 263);border-bottom:1px solid var(--border-light)}
-        .ch-hdr h2{font-size:1rem;color:var(--primary);font-weight:750}
+        .ch-hdr{padding:14px 28px 12px;background:var(--surface);border-bottom:1px solid var(--border-light)}
+        .ch-hdr h2{font-size:var(--fs-xl);color:var(--text);font-weight:700;letter-spacing:-.015em}
 
         /* ===== STAGE HDR (STICKY) ===== */
-        .stage-outer{position:sticky;top:calc(var(--legend-h,48px) + var(--toolbar-h,0px));z-index:35;background:var(--primary);border-bottom:2px solid var(--accent);box-shadow:0 3px 8px rgba(0,0,0,.12)}
+        .stage-outer{position:sticky;top:calc(var(--legend-h,48px) + var(--toolbar-h,0px));z-index:35;background:var(--ink-stage);border-bottom:2px solid var(--accent-line);box-shadow:0 3px 8px rgba(15,21,38,.1)}
         .scroll-hide{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
         .scroll-hide::-webkit-scrollbar{display:none}
 
         /* ===== SUB-JOURNEY HDR ===== */
-        .sj-scroll{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;background:#1e293b;border:1px solid var(--border);border-top:none}
+        .sj-scroll{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;background:var(--ink-sub);border:1px solid var(--border);border-top:none}
         .sj-scroll::-webkit-scrollbar{display:none}
 
         /* ===== BP TABLE ===== */
         .bp{border-collapse:collapse;table-layout:fixed}
-        .bp td{border:1px solid var(--border-light);padding:10px 12px;vertical-align:top;text-align:left;font-size:.8rem}
+        .bp td{border:1px solid var(--border-light);padding:11px 13px;vertical-align:top;text-align:left;font-size:var(--fs-sm)}
 
         /* Lane label */
-        .ll{width:180px;min-width:180px;max-width:180px;position:sticky;left:0;z-index:10;font-weight:700;font-size:.74rem;text-transform:uppercase;letter-spacing:.5px;background:#fff;border-right:2px solid var(--border)}
+        .ll{width:180px;min-width:180px;max-width:180px;position:sticky;left:0;z-index:10;font-weight:700;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:.6px;background:var(--surface);border-right:2px solid var(--border)}
 
         /* Stage header cells */
-        .stg-ll{background:var(--primary)!important;color:#fff!important;border:1px solid rgba(255,255,255,.15)!important;border-right:2px solid rgba(255,255,255,.3)!important;text-align:left!important}
-        .stg-c{min-width:260px;background:var(--primary)!important;color:#fff!important;font-weight:700!important;font-size:.84rem!important;text-align:center!important;vertical-align:middle!important;border:1px solid rgba(255,255,255,.15)!important}
+        .stg-ll{background:var(--ink-stage)!important;color:#fff!important;border:1px solid rgba(255,255,255,.12)!important;border-right:2px solid rgba(255,255,255,.22)!important;text-align:left!important}
+        .stg-c{min-width:260px;background:var(--ink-stage)!important;color:#fff!important;font-weight:700!important;font-size:var(--fs-md)!important;letter-spacing:-.005em!important;text-align:center!important;vertical-align:middle!important;border:1px solid rgba(255,255,255,.12)!important}
 
         /* SJ header cells */
-        .sj-ll{background:#1e293b!important;color:#fff!important;border:1px solid rgba(255,255,255,.1)!important;border-right:2px solid rgba(255,255,255,.2)!important;font-size:.74rem!important;text-align:left!important}
-        .sj-tc{background:#1e293b!important;color:#fff!important;font-weight:700!important;font-size:.7rem!important;text-transform:uppercase!important;letter-spacing:1.5px!important;text-align:center!important;padding:8px 12px!important;border:1px solid rgba(255,255,255,.1)!important}
+        .sj-ll{background:var(--ink-sub)!important;color:#fff!important;border:1px solid rgba(255,255,255,.1)!important;border-right:2px solid rgba(255,255,255,.18)!important;font-size:var(--fs-2xs)!important;text-align:left!important}
+        .sj-tc{background:var(--ink-sub)!important;color:#fff!important;font-weight:600!important;font-size:var(--fs-2xs)!important;text-transform:uppercase!important;letter-spacing:1.4px!important;text-align:center!important;padding:8px 12px!important;border:1px solid rgba(255,255,255,.1)!important}
 
         /* Data cell */
         .dc{min-width:260px}
         .dc-span{min-width:auto!important;width:auto!important}
 
         /* Wrapper */
-        .bpw{overflow-x:auto;background:#fff;border:1px solid var(--border);border-top:none}
+        .bpw{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-top:none}
         .bpw::-webkit-scrollbar{height:10px}
-        .bpw::-webkit-scrollbar-track{background:#eee}
-        .bpw::-webkit-scrollbar-thumb{background:var(--accent);border-radius:5px}
-        .bpw{scrollbar-width:thin;scrollbar-color:var(--accent) #eee}
+        .bpw::-webkit-scrollbar-track{background:var(--surface-2)}
+        .bpw::-webkit-scrollbar-thumb{background:var(--border);border-radius:5px;border:2px solid var(--surface-2)}
+        .bpw::-webkit-scrollbar-thumb:hover{background:var(--text-sec)}
+        .bpw{scrollbar-width:thin;scrollbar-color:var(--border) var(--surface-2)}
 
-        /* ===== ROW TYPES ===== */
-        .row-parties>.ll{background:#f5f5f5;color:#616161}
-        .row-parties>.dc{background:#fafafa}
+        /* ===== ROW TYPES =====
+           Label column carries a soft tint + readable colored label; the data
+           column stays near-white so written content always leads. */
+        .row-parties>.ll{background:oklch(96% .004 256);color:var(--text-sec)}
+        .row-parties>.dc{background:var(--surface-2)}
 
-        .row-operator>.ll{background:#fff;color:var(--text)}
-        .row-operator>.dc{background:#fff}
+        .row-operator>.ll{background:var(--surface);color:var(--text)}
+        .row-operator>.dc{background:var(--surface)}
 
-        .row-fs-human>.ll{background:#dbeafe;color:#1565c0}
-        .row-fs-human>.dc{background:#f0f7ff}
+        .row-fs-human>.ll{background:oklch(93% .035 245);color:oklch(45% .11 250)}
+        .row-fs-human>.dc{background:oklch(98% .012 245)}
 
-        .row-fs-system>.ll{background:#dbeafe;color:#1565c0}
-        .row-fs-system>.dc{background:#f0f7ff}
+        .row-fs-system>.ll{background:oklch(93% .035 245);color:oklch(45% .11 250)}
+        .row-fs-system>.dc{background:oklch(98% .012 245)}
 
-        .row-divider>.ll{background:#ff6f00;color:#fff;border-right-color:rgba(255,255,255,.4)}
-        .row-divider>.dc{background:#ff6f00;color:#fff;font-weight:800;text-align:center;padding:6px 12px;font-size:.72rem;text-transform:uppercase;letter-spacing:2px}
+        .row-divider>.ll{background:var(--ink-divider);color:oklch(94% .01 256);border-right-color:rgba(255,255,255,.25)}
+        .row-divider>.dc{background:var(--ink-divider);color:oklch(94% .01 256);font-weight:600;text-align:center;padding:7px 12px;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:1.6px}
 
-        .row-bs-human>.ll{background:#fce8c8;color:#e65100}
-        .row-bs-human>.dc{background:#fdf6ee}
+        .row-bs-human>.ll{background:oklch(94% .04 80);color:oklch(48% .1 65)}
+        .row-bs-human>.dc{background:oklch(98.5% .012 80)}
 
-        .row-bs-system>.ll{background:#fce8c8;color:#e65100}
-        .row-bs-system>.dc{background:#fdf6ee}
+        .row-bs-system>.ll{background:oklch(94% .04 80);color:oklch(48% .1 65)}
+        .row-bs-system>.dc{background:oklch(98.5% .012 80)}
 
-        .row-support>.ll{background:#e8dff5;color:#6a1b9a}
-        .row-support>.dc{background:#f3f0f9}
+        .row-support>.ll{background:oklch(93% .03 305);color:oklch(46% .11 305)}
+        .row-support>.dc{background:oklch(98% .012 305)}
 
-        .row-pain>.ll{background:#fecdd3;color:#c62828}
-        .row-pain>.dc{background:#fff5f5}
+        .row-pain>.ll{background:oklch(92% .04 20);color:oklch(48% .14 25)}
+        .row-pain>.dc{background:oklch(98.5% .012 20)}
 
-        .row-verbatim>.ll{background:#fef3c7;color:#92400e}
-        .row-verbatim>.dc{background:#fffbeb;font-style:italic;color:#92400e;font-size:.76rem}
+        .row-verbatim>.ll{background:oklch(94% .05 90);color:oklch(45% .09 75)}
+        .row-verbatim>.dc{background:oklch(98.5% .02 90);font-style:italic;color:oklch(45% .07 75);font-size:var(--fs-xs)}
 
-        .row-emotion>.ll{background:#d1fae5;color:#2e7d32}
-        .row-emotion>.dc{background:#f0faf0;text-align:center}
+        .row-emotion>.ll{background:oklch(93% .04 155);color:oklch(43% .1 155)}
+        .row-emotion>.dc{background:oklch(98% .015 155);text-align:center}
 
-        .row-suggest>.ll{background:#bfdbfe;color:#1565c0}
-        .row-suggest>.dc{background:#eff6ff}
+        .row-suggest>.ll{background:oklch(93% .035 235);color:oklch(45% .11 245)}
+        .row-suggest>.dc{background:oklch(98% .012 235)}
 
         /* ===== INNER CELL ELEMENTS ===== */
-        .bp-tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:.68rem;font-weight:600;margin:2px 2px 2px 0}
+        .bp-tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:var(--fs-2xs);font-weight:600;margin:2px 2px 2px 0}
         .tag-ecda{background:#dbeafe;color:#1e40af}.tag-scdf{background:#fecdd3;color:#991b1b}
         .tag-ura{background:#ede9fe;color:#5b21b6}.tag-bca{background:#ffedd5;color:#9a3412}
         .tag-nea{background:#d1fae5;color:#065f46}.tag-hpb{background:#ccfbf1;color:#115e59}
@@ -183,65 +218,81 @@
         .tag-cms{background:#e0e7ff;color:#3730a3}.tag-acra{background:#f3f4f6;color:#374151}
 
         .bp-bullet{padding-left:14px;position:relative;margin-bottom:4px}
-        .bp-bullet::before{content:'•';position:absolute;left:2px;color:var(--accent);font-weight:700}
+        .bp-bullet::before{content:'•';position:absolute;left:2px;color:var(--accent-strong);font-weight:700}
 
-        .bp-pain-item{padding:4px 8px;background:#fee2e2;border:1px solid #f3b9bd;border-radius:4px;margin-bottom:4px;font-size:.76rem}
-        .bp-suggest-item{padding:4px 8px;background:#dbeafe;border:1px solid #b7d3f3;border-radius:4px;margin-bottom:4px;font-size:.76rem}
+        .bp-pain-item{padding:4px 8px;background:oklch(96% .03 20);border:1px solid oklch(88% .05 20);border-radius:4px;margin-bottom:4px;font-size:var(--fs-xs)}
+        .bp-suggest-item{padding:4px 8px;background:oklch(96% .03 240);border:1px solid oklch(88% .05 240);border-radius:4px;margin-bottom:4px;font-size:var(--fs-xs)}
 
         .emotion-icon{font-size:1.4rem;display:block;margin-bottom:2px}
-        .emotion-text{font-size:.72rem;font-weight:600}
+        .emotion-text{font-size:var(--fs-xs);font-weight:600}
         .emotion-neg{color:var(--red)}.emotion-pos{color:var(--green)}.emotion-neu{color:var(--gold)}
 
-        .stage-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;font-size:.8rem}
+        .stage-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:var(--fs-sm)}
 
         /* ===== EDITABLE ===== */
-        td[contenteditable="true"]{cursor:text;outline:none;transition:box-shadow .15s}
-        td[contenteditable="true"]:hover{box-shadow:inset 0 0 0 2px rgba(232,145,26,.25)}
+        td[contenteditable="true"]{cursor:text;outline:none;transition:box-shadow .12s,background .12s}
+        td[contenteditable="true"]:hover{box-shadow:inset 0 0 0 1.5px var(--accent-line)}
         td[contenteditable="true"]:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 
         /* ===== TAB BAR ===== */
-        .tab-bar{position:fixed;bottom:0;left:0;right:0;height:42px;background:#e2e6ec;border-top:1px solid #bcc3cf;display:flex;align-items:flex-end;padding:0 8px;z-index:100}
-        .tab-scroll{display:flex;align-items:flex-end;overflow-x:auto;flex:1;gap:2px;scrollbar-width:none}
+        .tab-bar{position:fixed;bottom:0;left:0;right:0;height:42px;background:var(--surface-2);border-top:1px solid var(--border);display:flex;align-items:flex-end;padding:0 8px;z-index:100}
+        .tab-scroll{display:flex;align-items:flex-end;overflow-x:auto;flex:1;gap:3px;scrollbar-width:none}
         .tab-scroll::-webkit-scrollbar{display:none}
-        .tab-btn{flex-shrink:0;height:33px;border:1px solid #bcc3cf;border-bottom:none;border-radius:7px 7px 0 0;background:#d5dae2;color:var(--text-sec);display:flex;align-items:center;max-width:340px;white-space:nowrap;overflow:hidden;transition:background .15s}
-        .tab-btn:hover{background:#e8ecf1}
-        .tab-btn.active{background:#fff;color:var(--text);border-top:2px solid var(--accent);height:35px;z-index:1}
-        .tab-select{min-width:0;flex:1;height:100%;padding:0 15px;border:0;background:transparent;color:inherit;font-size:.72rem;font-weight:600;cursor:pointer;display:flex;align-items:center;overflow:hidden;font-family:inherit}
+        .tab-btn{flex-shrink:0;height:32px;border:1px solid var(--border);border-bottom:none;border-radius:8px 8px 0 0;background:transparent;color:var(--text-sec);display:flex;align-items:center;max-width:340px;white-space:nowrap;overflow:hidden;transition:background .15s,color .15s}
+        .tab-btn:hover{background:var(--surface)}
+        .tab-btn.active{background:var(--surface);color:var(--text);border-top:2px solid var(--accent);height:35px;z-index:1}
+        .tab-select{min-width:0;flex:1;height:100%;padding:0 14px;border:0;background:transparent;color:inherit;font-size:var(--fs-xs);font-weight:600;cursor:pointer;display:flex;align-items:center;overflow:hidden;font-family:inherit}
         .tab-select{padding-right:6px}
         .tab-ttl{overflow:hidden;text-overflow:ellipsis}
-        .tab-del{width:22px;height:22px;margin-right:5px;border:0;border-radius:5px;background:transparent;color:#7a8496;font-size:1rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit}
-        .tab-del:hover{background:#e5e9ef;color:#c62828}
-        .tab-btn.active .tab-del:hover{background:#f1f3f6}
+        .tab-del{width:22px;height:22px;margin-right:5px;border:0;border-radius:5px;background:transparent;color:var(--text-sec);font-size:1rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;opacity:.6}
+        .tab-del:hover{background:oklch(94% .03 20);color:var(--red);opacity:1}
         .tab-actions{display:flex;align-items:flex-end;gap:6px;margin:0 0 5px 8px;flex-shrink:0}
-        .tab-load{height:29px;padding:0 13px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:.72rem;font-weight:600;cursor:pointer;color:var(--primary);transition:background .15s;font-family:inherit}
-        .tab-load:hover{background:#f1f3f4}
+        .tab-load{height:29px;padding:0 13px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:var(--fs-xs);font-weight:600;cursor:pointer;color:var(--text-sec);transition:background .15s,color .15s;font-family:inherit}
+        .tab-load:hover{background:var(--surface-2);color:var(--text)}
 
         /* ===== MODAL ===== */
-        .m-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
-        .m-box{background:#fff;border-radius:12px;width:100%;max-width:620px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
-        .m-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border-light)}
-        .m-hdr h3{font-size:1rem;color:var(--primary)}
-        .m-close{background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-sec);padding:4px}
-        .m-body{padding:14px 20px;flex:1;overflow-y:auto}
-        .m-body>p{font-size:.84rem;color:var(--text-sec);margin-bottom:10px}
-        .m-body textarea{width:100%;border:1px solid var(--border);border-radius:8px;padding:11px;font-family:Menlo,Consolas,monospace;font-size:.74rem;resize:vertical;line-height:1.5;outline:none}
-        .m-body textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,145,26,.15)}
+        .m-ov{position:fixed;inset:0;background:oklch(25% .02 264 / .42);backdrop-filter:blur(2px);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;animation:m-fade .14s ease-out}
+        @keyframes m-fade{from{opacity:0}to{opacity:1}}
+        .m-box{background:var(--surface);border-radius:14px;width:100%;max-width:620px;max-height:82vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);animation:m-rise .18s cubic-bezier(.2,.8,.2,1)}
+        @keyframes m-rise{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:none}}
+        .m-box.m-sm{max-width:440px}
+        .m-hdr{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid var(--border-light)}
+        .m-hdr h3{font-size:var(--fs-lg);color:var(--text);font-weight:700;letter-spacing:-.01em}
+        .m-close{background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-sec);padding:4px;border-radius:6px;line-height:1}
+        .m-close:hover{background:var(--surface-2);color:var(--text)}
+        .m-body{padding:16px 22px;flex:1;overflow-y:auto}
+        .m-body>p{font-size:var(--fs-sm);color:var(--text-sec);margin-bottom:12px;line-height:1.55}
+        .m-body textarea{width:100%;border:1px solid var(--border);border-radius:8px;padding:11px;font-family:Menlo,Consolas,monospace;font-size:var(--fs-xs);resize:vertical;line-height:1.5;outline:none}
+        .m-body textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+        .m-input{width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:inherit;font-size:var(--fs-md);color:var(--text);outline:none}
+        .m-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
         .m-file{margin-top:10px}
-        .m-ft{padding:12px 20px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:8px}
+        .m-warn{margin-top:14px;padding:11px 13px;background:#fff8e6;border:1px solid #f3d27a;border-radius:8px;font-size:var(--fs-xs);color:#7a5c12;line-height:1.5}
+        .m-ft{padding:14px 22px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:8px}
 
-        /* ===== PROJECT MANAGER ===== */
-        .proj-list{display:flex;flex-direction:column;gap:8px}
-        .proj-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border-light);border-radius:8px;background:#fafbfc}
-        .proj-row.current{border-color:var(--accent);background:#fffaf2}
-        .proj-info{flex:1;min-width:0}
-        .proj-info .pn{font-weight:600;font-size:.84rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .proj-info .pn .cur-badge{display:inline-block;background:var(--accent);color:#fff;font-size:.6rem;font-weight:700;padding:1px 7px;border-radius:9px;margin-left:6px;vertical-align:middle;text-transform:uppercase;letter-spacing:.5px}
-        .proj-info .pm{font-size:.7rem;color:var(--text-sec);margin-top:2px}
-        .proj-actions{display:flex;gap:6px;flex-shrink:0}
-        .icon-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:.72rem;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-sec);transition:background .15s}
-        .icon-btn:hover{background:#f1f3f4;color:var(--text)}
-        .icon-btn.danger:hover{background:#fee2e2;color:var(--red);border-color:#f5b5b5}
-        .proj-empty{text-align:center;color:var(--text-sec);padding:24px 12px;font-size:.84rem}
+        /* ===== LIBRARY (home screen) ===== */
+        .lib{max-width:920px;margin:0 auto;padding:44px 24px 80px}
+        .lib-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+        .lib-eyebrow{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--accent-strong);margin-bottom:6px}
+        .lib-head h1{font-size:var(--fs-2xl);font-weight:700;letter-spacing:-.02em;color:var(--text)}
+        .lib-head p{font-size:var(--fs-sm);color:var(--text-sec);margin-top:6px;max-width:48ch;line-height:1.55}
+        .lib-actions{display:flex;gap:8px;flex-shrink:0}
+        .lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+        .proj-card{position:relative;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 18px 14px;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s;display:flex;flex-direction:column;gap:6px;min-height:128px;font-family:inherit}
+        .proj-card:hover{border-color:var(--accent-line);box-shadow:var(--shadow-md);transform:translateY(-2px)}
+        .proj-card.current{border-color:var(--accent)}
+        .proj-card .pc-name{font-weight:700;font-size:var(--fs-md);color:var(--text);letter-spacing:-.01em;padding-right:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .proj-card .pc-meta{font-size:var(--fs-xs);color:var(--text-sec);margin-top:auto}
+        .pc-badge{display:inline-block;background:var(--accent-soft);color:var(--accent-strong);font-size:var(--fs-2xs);font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px;align-self:flex-start}
+        .pc-menu{position:absolute;top:10px;right:10px}
+        .proj-card.add{align-items:center;justify-content:center;text-align:center;border-style:dashed;color:var(--text-sec);gap:8px}
+        .proj-card.add:hover{color:var(--accent-strong);transform:translateY(-2px)}
+        .proj-card.add .pc-plus{font-size:1.6rem;line-height:1;font-weight:400}
+        .proj-card.add .pc-add-label{font-weight:600;font-size:var(--fs-sm)}
+        .lib-empty{text-align:center;padding:60px 20px;color:var(--text-sec)}
+        .icon-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-sec);transition:background .15s}
+        .icon-btn:hover{background:var(--surface-2);color:var(--text)}
+        .icon-btn.danger:hover{background:oklch(95% .03 20);color:var(--red);border-color:oklch(85% .06 20)}
 
         /* ===== RESPONSIVE ===== */
         @media(max-width:980px){
@@ -256,8 +307,10 @@
             .ab-btn{padding:5px 8px}
             .ab-icon-btn{width:30px}
             .ab-key{padding:9px 14px;gap:9px}
-            .ch-hdr{padding:10px 16px 8px}
-            .ch-hdr h2{font-size:.95rem}
+            .ch-hdr{padding:12px 16px 10px}
+            .ch-hdr h2{font-size:var(--fs-lg)}
+            .lib{padding:28px 16px 80px}
+            .lib-head h1{font-size:var(--fs-xl)}
         }
         @media print{
             .tab-bar,.m-ov,.ab-actions,.edit-toolbar,.menu-wrap,.add-col-c,.add-row-bar{display:none}
@@ -266,42 +319,42 @@
         }
 
         /* ===== EDIT MODE ===== */
-        .edit-toolbar{position:sticky;top:var(--legend-h,48px);z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 16px;background:#fff;border-bottom:1px solid var(--border);box-shadow:0 2px 4px rgba(0,0,0,.06)}
+        .edit-toolbar{position:sticky;top:var(--legend-h,48px);z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm)}
         .tb-group{display:flex;align-items:center;gap:3px}
         .tb-sep{width:1px;height:20px;background:var(--border);margin:0 5px}
-        .tb-label{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-sec);margin-right:3px}
-        .tb-btn{background:#f4f5f9;border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:.74rem;font-weight:600;cursor:pointer;color:var(--text-sec);font-family:inherit;line-height:1.1}
-        .tb-btn:hover:not(:disabled){background:#e8ecf1;color:var(--text)}
-        .tb-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+        .tb-label{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-sec);margin-right:3px}
+        .tb-btn{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;color:var(--text-sec);font-family:inherit;line-height:1.1}
+        .tb-btn:hover:not(:disabled){background:var(--bg);color:var(--text);border-color:var(--text-sec)}
+        .tb-btn.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
         .tb-btn:disabled{opacity:.4;cursor:not-allowed}
-        .tb-hint{font-size:.7rem;color:var(--text-sec);margin-left:auto}
+        .tb-hint{font-size:var(--fs-xs);color:var(--text-sec);margin-left:auto}
 
         /* dropdown menus */
         .menu-wrap{position:relative;display:inline-block}
-        .menu-trigger{background:rgba(255,255,255,.9);border:1px solid var(--border);border-radius:5px;width:20px;height:20px;line-height:1;font-size:.85rem;font-weight:700;cursor:pointer;color:var(--text);padding:0;display:inline-flex;align-items:center;justify-content:center}
+        .menu-trigger{background:rgba(255,255,255,.92);border:1px solid var(--border);border-radius:5px;width:20px;height:20px;line-height:1;font-size:var(--fs-md);font-weight:700;cursor:pointer;color:var(--text);padding:0;display:inline-flex;align-items:center;justify-content:center}
         .menu-trigger:hover{background:#fff}
-        .menu-pop{position:absolute;z-index:130;top:100%;left:0;margin-top:3px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px;min-width:180px;text-align:left;color:var(--text)}
+        .menu-pop{position:absolute;z-index:130;top:100%;left:0;margin-top:3px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-md);padding:6px;min-width:184px;text-align:left;color:var(--text)}
         .menu-pop.right{left:auto;right:0}
         .menu-portal{position:fixed;z-index:300;margin-top:0}
-        .menu-item{display:flex;align-items:center;gap:7px;width:100%;background:none;border:none;padding:7px 9px;border-radius:6px;font-size:.78rem;font-weight:500;color:var(--text);cursor:pointer;font-family:inherit;text-align:left}
-        .menu-item:hover{background:#f1f3f4}
+        .menu-item{display:flex;align-items:center;gap:7px;width:100%;background:none;border:none;padding:8px 10px;border-radius:7px;font-size:var(--fs-sm);font-weight:500;color:var(--text);cursor:pointer;font-family:inherit;text-align:left}
+        .menu-item:hover{background:var(--surface-2)}
         .menu-item:disabled{opacity:.38;cursor:not-allowed}
         .menu-item:disabled:hover{background:none}
         .menu-item.danger{color:var(--red)}
-        .menu-item.danger:hover{background:#fee2e2}
-        .menu-head{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-sec);padding:6px 9px 3px}
+        .menu-item.danger:hover{background:oklch(95% .03 20)}
+        .menu-head{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-sec);padding:6px 10px 3px}
         .menu-sep{height:1px;background:var(--border-light);margin:5px 0}
-        .menu-select{width:calc(100% - 2px);margin:0 1px 4px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:.76rem}
-        .swatches{display:flex;flex-wrap:wrap;gap:5px;padding:4px 9px 6px}
-        .swatch{width:20px;height:20px;border-radius:5px;border:1px solid rgba(0,0,0,.15);cursor:pointer;padding:0}
+        .menu-select{width:calc(100% - 2px);margin:0 1px 4px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:var(--fs-xs)}
+        .swatches{display:flex;flex-wrap:wrap;gap:5px;padding:4px 10px 6px}
+        .swatch{width:20px;height:20px;border-radius:5px;border:1px solid rgba(0,0,0,.12);cursor:pointer;padding:0}
         .swatch:hover{outline:2px solid var(--accent);outline-offset:1px}
         .sw-custom{position:relative;overflow:hidden;background:conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)}
         .sw-input{position:absolute;inset:-4px;width:130%;height:130%;opacity:0;cursor:pointer;border:none;padding:0;background:none}
 
         /* text-color control in the format toolbar */
         .tb-color{position:relative;display:inline-block}
-        .tb-A{border-bottom:3px solid #c62828;line-height:1;padding-bottom:1px;font-weight:800}
-        .color-pop{position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:7px;display:flex;flex-wrap:wrap;gap:5px;width:120px;z-index:320}
+        .tb-A{border-bottom:3px solid var(--red);line-height:1;padding-bottom:1px;font-weight:700}
+        .color-pop{position:absolute;top:100%;left:0;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);padding:7px;display:flex;flex-wrap:wrap;gap:5px;width:120px;z-index:320}
 
         /* header cell menus + editable titles */
         .stg-c,.sub-c{position:relative}
@@ -317,21 +370,21 @@
         .ll.ll-editing{padding-left:28px}
         .stg-drag,.sub-drag{position:absolute;top:5px;left:5px}
         .dragging{opacity:.56}
-        .drop-before{box-shadow:inset 4px 0 0 var(--accent), inset 0 0 0 1px rgba(232,145,26,.35)}
-        .drop-after{box-shadow:inset -4px 0 0 var(--accent), inset 0 0 0 1px rgba(232,145,26,.35)}
+        .drop-before{box-shadow:inset 4px 0 0 var(--accent), inset 0 0 0 1px var(--accent-ring)}
+        .drop-after{box-shadow:inset -4px 0 0 var(--accent), inset 0 0 0 1px var(--accent-ring)}
         tr.drop-before>.ll,tr.drop-before>.dc{box-shadow:inset 0 4px 0 var(--accent)}
-        .add-row-bar.drop-end{box-shadow:inset 0 3px 0 var(--accent);background:#fff8ed}
+        .add-row-bar.drop-end{box-shadow:inset 0 3px 0 var(--accent);background:var(--accent-soft)}
 
         /* sub-stage header row */
-        .sub-c{background:#243049!important;color:#fff!important;font-weight:600!important;font-size:.73rem!important;text-align:center!important;vertical-align:middle!important;border:1px solid rgba(255,255,255,.12)!important}
+        .sub-c{background:var(--ink-sub)!important;color:#fff!important;font-weight:600!important;font-size:var(--fs-xs)!important;text-align:center!important;vertical-align:middle!important;border:1px solid rgba(255,255,255,.1)!important}
 
         /* add column / add row affordances */
-        .add-col-c{min-width:62px;width:62px;background:var(--primary)!important;text-align:center!important;border:1px solid rgba(255,255,255,.15)!important;vertical-align:middle!important}
-        .add-btn{background:rgba(255,255,255,.15);color:#fff;border:1px dashed rgba(255,255,255,.55);border-radius:6px;padding:5px 11px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit}
-        .add-btn:hover{background:rgba(255,255,255,.3)}
-        .add-row-bar{padding:6px 12px;background:#fafbfc;border:1px solid var(--border);border-top:none}
-        .add-row-btn{background:#fff;border:1px dashed var(--border);border-radius:6px;padding:5px 12px;font-size:.74rem;font-weight:600;color:var(--text-sec);cursor:pointer;font-family:inherit}
-        .add-row-btn:hover{background:#f1f3f4;color:var(--text)}
+        .add-col-c{min-width:62px;width:62px;background:var(--ink-stage)!important;text-align:center!important;border:1px solid rgba(255,255,255,.12)!important;vertical-align:middle!important}
+        .add-btn{background:rgba(255,255,255,.14);color:#fff;border:1px dashed rgba(255,255,255,.5);border-radius:6px;padding:5px 11px;font-size:var(--fs-sm);font-weight:700;cursor:pointer;font-family:inherit}
+        .add-btn:hover{background:rgba(255,255,255,.28)}
+        .add-row-bar{padding:7px 12px;background:var(--surface-2);border:1px solid var(--border);border-top:none}
+        .add-row-btn{background:var(--surface);border:1px dashed var(--border);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);font-weight:600;color:var(--text-sec);cursor:pointer;font-family:inherit}
+        .add-row-btn:hover{background:var(--bg);color:var(--text);border-color:var(--text-sec)}
 
         /* selected cell highlight */
         .dc.cell-sel{box-shadow:inset 0 0 0 2px var(--accent)}
@@ -342,30 +395,30 @@
 
         /* tags-mode cell */
         .cell-tags{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
-        .tag-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:.68rem;font-weight:600}
-        .tag-x{cursor:pointer;font-weight:800;opacity:.55;font-size:.72rem}
+        .tag-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:var(--fs-2xs);font-weight:600}
+        .tag-x{cursor:pointer;font-weight:700;opacity:.55;font-size:var(--fs-xs)}
         .tag-x:hover{opacity:1}
         .tag-add{display:inline-flex;gap:3px;align-items:center;margin-top:4px}
-        .tag-add input{border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:.7rem;font-family:inherit;width:74px;outline:none}
+        .tag-add input{border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:var(--fs-xs);font-family:inherit;width:74px;outline:none}
         .tag-add input:focus{border-color:var(--accent)}
-        .tag-add-color{width:18px;height:18px;border-radius:4px;border:1px solid rgba(0,0,0,.25);cursor:pointer;padding:0}
-        .tag-add-go{background:var(--accent);color:#fff;border:none;border-radius:4px;font-size:.72rem;font-weight:800;padding:2px 7px;cursor:pointer;line-height:1.2}
+        .tag-add-color{width:18px;height:18px;border-radius:4px;border:1px solid rgba(0,0,0,.2);cursor:pointer;padding:0}
+        .tag-add-go{background:var(--accent);color:var(--accent-ink);border:none;border-radius:4px;font-size:var(--fs-xs);font-weight:700;padding:2px 7px;cursor:pointer;line-height:1.2}
 
         /* bullets-mode cell */
         .cell-bullets>div,.cell-bullets>p{padding-left:14px;position:relative;margin-bottom:3px}
-        .cell-bullets>div::before,.cell-bullets>p::before{content:'•';position:absolute;left:2px;color:var(--accent);font-weight:700}
+        .cell-bullets>div::before,.cell-bullets>p::before{content:'•';position:absolute;left:2px;color:var(--accent-strong);font-weight:700}
 
         /* boxes-mode cell (card-style bullet items) */
-        .cell-boxes>div,.cell-boxes>p{background:rgba(255,255,255,.6);border:1px solid rgba(0,0,0,.12);border-radius:5px;padding:5px 9px;margin-bottom:5px}
+        .cell-boxes>div,.cell-boxes>p{background:rgba(255,255,255,.7);border:1px solid rgba(20,28,48,.1);border-radius:5px;padding:5px 9px;margin-bottom:5px}
         .cell-boxes>div:last-child,.cell-boxes>p:last-child{margin-bottom:0}
 
         /* per-cell save / discard mini-toolbar */
         .cell-tick{position:fixed;z-index:310;display:flex;gap:4px}
-        .ct-btn{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:#fff;cursor:pointer;font-weight:800;font-size:.85rem;box-shadow:0 2px 6px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
-        .ct-ok{color:var(--green)}.ct-ok:hover{background:#e9f7ec}
-        .ct-no{color:var(--red)}.ct-no:hover{background:#fdeaea}
+        .ct-btn{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-weight:700;font-size:var(--fs-md);box-shadow:var(--shadow-md);display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
+        .ct-ok{color:var(--green)}.ct-ok:hover{background:oklch(95% .04 150)}
+        .ct-no{color:var(--red)}.ct-no:hover{background:oklch(95% .03 20)}
 
-        .save-meta{font-size:.66rem;font-weight:500;opacity:.85;margin-left:4px}
+        .save-meta{font-size:var(--fs-2xs);font-weight:500;opacity:.85;margin-left:4px}
         @media(max-width:820px){.save-meta{display:none}}
     </style>
 </head>
@@ -968,18 +1021,18 @@ function buildExampleProject() {
 // TOP APP BAR + COLLAPSIBLE KEY
 // ═══════════════════════════════════════
 const LEGEND = [
-    { label: "Operator Actions", color: "#fff", border: true },
-    { label: "Frontstage (Visible)", color: "#f0f7ff" },
-    { label: "Divider (merged row)", color: "#ff6f00" },
-    { label: "Backstage (Hidden)", color: "#fdf6ee" },
-    { label: "Support Processes", color: "#f3f0f9" },
-    { label: "Pain Points", color: "#fff5f5" },
-    { label: "Suggestions", color: "#eff6ff" },
+    { label: "Operator Actions", color: "#ffffff", border: true },
+    { label: "Frontstage (Visible)", color: "oklch(93% .035 245)" },
+    { label: "Divider (merged row)", color: "oklch(48% .03 256)" },
+    { label: "Backstage (Hidden)", color: "oklch(94% .04 80)" },
+    { label: "Support Processes", color: "oklch(93% .03 305)" },
+    { label: "Pain Points", color: "oklch(92% .04 20)" },
+    { label: "Suggestions", color: "oklch(93% .035 235)" },
 ];
 
-function TopBar({ innerRef, currentName, onRenameCurrent, onProjects, onDownloadExport, onStandaloneExport, onPromptExport, canExport, saveState, lastSaved,
+function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadExport, onStandaloneExport, onPromptExport, canExport, saveState, lastSaved,
         viewOnly,
-        editMode, onToggleEdit, canUndo, canRedo, onUndo, onRedo }) {
+        editMode, onSetEdit, canUndo, canRedo, onUndo, onRedo }) {
     const [keyOpen, setKeyOpen] = useState(false);
     const [promptCopied, setPromptCopied] = useState(false);
     const copyPrompt = async (close) => {
@@ -992,13 +1045,13 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onProjects, onDownload
         <header className="app-bar" ref={innerRef}>
             <div className="app-bar-main">
                 <div className="ab-brand">
-                    <span className="ab-eyebrow">Service Blueprint Viewer</span>
-                    <InlineTitleEdit className="ab-title" value={currentName} fallback="No project loaded"
+                    <span className="ab-eyebrow">Service Journey Mapper</span>
+                    <InlineTitleEdit className="ab-title" value={currentName} fallback="Untitled project"
                         disabled={!currentName || viewOnly} onCommit={onRenameCurrent} />
                 </div>
                 {!viewOnly && <div className="ab-status" aria-live="polite">
                     {saveState === "saving" ? (
-                        <span className="save-state save-saving">Saving...</span>
+                        <span className="save-state save-saving">Saving…</span>
                     ) : lastSaved ? (
                         <span className="save-state save-saved">
                             Saved ✓<span className="save-meta">Last saved {fmtDate(lastSaved)}</span>
@@ -1007,22 +1060,26 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onProjects, onDownload
                 </div>}
                 <div className="ab-actions">
                     {!viewOnly && (
+                        <button className="ab-btn" onClick={onLibrary} title="Back to your projects">← Library</button>
+                    )}
+                    {!viewOnly && (
                         <div className="ab-cluster" aria-label="History controls">
                             <button className="ab-btn ab-icon-btn" onClick={onUndo} disabled={!canUndo} title="Undo (⌘/Ctrl+Z)" aria-label="Undo">↶</button>
                             <button className="ab-btn ab-icon-btn" onClick={onRedo} disabled={!canRedo} title="Redo (⌘/Ctrl+Shift+Z)" aria-label="Redo">↷</button>
                         </div>
                     )}
-                    <div className="ab-cluster">
-                        <button className="ab-btn" aria-expanded={keyOpen}
-                            onClick={() => setKeyOpen((o) => !o)}>Key {keyOpen ? "▴" : "▾"}</button>
-                        {!viewOnly && (
-                            <button className={`ab-btn${editMode ? " editing" : ""}`} aria-pressed={editMode}
-                                onClick={onToggleEdit} disabled={!canExport}>{editMode ? "Editing" : "Edit"}</button>
-                        )}
-                    </div>
+                    <button className="ab-btn" aria-expanded={keyOpen}
+                        onClick={() => setKeyOpen((o) => !o)}>Key {keyOpen ? "▴" : "▾"}</button>
+                    {!viewOnly && (
+                        <div className="ab-seg" role="group" aria-label="Editing mode">
+                            <button className={editMode ? "on" : ""} aria-pressed={editMode}
+                                onClick={() => onSetEdit(true)} disabled={!canExport}>Edit</button>
+                            <button className={!editMode ? "on" : ""} aria-pressed={!editMode}
+                                onClick={() => onSetEdit(false)} disabled={!canExport}>View</button>
+                        </div>
+                    )}
                     {!viewOnly && (
                         <div className="ab-cluster">
-                            <button className="ab-btn" onClick={onProjects}>Projects</button>
                             {canExport ? (
                                 <Menu trigger={promptCopied ? "Copied ✓" : "Export ▾"} align="right">
                                     {(close) => (
@@ -1067,26 +1124,25 @@ function EmptyState({ onNew, onLoad, onPrompt }) {
     return (
         <div className="empty-state">
             <div className="empty-icon">📋</div>
-            <h2>No Service Journeys Loaded</h2>
-            <p>Load JSON data extracted from a service blueprint to visualize journey maps with dynamic rows, columns, and Excel-like tabs.</p>
-            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-                <button className="btn-p" onClick={onNew}>+ New Blank Journey</button>
-                <button className="btn-p" onClick={onLoad}>📂 Load JSON Data</button>
-                <div className="empty-hint">Or run <code>window.loadJSON(text)</code> in the browser console</div>
+            <h2>This project is empty</h2>
+            <p>Start a blank journey to build a service blueprint, or load JSON you already have. Each journey becomes its own tab.</p>
+            <div className="empty-actions">
+                <button className="btn-p" onClick={onNew}>＋ New blank journey</button>
+                <button className="btn-s" onClick={onLoad}>Load JSON data</button>
             </div>
             <div className="ideate-card">
                 <div className="ideate-title">✨ Ideate with an AI assistant</div>
                 <p className="ideate-desc">
-                    New to service blueprints? Copy a ready-made prompt — it includes the data schema and
+                    New to service blueprints? Copy a ready-made prompt: it includes the data schema and
                     design guidance so an LLM (Claude, ChatGPT, etc.) can draft a full journey map for you.
                 </p>
                 <ol className="ideate-steps">
                     <li>Copy the prompt below.</li>
                     <li>Paste it into your AI assistant and describe your service where prompted.</li>
-                    <li>Copy the JSON it returns, then click <b>Load JSON Data</b> above.</li>
+                    <li>Copy the JSON it returns, then click <b>Load JSON data</b> above.</li>
                 </ol>
                 <button className="btn-p" onClick={copyPrompt}>
-                    {promptCopied ? "✓ Prompt copied — paste into your AI" : "📋 Copy AI ideation prompt"}
+                    {promptCopied ? "✓ Prompt copied, paste into your AI" : "📋 Copy AI ideation prompt"}
                 </button>
             </div>
         </div>
@@ -1096,7 +1152,7 @@ function EmptyState({ onNew, onLoad, onPrompt }) {
 // ═══════════════════════════════════════
 // LOAD MODAL
 // ═══════════════════════════════════════
-function LoadModal({ onLoad, onClose }) {
+function LoadModal({ onLoad, onClose, existingCount = 0 }) {
     const [text, setText] = useState("");
     const fileRef = useRef(null);
 
@@ -1108,9 +1164,9 @@ function LoadModal({ onLoad, onClose }) {
         r.readAsText(f);
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (mode) => {
         if (!text.trim()) return;
-        try { await onLoad(text); onClose(); }
+        try { await onLoad(text, mode); onClose(); }
         catch (err) { alert("Error parsing data:\n" + err.message); }
     };
 
@@ -1129,10 +1185,23 @@ function LoadModal({ onLoad, onClose }) {
                         <button className="btn-s" onClick={() => fileRef.current?.click()}>📁 Upload file</button>
                         <input ref={fileRef} type="file" accept=".json,.txt" onChange={handleFile} style={{ display: "none" }} />
                     </div>
+                    {existingCount > 0 && (
+                        <div className="m-warn">
+                            ⚠️ This project already has {existingCount} sheet{existingCount === 1 ? "" : "s"}.
+                            Choose <b>Add as new sheets</b> to keep them, or <b>Overwrite</b> to replace them all.
+                        </div>
+                    )}
                 </div>
                 <div className="m-ft">
                     <button className="btn-s" onClick={onClose}>Cancel</button>
-                    <button className="btn-p" onClick={handleSubmit} disabled={!text.trim()}>Load Data</button>
+                    {existingCount > 0 ? (
+                        <>
+                            <button className="btn-s" onClick={() => handleSubmit("replace")} disabled={!text.trim()}>Overwrite</button>
+                            <button className="btn-p" onClick={() => handleSubmit("append")} disabled={!text.trim()}>Add as new sheets</button>
+                        </>
+                    ) : (
+                        <button className="btn-p" onClick={() => handleSubmit("replace")} disabled={!text.trim()}>Load Data</button>
+                    )}
                 </div>
             </div>
         </div>
@@ -1140,46 +1209,105 @@ function LoadModal({ onLoad, onClose }) {
 }
 
 // ═══════════════════════════════════════
-// PROJECT MANAGER
+// CONFIRM DIALOG (styled replacement for window.confirm)
 // ═══════════════════════════════════════
-function ProjectManager({ projects, currentId, onOpen, onDelete, onRename, onNew, onClose }) {
+function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onClose }) {
+    useEffect(() => {
+        const h = (e) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
     return (
         <div className="m-ov" onClick={onClose}>
-            <div className="m-box" onClick={(e) => e.stopPropagation()}>
+            <div className="m-box m-sm" onClick={(e) => e.stopPropagation()}>
                 <div className="m-hdr">
-                    <h3>Projects</h3>
-                    <button className="m-close" onClick={onClose}>✕</button>
+                    <h3>{title}</h3>
+                    <button className="m-close" onClick={onClose} aria-label="Close">✕</button>
                 </div>
-                <div className="m-body">
-                    <p>Each project keeps its own journeys, saved in your browser (IndexedDB). Open one to switch, or create a new project to start fresh.</p>
-                    {projects.length === 0 ? (
-                        <div className="proj-empty">No saved projects yet. Create one to get started.</div>
-                    ) : (
-                        <div className="proj-list">
-                            {projects.map((p) => (
-                                <div key={p.id} className={`proj-row${p.id === currentId ? " current" : ""}`}>
-                                    <div className="proj-info">
-                                        <div className="pn">
-                                            {p.name}
-                                            {p.id === currentId && <span className="cur-badge">current</span>}
-                                        </div>
-                                        <div className="pm">{(p.journeys?.length || 0)} journey(s) · updated {fmtDate(p.updatedAt)}</div>
-                                    </div>
-                                    <div className="proj-actions">
-                                        {p.id !== currentId && <button className="icon-btn" onClick={() => onOpen(p.id)}>Open</button>}
-                                        <button className="icon-btn" onClick={() => onRename(p.id, p.name)}>Rename</button>
-                                        <button className="icon-btn danger" onClick={() => onDelete(p.id, p.name)}>Delete</button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                <div className="m-body"><p style={{ margin: 0 }}>{message}</p></div>
                 <div className="m-ft">
-                    <button className="btn-s" onClick={onClose}>Close</button>
-                    <button className="btn-p" onClick={onNew}>+ New Project</button>
+                    <button className="btn-s" onClick={onClose}>Cancel</button>
+                    <button className={danger ? "btn-danger" : "btn-p"}
+                        onClick={() => { onConfirm(); onClose(); }}>{confirmLabel || "Confirm"}</button>
                 </div>
             </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════
+// LIBRARY (home screen) — project cards
+// ═══════════════════════════════════════
+function ProjectCard({ p, current, onOpen, onRename, onDelete }) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState(p.name);
+    const inputRef = useRef(null);
+    useEffect(() => { if (editing) { inputRef.current?.focus(); inputRef.current?.select(); } }, [editing]);
+    const startRename = () => { setDraft(p.name); setEditing(true); };
+    const commit = () => {
+        const n = draft.trim();
+        setEditing(false);
+        if (n && n !== p.name) onRename(p.id, n); else setDraft(p.name);
+    };
+    const count = p.journeys?.length || 0;
+    return (
+        <div className={`proj-card${current ? " current" : ""}`} role="button" tabIndex={0}
+            onClick={() => !editing && onOpen(p.id)}
+            onKeyDown={(e) => { if (!editing && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onOpen(p.id); } }}>
+            <div className="pc-menu" onClick={(e) => e.stopPropagation()}>
+                <Menu trigger="⋮" align="right">
+                    {(close) => (
+                        <>
+                            <button className="menu-item" onClick={() => { startRename(); close(); }}>✎ Rename</button>
+                            <button className="menu-item danger" onClick={() => { onDelete(p.id, p.name); close(); }}>🗑 Delete</button>
+                        </>
+                    )}
+                </Menu>
+            </div>
+            {current && <span className="pc-badge">Current</span>}
+            {editing ? (
+                <input ref={inputRef} className="m-input pc-rename" value={draft}
+                    onClick={(e) => e.stopPropagation()} onChange={(e) => setDraft(e.target.value)} onBlur={commit}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); commit(); }
+                        if (e.key === "Escape") { setDraft(p.name); setEditing(false); }
+                    }} />
+            ) : (
+                <div className="pc-name" title={p.name}>{p.name}</div>
+            )}
+            <div className="pc-meta">{count} journey{count === 1 ? "" : "s"} · updated {fmtDate(p.updatedAt)}</div>
+        </div>
+    );
+}
+
+function LibraryScreen({ projects, currentId, onOpen, onNew, onRename, onDelete, onLoad }) {
+    return (
+        <div className="lib">
+            <div className="lib-head">
+                <div>
+                    <div className="lib-eyebrow">Service Journey Mapper</div>
+                    <h1>Your projects</h1>
+                    <p>Each project holds its own set of journey maps, saved privately in this browser. Open one to keep working, or start something new.</p>
+                </div>
+                <div className="lib-actions">
+                    <button className="btn-s" onClick={onLoad}>Load JSON</button>
+                    <button className="btn-p" onClick={onNew}>＋ New project</button>
+                </div>
+            </div>
+            {projects.length === 0 ? (
+                <div className="lib-empty">No projects yet. Create your first one to get started.</div>
+            ) : (
+                <div className="lib-grid">
+                    {projects.map((p) => (
+                        <ProjectCard key={p.id} p={p} current={p.id === currentId}
+                            onOpen={onOpen} onRename={onRename} onDelete={onDelete} />
+                    ))}
+                    <button className="proj-card add" onClick={onNew}>
+                        <span className="pc-plus">＋</span>
+                        <span className="pc-add-label">New project</span>
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
@@ -1797,14 +1925,17 @@ function App() {
     const [journeys, setJourneys] = useState([]);
     const [tab, setTab] = useState(0);
     const [modal, setModal] = useState(false);
-    const [projModal, setProjModal] = useState(false);
+    // "library" = home screen listing projects; "project" = working inside one.
+    const [view, setView] = useState("library");
+    const [confirmState, setConfirmState] = useState(null);
     const [projects, setProjects] = useState([]);
     const [currentId, setCurrentId] = useState(null);
     const [standaloneName, setStandaloneName] = useState(null);
     const [viewOnly, setViewOnly] = useState(false);
     const [ready, setReady] = useState(false);
     const [saveState, setSaveState] = useState("idle");
-    const [editMode, setEditMode] = useState(false);
+    // Edit is the default working mode; users switch to View when they want to read.
+    const [editMode, setEditMode] = useState(true);
     const [selected, setSelected] = useState(null);
     const [lastSaved, setLastSaved] = useState(null);
     const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
@@ -1888,6 +2019,8 @@ function App() {
                 setCurrentId(null);
                 setStandaloneName(embedded.name || "Standalone Service Journey");
                 setViewOnly(true);
+                setView("project");
+                setEditMode(false);
                 replaceJourneys(hydrate(embedded.journeys || []));
                 clearHistory();
                 setLastSaved(embedded.lastSavedAt ? new Date(embedded.lastSavedAt).getTime() : null);
@@ -1896,17 +2029,10 @@ function App() {
                 return;
             }
 
+            // Land on the library; the user picks (or creates) a project to enter.
             const list = await dbListProjects();
             setProjects(list);
-            const last = Number(localStorage.getItem(LAST_KEY));
-            const open = list.find((p) => p.id === last) || list[0];
-            if (open) {
-                setCurrentId(open.id);
-                replaceJourneys(hydrate(open.journeys || []));
-                clearHistory();
-                setLastSaved(open.updatedAt || null);
-                localStorage.setItem(LAST_KEY, String(open.id));
-            }
+            setView("library");
             setReady(true);
         })();
     }, [clearHistory, replaceJourneys]);
@@ -1925,7 +2051,7 @@ function App() {
     }, [journeys, currentId, ready, refreshProjects]);
 
     // ── Load data (JSON array / exported project) ──
-    const loadFromText = useCallback(async (text) => {
+    const loadFromText = useCallback(async (text, mode = "replace") => {
         const parsed = parseInput(text);
         const data = hydrate(parsed.journeys);
         if (!data.length) throw new Error("No valid journey data found.");
@@ -1939,10 +2065,17 @@ function App() {
         if (currentId == null) {
             replaceJourneys(data);
             clearHistory();
+            setTab(0);
+            setEditMode(true);
+            setView("project");
+        } else if (mode === "append") {
+            const at = journeysRef.current.length;
+            commitJourneys((prev) => [...prev, ...data]);
+            setTab(at);
         } else {
             commitJourneys(data);
+            setTab(0);
         }
-        setTab(0);
         await refreshProjects();
         console.log(`%c✅ Loaded ${data.length} service journey(s)`, "color:#2e7d32;font-weight:bold;font-size:14px");
     }, [clearHistory, commitJourneys, currentId, projects, refreshProjects, replaceJourneys]);
@@ -2150,35 +2283,43 @@ function App() {
         clearHistory();
         setLastSaved(p.updatedAt || null);
         setTab(0);
+        setEditMode(true);
+        setView("project");
         localStorage.setItem(LAST_KEY, String(id));
-        setProjModal(false);
     }, [clearHistory, replaceJourneys]);
 
-    const deleteProject = useCallback(async (id, name) => {
-        if (!confirm(`Delete project "${name}"?\nThis permanently removes its saved data and cannot be undone.`)) return;
+    const goLibrary = useCallback(() => {
+        setSelected(null);
+        setView("library");
+        refreshProjects();
+    }, [refreshProjects]);
+
+    const doDeleteProject = useCallback(async (id) => {
         await dbDeleteProject(id);
         if (id === currentId) {
-            const remaining = (await dbListProjects());
-            const fallback = remaining[0];
-            if (fallback) {
-                setCurrentId(fallback.id);
-                replaceJourneys(hydrate(fallback.journeys || []));
-                localStorage.setItem(LAST_KEY, String(fallback.id));
-            } else {
-                setCurrentId(null);
-                replaceJourneys([]);
-                localStorage.removeItem(LAST_KEY);
-            }
+            setCurrentId(null);
+            replaceJourneys([]);
             clearHistory();
             setTab(0);
+            localStorage.removeItem(LAST_KEY);
+            setView("library");
         }
         await refreshProjects();
     }, [clearHistory, currentId, refreshProjects, replaceJourneys]);
 
+    const deleteProject = useCallback((id, name) => {
+        setConfirmState({
+            title: "Delete project",
+            message: `Delete “${name}”? This permanently removes its saved journeys and can't be undone.`,
+            confirmLabel: "Delete project",
+            danger: true,
+            onConfirm: () => doDeleteProject(id),
+        });
+    }, [doDeleteProject]);
+
     const renameProject = useCallback(async (id, name) => {
-        const nn = prompt("Rename project", name);
-        if (nn == null || !nn.trim()) return;
-        await dbRenameProject(id, nn.trim());
+        if (!name || !name.trim()) return;
+        await dbRenameProject(id, name.trim());
         await refreshProjects();
     }, [refreshProjects]);
 
@@ -2197,17 +2338,15 @@ function App() {
     }, [editJourney]);
 
     const newProject = useCallback(async () => {
-        const name = prompt("New project name", defaultName(projects));
-        if (name == null) return;
-        const id = await dbCreateProject(name.trim() || defaultName(projects), []);
+        const id = await dbCreateProject(defaultName(projects), []);
         setCurrentId(id);
         replaceJourneys([]);
         clearHistory();
         setTab(0);
+        setEditMode(true);
+        setView("project");
         localStorage.setItem(LAST_KEY, String(id));
         await refreshProjects();
-        setProjModal(false);
-        setModal(true); // prompt to load data into the fresh project
     }, [clearHistory, projects, refreshProjects, replaceJourneys]);
 
     const newBlankJourney = useCallback(async () => {
@@ -2233,17 +2372,22 @@ function App() {
     const deleteJourney = useCallback((jIdx) => {
         const journey = journeysRef.current[jIdx];
         if (!journey) return;
-        if (!confirm(`Delete sheet "${journey.title}"?`)) return;
-        commitJourneys((prev) => {
-            const next = prev.filter((_, i) => i !== jIdx);
-            setTab((cur) => {
-                if (!next.length) return 0;
-                if (cur > jIdx) return cur - 1;
-                if (cur >= next.length) return next.length - 1;
-                return cur;
-            });
-            setSelected(null);
-            return next;
+        setConfirmState({
+            title: "Delete journey",
+            message: `Delete the journey “${journey.title}”? You can undo this right after.`,
+            confirmLabel: "Delete journey",
+            danger: true,
+            onConfirm: () => commitJourneys((prev) => {
+                const next = prev.filter((_, i) => i !== jIdx);
+                setTab((cur) => {
+                    if (!next.length) return 0;
+                    if (cur > jIdx) return cur - 1;
+                    if (cur >= next.length) return next.length - 1;
+                    return cur;
+                });
+                setSelected(null);
+                return next;
+            }),
         });
     }, [commitJourneys]);
 
@@ -2355,16 +2499,32 @@ function App() {
         ? journeys[selected.jIdx]?.subJourneys?.[selected.sjIdx]?.rows?.[selected.rowIdx]?.cells?.[selected.cellIdx]
         : null;
 
+    if (!ready) return null;
+
+    // ── Home / library screen ──
+    if (!viewOnly && view === "library") {
+        return (
+            <>
+                <LibraryScreen projects={projects} currentId={currentId}
+                    onOpen={openProject} onNew={newProject}
+                    onRename={renameProject} onDelete={deleteProject}
+                    onLoad={() => setModal(true)} />
+                {modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} existingCount={0} />}
+                {confirmState && <ConfirmModal {...confirmState} onClose={() => setConfirmState(null)} />}
+            </>
+        );
+    }
+
     return (
         <>
             <TopBar innerRef={legendRef} currentName={currentName}
                 onRenameCurrent={renameCurrentProject}
-                onProjects={() => setProjModal(true)}
+                onLibrary={goLibrary}
                 onDownloadExport={exportProject} onStandaloneExport={exportStandaloneHtml}
                 onPromptExport={copyPromptExport}
                 canExport={journeys.length > 0} saveState={saveState} lastSaved={lastSaved}
                 viewOnly={viewOnly}
-                editMode={editMode} onToggleEdit={() => setEditMode((e) => !e)}
+                editMode={editMode} onSetEdit={(v) => setEditMode(v)}
                 canUndo={historyState.canUndo} canRedo={historyState.canRedo}
                 onUndo={undo} onRedo={redo} />
             {!viewOnly && editMode && journeys.length > 0 && (
@@ -2391,10 +2551,8 @@ function App() {
             <TabBar journeys={journeys} activeTab={tab} setActiveTab={setTab}
                 onNew={newBlankJourney} onLoad={() => setModal(true)}
                 onDelete={deleteJourney} viewOnly={viewOnly} />
-            {!viewOnly && modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} />}
-            {!viewOnly && projModal && <ProjectManager projects={projects} currentId={currentId}
-                onOpen={openProject} onDelete={deleteProject} onRename={renameProject}
-                onNew={newProject} onClose={() => setProjModal(false)} />}
+            {!viewOnly && modal && <LoadModal onLoad={loadFromText} onClose={() => setModal(false)} existingCount={journeys.length} />}
+            {confirmState && <ConfirmModal {...confirmState} onClose={() => setConfirmState(null)} />}
         </>
     );
 }
