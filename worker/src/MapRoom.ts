@@ -3,7 +3,14 @@
 // storage + auth over an internal HTTP interface; Phase 2 adds the WebSocket
 // live channel (whole-document, last-write-wins) using the Hibernation API.
 
-import { Role, sha256Hex, safeEqual, randomSecret } from "./util";
+import {
+  Role,
+  sha256Hex,
+  safeEqual,
+  randomSecret,
+  hashPassword,
+  verifyPassword,
+} from "./util";
 
 interface InitBody {
   mapId: string;
@@ -19,12 +26,23 @@ interface InitBody {
   shareTokens: { editor: string; viewer: string };
 }
 
-// Body for the owner-only link-management endpoint (POST /links).
+// Body for the owner-only link-management endpoint (POST /links). Phase 5 adds
+// the password-management actions (setPassword / clearPassword).
 interface LinksBody {
   token?: string;
-  action?: "get" | "rotate" | "setEnabled";
+  action?: "get" | "rotate" | "setEnabled" | "setPassword" | "clearPassword";
   role?: "editor" | "viewer";
   enabled?: boolean;
+  password?: string;
+}
+
+// Body for the public POST /access endpoint (Phase 5). A non-owner exchanges
+// (link token + optional password) for a short-lived session token that the
+// client then passes to hydrate (/doc) and the WS (/sync) as proof of the
+// password factor. Owners bypass the password entirely.
+interface AccessBody {
+  token?: string;
+  password?: string;
 }
 
 // Per-socket data persisted across hibernation via serializeAttachment.
@@ -38,6 +56,7 @@ interface SocketAttachment {
 }
 
 const MAX_DOC_BYTES = 2 * 1024 * 1024; // 2 MB ceiling per document
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // password sessions live 12 hours
 
 export class MapRoom {
   private state: DurableObjectState;
@@ -60,6 +79,10 @@ export class MapRoom {
         token_hash TEXT NOT NULL,
         enabled INTEGER NOT NULL DEFAULT 1
       );
+      CREATE TABLE IF NOT EXISTS sessions (
+        token_hash TEXT PRIMARY KEY,
+        expires INTEGER NOT NULL
+      );
     `);
   }
 
@@ -69,16 +92,18 @@ export class MapRoom {
     // WebSocket live channel (Phase 2). The router forwards
     // GET /api/maps/:id/sync here with the Upgrade header intact.
     if (url.pathname === "/sync" && request.headers.get("Upgrade") === "websocket") {
-      return this.handleSync(url.searchParams.get("token"));
+      return this.handleSync(url.searchParams.get("token"), url.searchParams.get("session"));
     }
 
     switch (`${request.method} ${url.pathname}`) {
       case "POST /init":
         return this.handleInit(await request.json());
       case "GET /doc":
-        return this.handleGetDoc(url.searchParams.get("token"));
+        return this.handleGetDoc(url.searchParams.get("token"), url.searchParams.get("session"));
       case "POST /links":
         return this.handleLinks(await request.json());
+      case "POST /access":
+        return this.handleAccess(await request.json());
       default:
         return new Response("Not found", { status: 404 });
     }
@@ -86,13 +111,19 @@ export class MapRoom {
 
   // ── WebSocket live channel (Hibernation API) ─────────────────────────
 
-  private async handleSync(token: string | null): Promise<Response> {
+  private async handleSync(token: string | null, session: string | null): Promise<Response> {
     if (!this.getMeta("mapId")) {
       return new Response("Map not found", { status: 404 });
     }
     const role = await this.roleForToken(token);
     if (!role) {
       return new Response("Invalid token", { status: 403 });
+    }
+    // Password gate (Phase 5): when a password is set, non-owner sockets must
+    // present a valid unexpired session (obtained from POST /access). Owners
+    // bypass the password. Keeps the password out of the WS URL.
+    if (role !== "owner" && this.passwordEnabled() && !(await this.validSession(session))) {
+      return new Response("Password required", { status: 401 });
     }
 
     const pair = new WebSocketPair();
@@ -274,13 +305,22 @@ export class MapRoom {
     });
   }
 
-  private async handleGetDoc(token: string | null): Promise<Response> {
+  private async handleGetDoc(token: string | null, session: string | null): Promise<Response> {
     if (!this.getMeta("mapId")) {
       return new Response(JSON.stringify({ error: "Map not found" }), { status: 404 });
     }
     const role = await this.roleForToken(token);
     if (!role) {
       return new Response(JSON.stringify({ error: "Invalid token" }), { status: 403 });
+    }
+    // Password gate (Phase 5): when a password is set, a non-owner must present a
+    // valid session (from POST /access) in addition to the link token. 401 so the
+    // client knows to prompt for the password rather than treating it as a dead link.
+    if (role !== "owner" && this.passwordEnabled() && !(await this.validSession(session))) {
+      return new Response(JSON.stringify({ error: "Password required", passwordRequired: true }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     const version = Number(this.getMeta("version") || "1");
     const row = this.sql.exec("SELECT json FROM snapshot WHERE version = ?", version).one();
@@ -347,12 +387,111 @@ export class MapRoom {
           target,
         );
       }
+    } else if (action === "setPassword") {
+      // Phase 5: set/change the map password. Only the salted PBKDF2 hash + salt
+      // are stored; the raw password is never persisted. Existing sessions are
+      // invalidated so a password change re-locks open links on reconnect/hydrate.
+      const password = typeof body.password === "string" ? body.password : "";
+      if (!password) {
+        return new Response(JSON.stringify({ error: "Password required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const { hashHex, saltHex } = await hashPassword(password);
+      this.setMeta("pw:hash", hashHex);
+      this.setMeta("pw:salt", saltHex);
+      this.setMeta("pw:enabled", "1");
+      this.sql.exec("DELETE FROM sessions");
+    } else if (action === "clearPassword") {
+      // Phase 5: remove the password; links open without a prompt again.
+      this.sql.exec("DELETE FROM meta WHERE k IN ('pw:hash', 'pw:salt', 'pw:enabled')");
+      this.sql.exec("DELETE FROM sessions");
     }
 
-    // Every action returns the current state of both links.
-    return new Response(JSON.stringify({ links: this.readLinks() }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    // Every action returns the current state of both links + password status.
+    return new Response(
+      JSON.stringify({ links: this.readLinks(), passwordEnabled: this.passwordEnabled() }),
+      { headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // ── public password gate (Phase 5) ───────────────────────────────────
+
+  /**
+   * Exchange (link token + optional password) for access. Owners and
+   * password-disabled maps need no password. When a password IS enabled and the
+   * supplied one is correct, mint a short-lived session token (12h) the client
+   * passes to /doc and /sync. Wrong/missing password → 401 { passwordRequired }.
+   */
+  private async handleAccess(body: AccessBody): Promise<Response> {
+    if (!this.getMeta("mapId")) {
+      return new Response(JSON.stringify({ error: "Map not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const role = await this.roleForToken(body.token ?? null);
+    if (!role) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Owner or no password set → access granted, no session needed.
+    if (role === "owner" || !this.passwordEnabled()) {
+      return new Response(JSON.stringify({ ok: true, role, passwordRequired: false }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Password enabled: verify it. Reveal nothing beyond "password required".
+    const password = typeof body.password === "string" ? body.password : "";
+    const saltHex = this.getMeta("pw:salt");
+    const hashHex = this.getMeta("pw:hash");
+    const ok = !!password && !!saltHex && !!hashHex && (await verifyPassword(password, saltHex, hashHex));
+    if (!ok) {
+      return new Response(JSON.stringify({ ok: false, passwordRequired: true }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Correct: mint a session. Only the session hash is stored (treat like a token).
+    const session = randomSecret();
+    const sessionHash = await sha256Hex(session);
+    const expires = Date.now() + SESSION_TTL_MS;
+    this.sql.exec("DELETE FROM sessions WHERE expires < ?", Date.now()); // opportunistic GC
+    this.sql.exec(
+      "INSERT INTO sessions (token_hash, expires) VALUES (?, ?) ON CONFLICT(token_hash) DO UPDATE SET expires = excluded.expires",
+      sessionHash,
+      expires,
+    );
+    return new Response(
+      JSON.stringify({ ok: true, role, passwordRequired: false, session, expires }),
+      { headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  /** True if this map currently requires a password. */
+  private passwordEnabled(): boolean {
+    return this.getMeta("pw:enabled") === "1";
+  }
+
+  /** Validate a (raw) session token against the unexpired sessions table. */
+  private async validSession(session: string | null): Promise<boolean> {
+    if (!session) return false;
+    const hash = await sha256Hex(session);
+    const row = this.sql
+      .exec("SELECT expires FROM sessions WHERE token_hash = ?", hash)
+      .toArray()[0];
+    if (!row) return false;
+    if (Number(row.expires) < Date.now()) {
+      this.sql.exec("DELETE FROM sessions WHERE token_hash = ?", hash);
+      return false;
+    }
+    return true;
   }
 
   /** Read the editor/viewer raw tokens + enabled flags for the owner UI. */

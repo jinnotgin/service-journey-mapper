@@ -10,9 +10,136 @@ See `collab-sync.md` for the design.
 - [x] **Phase 2** — WebSocket live updates (`doc.sync/update/reject`) — verified locally (Worker + browser)
 - [x] **Phase 3** — Presence (anonymous names + avatar stack) — verified locally (Worker + browser)
 - [x] **Phase 4** — View vs edit links + rotate/disable — verified locally (Worker curl + browser)
-- [ ] **Phase 5** — (optional) password-gated links
+- [x] **Phase 5** — (optional) password-gated links — verified locally (Worker curl + WS + browser)
 
 ## Log
+
+### 2026-06-22 — Phase 5 done (optional password-gated share links)
+
+A single optional password for the whole map (not per-link). The owner can set,
+change, or remove it. When set, anyone opening a share link (editor or viewer)
+must enter the password before the map loads; the **owner** (owner token) is
+never prompted. Verification is server-side; the password never appears in any
+URL — it travels only in a POST body. The gate is a **second knowledge factor on
+top of the possession factor** (the link token); it does not replace token auth.
+
+**Password storage scheme.** Salted **PBKDF2-SHA256**, 100,000 iterations, random
+16-byte salt, 256-bit derived key, all hex-encoded. Only `pw:hash` (64 hex
+chars) + `pw:salt` (32 hex chars) + `pw:enabled` ("1") are stored in `meta`; the
+raw password is **never** persisted. Helpers `hashPassword(pw, saltHex?)` →
+`{hashHex, saltHex}` and `verifyPassword(pw, saltHex, hashHex)` (constant-time
+`safeEqual`) live in `worker/src/util.ts`.
+
+**Session-token mechanism (keeps the password out of the WS URL).** When the
+password is correct, `POST /api/maps/:id/access` mints a random 32-byte session
+secret, stores only its **SHA-256 hash** in a new `sessions(token_hash, expires)`
+SQLite table with a **12-hour** expiry, and returns the raw session to the
+client once. The client keeps it in `sessionStorage` (per-tab) keyed by map id
+and passes it as `&session=` to hydrate and the WS. Sessions are
+opportunistically GC'd (expired rows deleted on mint/validate) and **wiped on
+any password set/change/clear** (`DELETE FROM sessions`), so changing the
+password re-locks open links on the next hydrate/reconnect.
+
+**Gate enforcement (both data paths, owner bypass).** When `pw:enabled` and the
+role is **not** owner:
+- `handleGetDoc` (hydrate) requires a valid unexpired session, else **401**
+  `{passwordRequired:true}` (so the client re-prompts rather than treating it as
+  a dead link).
+- `handleSync` (WS upgrade) requires the same session via `&session=`, else a
+  **401** non-101 (no socket). The router (`worker/src/index.ts`) was fixed to
+  forward `&session=` into the DO `/sync` URL (it previously only forwarded
+  `token`).
+Owners (owner token) bypass the password on `/access`, `/doc`, and `/sync`.
+
+Worker (`worker/`):
+
+- `src/util.ts`: added `hashPassword` / `verifyPassword` (PBKDF2-SHA256 + random
+  salt, hex-encoded) plus `bytesToHex`/`hexToBytes`; constants
+  `PBKDF2_ITERATIONS=100_000`, `PBKDF2_KEY_BITS=256`.
+- `src/MapRoom.ts`:
+  - New `sessions(token_hash, expires)` table; `SESSION_TTL_MS = 12h`.
+  - `handleLinks` (owner-only) gained `setPassword` (body `{token,password}` →
+    derive salt+hash, set `pw:hash`/`pw:salt`/`pw:enabled=1`, wipe sessions;
+    empty password → 400) and `clearPassword` (delete `pw:*`, wipe sessions).
+    Every links response now includes `passwordEnabled:boolean` (so `get`
+    reflects status for the owner UI).
+  - New owner-bypassing public `handleAccess(body)` (routed from `POST /access`):
+    resolves role (403 invalid token), returns `{ok:true,role,passwordRequired:false}`
+    for owner or pw-disabled, `{ok:false,passwordRequired:true}` + **401** for
+    missing/wrong password, and `{ok:true,role,passwordRequired:false,session,expires}`
+    + **200** for a correct password.
+  - `handleGetDoc(token, session)` and `handleSync(token, session)` now enforce
+    the session gate for non-owners when `pw:enabled`; helpers `passwordEnabled()`
+    and `validSession(session)` added.
+- `src/index.ts`: new route `POST /api/maps/:id/access` → `accessMap()` (CORS
+  JSON, forwards to DO `/access`); `getMap` and the `/sync` upgrade now forward
+  `&session=`.
+- `cd worker && npx tsc --noEmit` passes.
+
+Client (`index.html`, no grid/cell/stage logic touched):
+
+- Session helpers `getMapSession`/`setMapSession` (sessionStorage, per-tab,
+  keyed by map id) next to `getMapToken`.
+- `apiGetMap(mapId, token, session)` now sends `&session=` and treats **401** as
+  `err.passwordRequired`. New `apiAccessMap(mapId, token, password?)` (POSTs
+  `/access`; 401 → `{ok:false,passwordRequired:true}`), `apiSetPassword`,
+  `apiClearPassword` (via the existing `/links` owner path).
+- New `passwordGate` state + `PasswordGateModal` (reuses the `m-ov`/`m-box`
+  confirm-modal styling): on opening a `?map=` link the init effect probes
+  `POST /access` first; if `passwordRequired` and no tab session is held, it
+  strips `?token=` from the URL, shows the modal, and blocks the app until a
+  valid session is obtained (`submitPassword` → store session → `mountCloudMap`)
+  or the user cancels back to the library (`cancelPasswordGate`). A stale tab
+  session that makes hydrate 401 also re-prompts. The hydrate/mount logic was
+  extracted into a reusable `mountCloudMap(mapId, token, session)` callback.
+- WS lifecycle effect appends `&session=` when a session is held.
+- Owner Share menu gained a compact `PasswordControl` section (status Off/On, a
+  Set/Change password input + Save, and Remove when on), reflecting
+  `passwordEnabled` from the links response. Non-owners never see it (the whole
+  Share control is already gated on `!viewOnly`).
+
+**Verification (local: `wrangler dev --local` :8787 + managed static server
+:8755 + browser preview; all servers/throwaway maps/scripts cleaned up):**
+
+- Worker (curl + a Node `ws` client), all PASS:
+  - Create map, set password as owner → links response `passwordEnabled:true`;
+    `get` reflects it.
+  - **Raw password is NOT stored**: direct SQLite dump shows `pw:hash` (64 hex),
+    `pw:salt` (32 hex), `pw:enabled=1`, and `SELECT count(*) FROM meta WHERE v
+    LIKE '%<rawpw>%'` = 0.
+  - `/access` (viewer): wrong password → **401** `{ok:false}`; no password →
+    **401** `{passwordRequired:true}`; correct → **200** `{ok:true, session}`.
+  - **Hydrate** `GET /doc`: WITHOUT session → **401**; WITH session → **200**;
+    OWNER without session → **200** (bypass).
+  - **WS** `/sync`: viewer WITHOUT session → rejected **HTTP 401** (no socket);
+    viewer WITH session → **OPEN (101)**; owner WITHOUT session → **OPEN (101)**.
+    (This caught the router bug where `&session=` wasn't forwarded to the DO.)
+  - Owner-only: viewer `setPassword` → **403**; bad token `/access` → **403**;
+    empty `setPassword` → **400**.
+  - `clearPassword` → `passwordEnabled:false`, viewer `/access` and `/doc`
+    succeed with no session (regression = pre-Phase-5 behavior); `pw:*` rows
+    removed and `sessions` table emptied.
+- Browser (real app via preview), no console errors:
+  - Opened a gated **viewer** link → the **Password required** modal appears and
+    `?token=` is stripped from the URL (only `?map=` remains). Wrong password →
+    inline "Incorrect password. Please try again." (stays on prompt). Correct
+    password → map loads **read-only** ("Gated Journey"), a 43-char session is in
+    `sessionStorage`, Share control hidden (viewer). Screenshots captured.
+  - Opened the same map as **owner** → no prompt; Share menu shows the new
+    **Password: On** section with Change password + Remove. Clicked **Remove** →
+    UI flips to **Off** and the server reports `passwordRequired:false`.
+  - Reopened the (now unprotected) viewer link in a cleared tab → loads directly,
+    **no prompt** (regression check).
+
+Limitations / follow-ups:
+- One password for the whole map (not per-link), by design (MVP scope).
+- Sessions are per-tab (`sessionStorage`); a new tab re-prompts (acceptable — a
+  `localStorage` session would persist across tabs but linger longer).
+- Changing/removing the password wipes sessions but does **not** force-disconnect
+  currently-connected sockets (same Phase-4 trade-off); the new rule applies on
+  the next hydrate/reconnect.
+- No rate-limiting on `/access` password attempts (PBKDF2 cost provides some
+  brute-force resistance; an explicit attempt limiter is a future hardening).
 
 ### 2026-06-22 — Fix: Menu dropdown clipped off-screen on narrow viewports
 

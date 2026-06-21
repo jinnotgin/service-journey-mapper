@@ -49,9 +49,12 @@ export default {
         request.headers.get("Upgrade") === "websocket"
       ) {
         const stub = env.MAP_ROOM.get(env.MAP_ROOM.idFromName(parts[2]));
-        // Forward the upgrade (incl. ?token=) to the DO and return its 101
-        // Response as-is. A 101 carries the webSocket; do NOT add CORS headers.
-        return await stub.fetch(`https://do/sync?token=${encodeURIComponent(url.searchParams.get("token") || "")}`, request);
+        // Forward the upgrade (incl. ?token= and the Phase-5 ?session=) to the DO
+        // and return its 101 Response as-is. A 101 carries the webSocket; do NOT
+        // add CORS headers.
+        const wsToken = encodeURIComponent(url.searchParams.get("token") || "");
+        const wsSession = encodeURIComponent(url.searchParams.get("session") || "");
+        return await stub.fetch(`https://do/sync?token=${wsToken}&session=${wsSession}`, request);
       }
 
       // POST /api/maps/:id/links  — owner-only link management (Phase 4)
@@ -63,6 +66,18 @@ export default {
         parts[3] === "links"
       ) {
         return await manageLinks(parts[2], request, env, cors);
+      }
+
+      // POST /api/maps/:id/access  — password gate (Phase 5). A non-owner
+      // exchanges (token + optional password) for a short-lived session token.
+      if (
+        request.method === "POST" &&
+        parts.length === 4 &&
+        parts[0] === "api" &&
+        parts[1] === "maps" &&
+        parts[3] === "access"
+      ) {
+        return await accessMap(parts[2], request, env, cors);
       }
 
       // GET /api/maps/:id  — hydrate
@@ -123,8 +138,34 @@ async function getMap(
   cors: Record<string, string>,
 ): Promise<Response> {
   const token = url.searchParams.get("token");
+  const session = url.searchParams.get("session");
   const stub = env.MAP_ROOM.get(env.MAP_ROOM.idFromName(mapId));
-  const res = await stub.fetch(`https://do/doc?token=${encodeURIComponent(token || "")}`);
+  const res = await stub.fetch(
+    `https://do/doc?token=${encodeURIComponent(token || "")}&session=${encodeURIComponent(session || "")}`,
+  );
+  const text = await res.text();
+  return new Response(text, {
+    status: res.status,
+    headers: { "Content-Type": "application/json", ...cors },
+  });
+}
+
+// POST /api/maps/:id/access — forward the password gate check to the DO and
+// return its JSON (with CORS). The password travels in the POST body, never the
+// URL. The DO resolves the role, verifies the password, and mints the session.
+async function accessMap(
+  mapId: string,
+  request: Request,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const bodyText = await request.text();
+  const stub = env.MAP_ROOM.get(env.MAP_ROOM.idFromName(mapId));
+  const res = await stub.fetch("https://do/access", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: bodyText,
+  });
   const text = await res.text();
   return new Response(text, {
     status: res.status,

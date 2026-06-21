@@ -1073,6 +1073,21 @@ const setMapToken = (mapId, token) => {
     try { localStorage.setItem(mapTokenKey(mapId), token); } catch { /* ignore */ }
 };
 
+// Password session (Phase 5): when a map requires a password, POST /api/maps/:id/access
+// returns a short-lived session token that proves the password factor. It is kept
+// in sessionStorage (per-tab, cleared on close) keyed by map id, and passed to
+// hydrate (/doc) and the WS (/sync) as &session=. The password is never stored.
+const mapSessionKey = (mapId) => `sjm:mapSession:${mapId}`;
+const getMapSession = (mapId) => {
+    try { return sessionStorage.getItem(mapSessionKey(mapId)); } catch { return null; }
+};
+const setMapSession = (mapId, session) => {
+    try {
+        if (session) sessionStorage.setItem(mapSessionKey(mapId), session);
+        else sessionStorage.removeItem(mapSessionKey(mapId));
+    } catch { /* ignore */ }
+};
+
 function writeMapRoute(mapId, { replace = false } = {}) {
     const url = new URL(window.location.href);
     url.searchParams.delete(ROUTE_PROJECT_PARAM);
@@ -1098,11 +1113,33 @@ async function apiCreateMap({ name, journeys }) {
 }
 
 // GET /api/maps/:id — hydrate. Returns { journeys, version, role, name }.
-async function apiGetMap(mapId, token) {
-    const res = await fetch(`${SYNC_API_BASE}/api/maps/${encodeURIComponent(mapId)}?token=${encodeURIComponent(token || "")}`);
+// When the map is password-gated, pass the session token (from apiAccessMap) as
+// &session=; a 401 means a (re)password prompt is needed.
+async function apiGetMap(mapId, token, session) {
+    const res = await fetch(`${SYNC_API_BASE}/api/maps/${encodeURIComponent(mapId)}?token=${encodeURIComponent(token || "")}&session=${encodeURIComponent(session || "")}`);
+    if (res.status === 401) { const e = new Error("This map requires a password."); e.passwordRequired = true; throw e; }
     if (res.status === 403) throw new Error("This link is not valid or has been disabled.");
     if (res.status === 404) throw new Error("This map no longer exists.");
     if (!res.ok) throw new Error(`Could not load map (${res.status})`);
+    return res.json();
+}
+
+// POST /api/maps/:id/access — password gate (Phase 5). Exchanges a link token
+// (+ optional password) for access. Returns { ok, role, passwordRequired, session? }.
+// The password is sent in the POST body, never the URL. Owners + non-password
+// maps return { ok:true, passwordRequired:false } with no session needed.
+async function apiAccessMap(mapId, token, password) {
+    const body = { token };
+    if (password != null) body.password = password;
+    const res = await fetch(`${SYNC_API_BASE}/api/maps/${encodeURIComponent(mapId)}/access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    });
+    if (res.status === 403) throw new Error("This link is not valid or has been disabled.");
+    if (res.status === 404) throw new Error("This map no longer exists.");
+    if (res.status === 401) return { ok: false, passwordRequired: true }; // wrong/missing password
+    if (!res.ok) throw new Error(`Could not open map (${res.status})`);
     return res.json();
 }
 
@@ -1120,9 +1157,20 @@ async function apiManageLink(mapId, ownerToken, body) {
     return res.json();
 }
 
-// Fetch the current edit/view share links for the owner.
+// Fetch the current edit/view share links for the owner. The response also
+// carries { passwordEnabled } so the owner UI can reflect the password status.
 async function apiGetLinks(mapId, ownerToken) {
     return apiManageLink(mapId, ownerToken, { action: "get" });
+}
+
+// Owner-only: set/change the map password (Phase 5).
+async function apiSetPassword(mapId, ownerToken, password) {
+    return apiManageLink(mapId, ownerToken, { action: "setPassword", password });
+}
+
+// Owner-only: remove the map password (Phase 5).
+async function apiClearPassword(mapId, ownerToken) {
+    return apiManageLink(mapId, ownerToken, { action: "clearPassword" });
 }
 
 function InlineTitleEdit({ value, fallback, className, inputClassName, disabled, onCommit }) {
@@ -1551,8 +1599,84 @@ function ShareLinkRow({ mapId, kind, link, onChange }) {
     );
 }
 
+// Owner-only password section in the Share menu (Phase 5). Shows the current
+// status (Off / On) and lets the owner set, change, or remove a single map
+// password that gates all share links. The password is sent to the server (over
+// setPassword) and never stored client-side.
+function PasswordControl({ mapId, enabled, onChange }) {
+    const [editing, setEditing] = useState(false);
+    const [value, setValue] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState("");
+    const ownerToken = getMapToken(mapId);
+
+    const save = async () => {
+        if (!value || busy) return;
+        setBusy(true); setErr("");
+        try {
+            const { passwordEnabled } = await apiSetPassword(mapId, ownerToken, value);
+            onChange(!!passwordEnabled);
+            setEditing(false); setValue("");
+        } catch (e) { setErr(e.message || "Could not save password"); }
+        finally { setBusy(false); }
+    };
+    const remove = async () => {
+        setBusy(true); setErr("");
+        try {
+            const { passwordEnabled } = await apiClearPassword(mapId, ownerToken);
+            onChange(!!passwordEnabled);
+        } catch (e) { setErr(e.message || "Could not remove password"); }
+        finally { setBusy(false); }
+    };
+
+    return (
+        <div style={{ display: "grid", gap: 5, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-sec)" }}>Password</span>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: enabled ? "var(--text-sec)" : "var(--muted)" }}>
+                    {enabled ? "On" : "Off"}
+                </span>
+            </div>
+            {editing ? (
+                <div style={{ display: "grid", gap: 6 }}>
+                    <input className="m-input" type="password" value={value} placeholder="New password"
+                        autoComplete="new-password" autoFocus
+                        onChange={(e) => { setValue(e.target.value); if (err) setErr(""); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } }} />
+                    <div style={{ display: "flex", gap: 6 }}>
+                        <button className="menu-item" style={{ flex: 1 }} onClick={save} disabled={!value || busy}>
+                            {busy ? "Saving…" : "Save"}
+                        </button>
+                        <button className="menu-item" style={{ flex: 1 }} onClick={() => { setEditing(false); setValue(""); setErr(""); }} disabled={busy}>
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div style={{ display: "flex", gap: 6 }}>
+                    <button className="menu-item" style={{ flex: 1 }} onClick={() => setEditing(true)} disabled={busy}>
+                        {enabled ? "Change password" : "Set password"}
+                    </button>
+                    {enabled && (
+                        <button className="menu-item danger" style={{ flex: 1 }} onClick={remove} disabled={busy}>
+                            {busy ? "Removing…" : "Remove"}
+                        </button>
+                    )}
+                </div>
+            )}
+            {enabled && !editing && (
+                <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                    People opening a share link must enter this password.
+                </span>
+            )}
+            {err && <span style={{ fontSize: "11px", color: "var(--red)" }}>{err}</span>}
+        </div>
+    );
+}
+
 function ShareControl({ sync, onEnableSync }) {
     const [links, setLinks] = useState(null); // {editor:{token,enabled}, viewer:{...}}
+    const [pwEnabled, setPwEnabled] = useState(false); // Phase 5: map password status
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [copiedSelf, setCopiedSelf] = useState(false);
@@ -1562,8 +1686,9 @@ function ShareControl({ sync, onEnableSync }) {
         if (!isOwner || !sync.mapId) return;
         setLoading(true); setError("");
         try {
-            const { links } = await apiGetLinks(sync.mapId, getMapToken(sync.mapId));
+            const { links, passwordEnabled } = await apiGetLinks(sync.mapId, getMapToken(sync.mapId));
             setLinks(links);
+            setPwEnabled(!!passwordEnabled);
         } catch (e) {
             setError(e.message || "Could not load links");
         } finally { setLoading(false); }
@@ -1608,6 +1733,8 @@ function ShareControl({ sync, onEnableSync }) {
                         <>
                             <ShareLinkRow mapId={sync.mapId} kind="edit" link={links.editor} onChange={setLinks} />
                             <ShareLinkRow mapId={sync.mapId} kind="view" link={links.viewer} onChange={setLinks} />
+                            <PasswordControl mapId={sync.mapId} enabled={pwEnabled}
+                                onChange={(pe) => setPwEnabled(pe)} />
                         </>
                     ) : (
                         <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-sec)" }}>No links available.</span>
@@ -1914,6 +2041,56 @@ function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onClose
                     <button className="btn-s" onClick={onClose}>Cancel</button>
                     <button className={danger ? "btn-danger" : "btn-p"}
                         onClick={() => { onConfirm(); onClose(); }}>{confirmLabel || "Confirm"}</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Password gate (Phase 5): shown when opening a password-protected share link.
+// `onSubmit(password)` returns null on success or an error string to display.
+function PasswordGateModal({ onSubmit, onCancel }) {
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const [busy, setBusy] = useState(false);
+    const inputRef = useRef(null);
+    useEffect(() => { inputRef.current?.focus(); }, []);
+    useEffect(() => {
+        const h = (e) => { if (e.key === "Escape") onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel]);
+
+    const submit = async () => {
+        if (!password || busy) return;
+        setBusy(true); setError("");
+        const err = await onSubmit(password);
+        if (err) { setError(err); setBusy(false); }
+        // On success the modal unmounts (passwordGate cleared by the parent).
+    };
+
+    return (
+        <div className="m-ov" onClick={onCancel}>
+            <div className="m-box m-sm" onClick={(e) => e.stopPropagation()}>
+                <div className="m-hdr">
+                    <h3>Password required</h3>
+                    <button className="m-close" onClick={onCancel} aria-label="Close">✕</button>
+                </div>
+                <div className="m-body" style={{ display: "grid", gap: 10 }}>
+                    <p style={{ margin: 0, color: "var(--text-sec)", fontSize: "var(--fs-sm)" }}>
+                        This shared map is protected. Enter the password to open it.
+                    </p>
+                    <input ref={inputRef} className="m-input" type="password" value={password}
+                        placeholder="Password" autoComplete="current-password"
+                        onChange={(e) => { setPassword(e.target.value); if (error) setError(""); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } }} />
+                    {error && <span style={{ color: "var(--red)", fontSize: "var(--fs-sm)" }}>{error}</span>}
+                </div>
+                <div className="m-ft">
+                    <button className="btn-s" onClick={onCancel}>Cancel</button>
+                    <button className="btn-p" onClick={submit} disabled={!password || busy}>
+                        {busy ? "Checking…" : "Open map"}
+                    </button>
                 </div>
             </div>
         </div>
@@ -2857,6 +3034,10 @@ function App() {
     // Presence (Phase 3): other people currently in this map. Ephemeral roster
     // pushed by the DO; excludes our own clientId. [{clientId, name, color}].
     const [peers, setPeers] = useState([]);
+    // Password gate (Phase 5): when opening a password-protected share link, this
+    // holds {mapId, token} and surfaces the password modal. Cleared once a valid
+    // session is obtained (or the gate is dismissed). Owners never see it.
+    const [passwordGate, setPasswordGate] = useState(null);
     const syncVersionRef = useRef(0);
     // Live WebSocket channel (Phase 2). wsRef holds the open socket; a pending
     // remote payload is stashed when a peer update arrives while the local user
@@ -2967,6 +3148,52 @@ function App() {
             : "Lanescape - Service Journey Mapper";
     }, [currentName, view]);
 
+    // Hydrate + mount a shared cloud map once access is granted. `session` is the
+    // password session (or null when the map has no password / caller is owner).
+    // Shared by the init path and the post-password-prompt path (Phase 5).
+    const mountCloudMap = useCallback(async (mapId, token, session) => {
+        const data = await apiGetMap(mapId, token, session);
+        setCurrentId(null);
+        setStandaloneName(data.name || "Shared map");
+        syncVersionRef.current = data.version || 0;
+        setSync({ mapId, role: data.role, status: "synced", error: null });
+        const isViewer = data.role === "viewer";
+        setViewOnly(isViewer);
+        setEditMode(!isViewer);
+        replaceJourneys(hydrate(data.journeys || []), { skipSave: true });
+        clearHistory();
+        setView("project");
+        setSaveState("idle");
+        writeMapRoute(mapId, { replace: true });
+        setReady(true);
+    }, []);
+
+    // Submit a password for a gated map (Phase 5). On success store the session
+    // and mount the map; on failure return an error string for the modal to show.
+    const submitPassword = useCallback(async (password) => {
+        if (!passwordGate) return null;
+        const { mapId, token } = passwordGate;
+        try {
+            const res = await apiAccessMap(mapId, token, password);
+            if (!res.ok) return "Incorrect password. Please try again.";
+            if (res.session) setMapSession(mapId, res.session);
+            await mountCloudMap(mapId, token, res.session || null);
+            setPasswordGate(null);
+            return null;
+        } catch (err) {
+            return err.message || "Could not open this map.";
+        }
+    }, [passwordGate, mountCloudMap]);
+
+    // Dismiss the password prompt → fall back to the library.
+    const cancelPasswordGate = useCallback(() => {
+        setPasswordGate(null);
+        setSync({ mapId: null, role: null, status: "off", error: null });
+        writeMapRoute(null, { replace: true });
+        setView("library");
+        setReady(true);
+    }, []);
+
     // ── Init: load project list + reopen last project ──
     useEffect(() => {
         (async () => {
@@ -2995,22 +3222,32 @@ function App() {
                 if (urlToken) setMapToken(mapId, urlToken);
                 const token = getMapToken(mapId);
                 try {
-                    const data = await apiGetMap(mapId, token);
-                    setCurrentId(null);
-                    setStandaloneName(data.name || "Shared map");
-                    syncVersionRef.current = data.version || 0;
-                    setSync({ mapId, role: data.role, status: "synced", error: null });
-                    const isViewer = data.role === "viewer";
-                    setViewOnly(isViewer);
-                    setEditMode(!isViewer);
-                    replaceJourneys(hydrate(data.journeys || []), { skipSave: true });
-                    clearHistory();
-                    setView("project");
-                    setSaveState("idle");
-                    writeMapRoute(mapId, { replace: true });
-                    setReady(true);
+                    // Phase 5: probe access first. Owners + non-password maps return
+                    // passwordRequired:false (no session). A password-gated map for a
+                    // non-owner returns passwordRequired:true → show the prompt; any
+                    // session already held (this tab) is reused so a reload skips it.
+                    const existingSession = getMapSession(mapId);
+                    const access = await apiAccessMap(mapId, token, undefined);
+                    if (access.passwordRequired && !existingSession) {
+                        // Strip ?token= from the URL before prompting (don't leak it
+                        // in the address bar) but keep ?map=.
+                        writeMapRoute(mapId, { replace: true });
+                        setPasswordGate({ mapId, token });
+                        setReady(true); // render the gate; mountCloudMap runs on success
+                        return;
+                    }
+                    await mountCloudMap(mapId, token, access.session || existingSession || null);
                     return;
                 } catch (err) {
+                    // A stale/expired session (e.g. the owner changed the password)
+                    // makes hydrate 401 → re-prompt instead of bouncing to library.
+                    if (err && err.passwordRequired) {
+                        setMapSession(mapId, null);
+                        writeMapRoute(mapId, { replace: true });
+                        setPasswordGate({ mapId, token });
+                        setReady(true);
+                        return;
+                    }
                     setSync({ mapId: null, role: null, status: "error", error: err.message });
                     writeMapRoute(null, { replace: true });
                     // fall through to the library
@@ -3134,6 +3371,7 @@ function App() {
         if (sync.status !== "synced" || !sync.mapId) return;
         const mapId = sync.mapId;
         const token = getMapToken(mapId);
+        const session = getMapSession(mapId); // Phase 5: proof of password (if any)
         let closed = false;
         let retries = 0;
         let reconnectTimer = null;
@@ -3141,7 +3379,7 @@ function App() {
         const connect = () => {
             if (closed) return;
             const wsBase = SYNC_API_BASE.replace(/^http/, "ws");
-            const url = `${wsBase}/api/maps/${encodeURIComponent(mapId)}/sync?token=${encodeURIComponent(token || "")}`;
+            const url = `${wsBase}/api/maps/${encodeURIComponent(mapId)}/sync?token=${encodeURIComponent(token || "")}${session ? `&session=${encodeURIComponent(session)}` : ""}`;
             let ws;
             try { ws = new WebSocket(url); } catch { scheduleReconnect(); return; }
             wsRef.current = ws;
@@ -3726,6 +3964,12 @@ function App() {
     const selectedKey = selected
         ? `cell-${selected.jIdx}-${selected.sjIdx}-${selected.rowIdx}-${selected.cellIdx}`
         : null;
+
+    // Password gate (Phase 5): block the app behind the prompt until a valid
+    // session is obtained (or the user cancels back to the library).
+    if (passwordGate) {
+        return <PasswordGateModal onSubmit={submitPassword} onCancel={cancelPasswordGate} />;
+    }
 
     if (!ready) return null;
 

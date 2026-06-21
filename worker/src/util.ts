@@ -39,6 +39,58 @@ export function safeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+// ── Password hashing (Phase 5: optional password-gated share links) ────
+// Salted PBKDF2-SHA256. Only the salt + derived hash are ever stored; the raw
+// password is never persisted. The optional map password is a second knowledge
+// factor on top of the possession factor (the link token).
+
+const PBKDF2_ITERATIONS = 100_000;
+const PBKDF2_KEY_BITS = 256; // 32-byte derived key
+
+function bytesToHex(bytes: Uint8Array): string {
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}
+
+/**
+ * Derive a PBKDF2-SHA256 hash of a password. If `saltHex` is omitted a fresh
+ * random 16-byte salt is generated. Returns hex-encoded salt + hash.
+ */
+export async function hashPassword(
+  password: string,
+  saltHex?: string,
+): Promise<{ hashHex: string; saltHex: string }> {
+  const salt = saltHex ? hexToBytes(saltHex) : crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt: salt as BufferSource, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+    keyMaterial,
+    PBKDF2_KEY_BITS,
+  );
+  return { hashHex: bytesToHex(new Uint8Array(bits)), saltHex: bytesToHex(salt) };
+}
+
+/** Verify a password against a stored salt + hash using a constant-time compare. */
+export async function verifyPassword(
+  password: string,
+  saltHex: string,
+  hashHex: string,
+): Promise<boolean> {
+  const { hashHex: candidate } = await hashPassword(password, saltHex);
+  return safeEqual(candidate, hashHex);
+}
+
 export type Role = "owner" | "editor" | "viewer";
 
 // ── HTTP helpers ──────────────────────────────────────────────────────
