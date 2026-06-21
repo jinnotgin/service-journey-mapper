@@ -351,12 +351,15 @@
         .cell-toolbar{position:fixed;z-index:320;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;padding:7px;background:oklch(32% .008 70);border:1px solid oklch(40% .006 70);border-radius:8px;box-shadow:var(--shadow-md);width:max-content;max-width:none;white-space:nowrap}
         .tb-group{display:flex;align-items:center;gap:3px}
         .tb-sep{width:1px;height:20px;background:oklch(46% .006 70);margin:0 5px}
-        .tb-label{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:oklch(68% .005 70);margin-right:3px}
-        .tb-btn{background:oklch(40% .008 70);border:1px solid oklch(48% .006 70);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;color:oklch(84% .005 70);font-family:inherit;line-height:1.1;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:30px}
+        .tb-btn{background:oklch(38% .008 70);border:1px solid oklch(47% .006 70);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;color:oklch(82% .005 70);font-family:inherit;line-height:1.1;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:30px;transition:background .13s ease-out,border-color .13s ease-out,color .13s ease-out,transform .13s ease-out}
         .tb-btn svg{width:15px;height:15px;display:block;stroke:currentColor;flex:0 0 auto}
         .tb-btn.icon-only{width:32px;padding:0}
-        .tb-btn:hover:not(:disabled){background:oklch(46% .008 70);color:oklch(98% .003 70);border-color:oklch(56% .006 70)}
-        .tb-btn.active{background:oklch(96% .003 70);border-color:oklch(96% .003 70);color:oklch(20% .006 70)}
+        .tb-btn:hover:not(:disabled){background:oklch(51% .011 70);border-color:oklch(64% .008 70);color:oklch(99% .002 70)}
+        .tb-btn:active:not(:disabled){transform:translateY(.5px);background:oklch(46% .01 70)}
+        .tb-btn:focus-visible{outline:2px solid oklch(80% .09 250);outline-offset:1px}
+        .tb-btn.active{background:oklch(96% .003 70);border-color:oklch(96% .003 70);color:oklch(22% .006 70)}
+        .tb-btn.active:hover:not(:disabled){background:oklch(88% .004 70);border-color:oklch(84% .005 70);color:oklch(20% .006 70)}
+        .tb-btn.active:active:not(:disabled){background:oklch(82% .005 70);transform:translateY(.5px)}
         .tb-btn:disabled{opacity:.4;cursor:not-allowed}
         .tb-hint{font-size:var(--fs-xs);color:oklch(62% .005 70);padding:0 4px;white-space:nowrap}
 
@@ -2219,7 +2222,6 @@ function FormatToolbar({ cell, selectedKey, onMode, onAlign }) {
     return createPortal(
         <div className="cell-toolbar" ref={toolbarRef} style={{ top: pos.top, left: pos.left, visibility: pos.measuring ? "hidden" : "visible" }}
             onMouseDown={(e) => e.stopPropagation()}>
-            <span className="tb-label">Cell</span>
             <div className="tb-group">
                 <button className={`tb-btn${mode === "text" ? " active" : ""}`} title={`Text mode (${modAlt}1)`} onMouseDown={keepFocus(() => onMode("text"))}>Text</button>
                 <button className={`tb-btn${mode === "bullets" ? " active" : ""}`} title={`Bullets mode (${modAlt}2)`} onMouseDown={keepFocus(() => onMode("bullets"))}>
