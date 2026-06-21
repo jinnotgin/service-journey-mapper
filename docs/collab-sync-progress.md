@@ -14,7 +14,32 @@ See `collab-sync.md` for the design.
 
 ## Log
 
-### 2026-06-22 — Phase 4 done (View vs edit links + rotate/disable)
+### 2026-06-22 — Fix: Menu dropdown clipped off-screen on narrow viewports
+
+The shared `Menu` component (used by the Export menu, the Share ▾ menu in
+`ShareControl`, and the row/cell option menus) positioned its body-level portal
+purely from the trigger rect: `align="right"` pinned the popup's right edge to
+the trigger via a CSS `right` value, with no viewport clamping. On narrow
+screens (~800px and below) this pushed the popup's left edge past x=0 — clipping
+it off the edge. The Share popup (`minWidth: 280`) was the worst case.
+
+Fix is entirely in `Menu` (so every menu benefits; no special-casing): the
+positioner now always resolves to a single `left` coordinate (`r.right - width`
+for `align="right"`, else `r.left`) and clamps it into
+`[8, innerWidth - width - 8]` so the popup stays fully on-screen with an 8px
+margin. The popup width is measured from the rendered node via `popRef`
+(falling back to the 184px CSS min-width on the first frame), and a
+`requestAnimationFrame` re-place runs after mount so the clamp uses the real
+measured width. Existing `max-width: calc(100vw - 16px)` is retained as a
+backstop. Wide-screen alignment is unchanged (when there's room, the right edge
+still lands under the trigger).
+
+**Verified** via the Export menu (shares the same `Menu` code path; the Share
+menu needs the Worker to render its rows). Opened Project 1 in the static
+preview and measured the portal rect: at 375px width the menu settled at
+left=178 / right=375 (= innerWidth−8, not clipped); at 800px it stayed
+right-aligned to the trigger (popRight 500 = triggerRight 500, not clipped).
+Screenshots captured at both widths; no console errors.
 
 Owner-only management of the editor/viewer share links: retrieve (after a
 reload), enable/disable, and rotate. This closes the Phase 1 gap where the

@@ -2052,16 +2052,31 @@ function Menu({ trigger, align, children, onOpen }) {
 
     // Position the popup (rendered in a body-level portal so it escapes the
     // table's overflow:auto scroll containers and sticky stacking contexts).
+    // We always resolve to a `left` coordinate (even for align="right") so the
+    // result can be clamped to the viewport, preventing the popup from being
+    // clipped off the left/right edge on narrow screens. The popup width is
+    // measured from the rendered node when available; until then we fall back
+    // to the CSS min-width (184) so the very first frame is still on-screen.
     const place = useCallback(() => {
         const t = triggerRef.current;
         if (!t) return;
         const r = t.getBoundingClientRect();
-        setPos({ top: r.bottom + 3, left: r.left, right: window.innerWidth - r.right });
-    }, []);
+        const M = 8; // viewport margin
+        const w = popRef.current?.getBoundingClientRect().width || 184;
+        // Intended left: align the popup's right edge to the trigger's right
+        // edge for align="right", otherwise its left edge to the trigger's left.
+        let left = align === "right" ? r.right - w : r.left;
+        // Clamp horizontally so the popup stays fully on-screen.
+        left = Math.min(Math.max(M, left), Math.max(M, window.innerWidth - w - M));
+        setPos({ top: r.bottom + 3, left });
+    }, [align]);
 
     useEffect(() => {
         if (!open) return;
         place();
+        // Re-place once the portal has rendered so we can measure its real
+        // width and clamp accurately (the first pass uses the fallback width).
+        const raf = requestAnimationFrame(place);
         const onDown = (e) => {
             if (popRef.current?.contains(e.target) || triggerRef.current?.contains(e.target)) return;
             setOpen(false);
@@ -2070,6 +2085,7 @@ function Menu({ trigger, align, children, onOpen }) {
         window.addEventListener("scroll", place, true);
         window.addEventListener("resize", place);
         return () => {
+            cancelAnimationFrame(raf);
             document.removeEventListener("mousedown", onDown);
             window.removeEventListener("scroll", place, true);
             window.removeEventListener("resize", place);
@@ -2082,7 +2098,7 @@ function Menu({ trigger, align, children, onOpen }) {
                 onClick={(e) => { e.stopPropagation(); setOpen((o) => { if (!o) onOpen?.(); return !o; }); }}>{trigger || <LucideIcon name="moreVertical" />}</button>
             {open && pos && createPortal(
                 <div ref={popRef} className="menu-pop menu-portal"
-                    style={align === "right" ? { top: pos.top, right: pos.right, left: "auto" } : { top: pos.top, left: pos.left }}
+                    style={{ top: pos.top, left: pos.left }}
                     onClick={(e) => e.stopPropagation()}>
                     {typeof children === "function" ? children(() => setOpen(false)) : children}
                 </div>, document.body)}
