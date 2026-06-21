@@ -7,12 +7,99 @@ See `collab-sync.md` for the design.
 
 - [x] **Phase 1 (backend)** — Worker skeleton + `POST /api/maps` + `GET /api/maps/:id` (HTTP) — verified locally
 - [x] **Phase 1 (client)** — `?map=` init branch, "Enable sync" + Share UI, hydrate over HTTP — verified in browser
-- [ ] **Phase 2** — WebSocket live updates (`doc.sync/update/reject`)
+- [x] **Phase 2** — WebSocket live updates (`doc.sync/update/reject`) — verified locally (Worker + browser)
 - [ ] **Phase 3** — Presence
 - [ ] **Phase 4** — View vs edit links + rotate/disable
 - [ ] **Phase 5** — (optional) password-gated links
 
 ## Log
+
+### 2026-06-21 — Phase 2 done (WebSocket live channel)
+
+Added the whole-document, last-write-wins live channel over WebSocket using the
+Durable Object Hibernation API. No op-log, no CRDT, no per-entity IDs — every
+accepted push replaces the full snapshot and bumps a single monotonic `version`.
+
+Worker (`worker/`):
+
+- `src/index.ts` — router now matches `GET /api/maps/:id/sync` with an
+  `Upgrade: websocket` header and forwards the request (token in `?token=`)
+  straight to the DO stub, returning its 101 response **as-is** (no CORS headers
+  on a 101).
+- `src/MapRoom.ts`:
+  - Constructor now stores `this.state = state` (needed for `acceptWebSocket` /
+    `getWebSockets`) alongside the existing `this.sql`.
+  - `fetch` detects the `/sync` path + `Upgrade` header and calls new
+    `handleSync(token)`: verifies the token via the existing `roleForToken`
+    (403 as a normal Response if invalid), creates a `WebSocketPair`,
+    `this.state.acceptWebSocket(server)`, persists the role with
+    `server.serializeAttachment({ role })`, sends `doc.sync` immediately, and
+    returns `new Response(null, { status: 101, webSocket: client })`.
+  - `webSocketMessage` — handles only `doc.push`; reads role via
+    `deserializeAttachment()` (viewers ignored); enforces the 2 MB cap; applies
+    the LWW rule (accept iff `version === currentVersion`): on accept it inserts
+    the new snapshot, prunes older snapshot rows, bumps `meta` version/updatedAt,
+    and broadcasts `doc.update {version, journeys}` to every **other** socket via
+    `this.state.getWebSockets()`; on stale it replies `doc.reject` (server's
+    current doc) to the sender only.
+  - `webSocketClose` / `webSocketError` implemented (no throw; role lives in the
+    attachment so there is no in-memory state to clean up).
+  - New `docMessage(t)` helper builds the `doc.sync/update/reject` envelope.
+- `tsc --noEmit` passes.
+
+Client (`index.html`, no grid/cell/stage logic touched):
+
+- New refs in `App`: `wsRef` (open socket), `pendingRemoteRef` (deferred remote
+  payload), `skipNextPushRef` (echo guard for the push effect).
+- `applyRemoteDoc(parsed)` — adopts `parsed.version` into `syncVersionRef`, sets
+  `skipNextPushRef`, and applies via `replaceJourneys(hydrate(...), {skipSave:true})`.
+- `applyOrDeferRemote(parsed)` — if `document.activeElement` is a
+  contentEditable/input/textarea, stash the payload and apply on the next blur
+  (mirrors the popstate `document.activeElement?.blur` dance); otherwise apply
+  immediately. Newest pending payload wins.
+- WebSocket lifecycle effect keyed on `sync.status`/`sync.mapId`: opens
+  `${SYNC_API_BASE.replace(/^http/,"ws")}/api/maps/:id/sync?token=` (token from
+  `getMapToken`), routes `doc.sync/update/reject` to `applyOrDeferRemote`,
+  reconnects with capped exponential backoff (1s→2s→4s… max 15s), and closes the
+  socket on unmount / when leaving the map.
+- Push effect keyed on `journeys`: when synced and role is owner/editor and the
+  socket is OPEN, sends `{ t:"doc.push", version: syncVersionRef.current,
+  journeys: journeysRef.current }`. It early-returns (consuming the flag) when
+  `skipNextPushRef` is set, so a remote apply never echoes back. The existing
+  Dexie autosave effect already early-returns on its own `skipNextSaveRef`, which
+  `replaceJourneys({skipSave:true})` sets — so a remote apply neither re-saves
+  nor re-pushes. `doc.reject` uses the same apply path, so the next push rebases
+  on the fresh server version.
+
+Verification (local: `wrangler dev --local` :8787 + static server :8755 +
+throwaway Node `WebSocket` clients, now deleted):
+
+- Server-side (two raw WS clients + HTTP hydrate), all assertions PASS:
+  - A connects → `doc.sync` v1; B connects → `doc.sync` v1.
+  - A pushes v1 (valid) → accepted, version→2; B receives `doc.update` v2 with
+    A's content; A receives **no** echo of its own update.
+  - A pushes v1 again (stale) → A receives `doc.reject` v2 with the server's
+    current doc.
+  - Viewer-token socket pushes → ignored; HTTP hydrate confirms version still 2
+    with A's content.
+- Client-side (real app in a browser preview):
+  - "Enable sync" → URL becomes `?map=…`, owner token stored, socket opens.
+  - Editing a grid cell (focus → input → blur) emits exactly one
+    `doc.push {version, journeys}` frame (captured via a `WebSocket.send` patch).
+  - A Node peer push (version=2 → server v3) arrives in the browser and is
+    **applied** — the journey tab renders "PEER-PUSHED-TITLE" — and crucially the
+    browser sends **zero** frames in response (no echo loop). HTTP hydrate
+    confirms server at v3 with the peer's content. No console errors throughout.
+
+Limitations / follow-ups:
+- Active-edit guard defers a remote apply only while a field is focused; if the
+  user keeps typing in *other* cells, later local pushes can still win/lose by
+  LWW — that's the accepted whole-doc tradeoff, not a regression.
+- No presence yet (Phase 3): the push effect treats every `journeys` change as a
+  candidate push; there is no peer cursor/awareness.
+- Snapshot pruning keeps only the latest row; there is no server-side history.
+- `SYNC_API_BASE` prod value still has the placeholder subdomain
+  (`lanescape-sync.YOUR-SUBDOMAIN.workers.dev`) — set after the Worker deploy.
 
 ### 2026-06-21 — Lengthen map id
 

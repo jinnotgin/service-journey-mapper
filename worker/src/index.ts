@@ -39,6 +39,21 @@ export default {
         return await createMap(request, env, cors);
       }
 
+      // GET /api/maps/:id/sync  — WebSocket upgrade -> DO live channel
+      if (
+        request.method === "GET" &&
+        parts.length === 4 &&
+        parts[0] === "api" &&
+        parts[1] === "maps" &&
+        parts[3] === "sync" &&
+        request.headers.get("Upgrade") === "websocket"
+      ) {
+        const stub = env.MAP_ROOM.get(env.MAP_ROOM.idFromName(parts[2]));
+        // Forward the upgrade (incl. ?token=) to the DO and return its 101
+        // Response as-is. A 101 carries the webSocket; do NOT add CORS headers.
+        return await stub.fetch(`https://do/sync?token=${encodeURIComponent(url.searchParams.get("token") || "")}`, request);
+      }
+
       // GET /api/maps/:id  — hydrate
       if (request.method === "GET" && parts.length === 3 && parts[0] === "api" && parts[1] === "maps") {
         return await getMap(parts[2], url, env, cors);

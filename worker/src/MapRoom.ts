@@ -1,7 +1,7 @@
 // Durable Object: one instance per map. Holds the whole-document snapshot, a
 // monotonic version, and the capability (link token) hashes. Phase 1 implements
 // storage + auth over an internal HTTP interface; Phase 2 adds the WebSocket
-// live channel.
+// live channel (whole-document, last-write-wins) using the Hibernation API.
 
 import { Role, sha256Hex, safeEqual } from "./util";
 
@@ -12,12 +12,19 @@ interface InitBody {
   tokenHashes: { owner: string; editor: string; viewer: string };
 }
 
+// Per-socket data persisted across hibernation via serializeAttachment.
+interface SocketAttachment {
+  role: Role;
+}
+
 const MAX_DOC_BYTES = 2 * 1024 * 1024; // 2 MB ceiling per document
 
 export class MapRoom {
+  private state: DurableObjectState;
   private sql: SqlStorage;
 
   constructor(state: DurableObjectState) {
+    this.state = state;
     this.sql = state.storage.sql;
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS meta (
@@ -38,6 +45,13 @@ export class MapRoom {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+
+    // WebSocket live channel (Phase 2). The router forwards
+    // GET /api/maps/:id/sync here with the Upgrade header intact.
+    if (url.pathname === "/sync" && request.headers.get("Upgrade") === "websocket") {
+      return this.handleSync(url.searchParams.get("token"));
+    }
+
     switch (`${request.method} ${url.pathname}`) {
       case "POST /init":
         return this.handleInit(await request.json());
@@ -46,6 +60,102 @@ export class MapRoom {
       default:
         return new Response("Not found", { status: 404 });
     }
+  }
+
+  // ── WebSocket live channel (Hibernation API) ─────────────────────────
+
+  private async handleSync(token: string | null): Promise<Response> {
+    if (!this.getMeta("mapId")) {
+      return new Response("Map not found", { status: 404 });
+    }
+    const role = await this.roleForToken(token);
+    if (!role) {
+      return new Response("Invalid token", { status: 403 });
+    }
+
+    const pair = new WebSocketPair();
+    const client = pair[0];
+    const server = pair[1];
+
+    // Accept with the Hibernation API so an idle map costs nothing.
+    this.state.acceptWebSocket(server);
+    // Persist the role so it survives hibernation (no in-memory map).
+    server.serializeAttachment({ role } satisfies SocketAttachment);
+
+    // Send the current document immediately on connect.
+    server.send(JSON.stringify(this.docMessage("doc.sync")));
+
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    let msg: { t?: string; version?: number; journeys?: unknown };
+    try {
+      msg = JSON.parse(typeof message === "string" ? message : new TextDecoder().decode(message));
+    } catch {
+      return; // ignore malformed frames
+    }
+    if (!msg || msg.t !== "doc.push") return; // only doc.push is handled
+
+    const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+    const role = attachment?.role;
+    if (role === "viewer" || !role) return; // viewers cannot mutate
+
+    const journeys = Array.isArray(msg.journeys) ? msg.journeys : [];
+    const docJson = JSON.stringify(journeys);
+    if (docJson.length > MAX_DOC_BYTES) return; // bound DO storage
+
+    const currentVersion = Number(this.getMeta("version") || "1");
+
+    // Whole-document LWW: accept only if the pusher is on the current version.
+    if (Number(msg.version) !== currentVersion) {
+      // Stale push: reply to the sender only with the server's truth.
+      ws.send(JSON.stringify(this.docMessage("doc.reject")));
+      return;
+    }
+
+    const newVersion = currentVersion + 1;
+    const now = Date.now();
+    this.sql.exec("INSERT INTO snapshot (version, json) VALUES (?, ?)", newVersion, docJson);
+    // Keep only the latest snapshot to bound storage.
+    this.sql.exec("DELETE FROM snapshot WHERE version <> ?", newVersion);
+    this.setMeta("version", String(newVersion));
+    this.setMeta("updatedAt", String(now));
+
+    // Broadcast the accepted doc to every OTHER connected client.
+    const update = JSON.stringify({ t: "doc.update", version: newVersion, journeys });
+    for (const peer of this.state.getWebSockets()) {
+      if (peer === ws) continue;
+      try {
+        peer.send(update);
+      } catch {
+        /* peer going away; ignore */
+      }
+    }
+  }
+
+  async webSocketClose(ws: WebSocket, code: number, _reason: string, _wasClean: boolean): Promise<void> {
+    try {
+      ws.close(code, "closing");
+    } catch {
+      /* already closed */
+    }
+  }
+
+  async webSocketError(_ws: WebSocket, _err: unknown): Promise<void> {
+    // Nothing to clean up: role lives in the socket attachment, not memory.
+  }
+
+  /** Build a doc.sync / doc.update / doc.reject envelope from current state. */
+  private docMessage(t: "doc.sync" | "doc.update" | "doc.reject"): {
+    t: string;
+    version: number;
+    journeys: unknown;
+  } {
+    const version = Number(this.getMeta("version") || "1");
+    const row = this.sql.exec("SELECT json FROM snapshot WHERE version = ?", version).toArray()[0];
+    const journeys = row ? JSON.parse(row.json as string) : [];
+    return { t, version, journeys };
   }
 
   // ── internal endpoints ───────────────────────────────────────────────

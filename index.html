@@ -2646,6 +2646,14 @@ function App() {
     // Collaborative sync. status: "off" | "enabling" | "synced" | "error".
     const [sync, setSync] = useState({ mapId: null, role: null, status: "off", error: null });
     const syncVersionRef = useRef(0);
+    // Live WebSocket channel (Phase 2). wsRef holds the open socket; a pending
+    // remote payload is stashed when a peer update arrives while the local user
+    // is actively editing a cell, then applied on the next blur.
+    const wsRef = useRef(null);
+    const pendingRemoteRef = useRef(null);
+    // Set when applying a remote payload so the push effect skips the resulting
+    // journeys change (prevents an echo loop back to the server).
+    const skipNextPushRef = useRef(false);
     const appBarRef = useRef(null);
     const saveTimer = useRef(null);
     const lastSavedRef = useRef(null);
@@ -2879,6 +2887,101 @@ function App() {
         }, 600);
         return () => clearTimeout(saveTimer.current);
     }, [journeys, currentId, ready, refreshProjects]);
+
+    // ── Collaborative sync: live WebSocket channel (Phase 2) ──
+    // Apply a remote whole-document payload (doc.sync / doc.update / doc.reject):
+    // adopt its version and replace journeys without re-saving or re-pushing.
+    const applyRemoteDoc = useCallback((parsed) => {
+        if (!parsed || typeof parsed.version !== "number") return;
+        syncVersionRef.current = parsed.version;
+        skipNextPushRef.current = true;
+        replaceJourneys(hydrate(parsed.journeys || []), { skipSave: true });
+    }, [replaceJourneys]);
+
+    // If a remote payload arrives while the user is actively editing a grid
+    // cell, stash it and apply on the next blur (mirrors the popstate dance).
+    const applyOrDeferRemote = useCallback((parsed) => {
+        const el = document.activeElement;
+        const editing = el && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+        if (editing) {
+            pendingRemoteRef.current = parsed; // newest wins; applied on blur
+            const onBlur = () => {
+                el.removeEventListener("blur", onBlur);
+                const pending = pendingRemoteRef.current;
+                pendingRemoteRef.current = null;
+                if (pending) applyRemoteDoc(pending);
+            };
+            el.addEventListener("blur", onBlur, { once: true });
+        } else {
+            applyRemoteDoc(parsed);
+        }
+    }, [applyRemoteDoc]);
+
+    // Open/maintain the socket while synced; reconnect with capped backoff.
+    useEffect(() => {
+        if (sync.status !== "synced" || !sync.mapId) return;
+        const mapId = sync.mapId;
+        const token = getMapToken(mapId);
+        let closed = false;
+        let retries = 0;
+        let reconnectTimer = null;
+
+        const connect = () => {
+            if (closed) return;
+            const wsBase = SYNC_API_BASE.replace(/^http/, "ws");
+            const url = `${wsBase}/api/maps/${encodeURIComponent(mapId)}/sync?token=${encodeURIComponent(token || "")}`;
+            let ws;
+            try { ws = new WebSocket(url); } catch { scheduleReconnect(); return; }
+            wsRef.current = ws;
+            ws.onopen = () => { retries = 0; };
+            ws.onmessage = (ev) => {
+                let parsed;
+                try { parsed = JSON.parse(ev.data); } catch { return; }
+                // doc.sync, doc.update and doc.reject all carry {version, journeys}
+                // and are applied the same way (reject also adopts server version).
+                if (parsed.t === "doc.sync" || parsed.t === "doc.update" || parsed.t === "doc.reject") {
+                    applyOrDeferRemote(parsed);
+                }
+            };
+            ws.onclose = () => { if (wsRef.current === ws) wsRef.current = null; scheduleReconnect(); };
+            ws.onerror = () => { try { ws.close(); } catch { /* ignore */ } };
+        };
+
+        const scheduleReconnect = () => {
+            if (closed) return;
+            const delay = Math.min(1000 * 2 ** retries, 15000);
+            retries += 1;
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(connect, delay);
+        };
+
+        connect();
+        return () => {
+            closed = true;
+            clearTimeout(reconnectTimer);
+            const ws = wsRef.current;
+            wsRef.current = null;
+            if (ws) { ws.onclose = null; ws.onerror = null; try { ws.close(); } catch { /* ignore */ } }
+        };
+    }, [sync.status, sync.mapId, applyOrDeferRemote]);
+
+    // Push local edits over the socket (owner/editor only). Runs on every
+    // journeys change while synced, except when the change came from a remote
+    // apply (skipNextPushRef) — that would echo back to the server.
+    useEffect(() => {
+        if (!ready) return;
+        if (skipNextPushRef.current) { skipNextPushRef.current = false; return; }
+        if (sync.status !== "synced" || sync.role === "viewer") return;
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        try {
+            ws.send(JSON.stringify({
+                t: "doc.push",
+                version: syncVersionRef.current,
+                journeys: journeysRef.current,
+            }));
+        } catch { /* socket going away; reconnect will resync */ }
+    }, [journeys, ready, sync.status, sync.role]);
 
     // ── Load data (JSON array / exported project) ──
     const loadFromText = useCallback(async (text, mode = "replace", options = {}) => {
