@@ -13,8 +13,13 @@ interface InitBody {
 }
 
 // Per-socket data persisted across hibernation via serializeAttachment.
+// Presence fields (clientId/name/color) are ephemeral identity for the avatar
+// stack — they live only here in the attachment, never in SQLite (Phase 3).
 interface SocketAttachment {
   role: Role;
+  clientId?: string;
+  name?: string;
+  color?: string;
 }
 
 const MAX_DOC_BYTES = 2 * 1024 * 1024; // 2 MB ceiling per document
@@ -89,17 +94,43 @@ export class MapRoom {
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    let msg: { t?: string; version?: number; journeys?: unknown };
+    let msg: {
+      t?: string;
+      version?: number;
+      journeys?: unknown;
+      clientId?: unknown;
+      name?: unknown;
+      color?: unknown;
+    };
     try {
       msg = JSON.parse(typeof message === "string" ? message : new TextDecoder().decode(message));
     } catch {
       return; // ignore malformed frames
     }
-    if (!msg || msg.t !== "doc.push") return; // only doc.push is handled
+    if (!msg) return;
 
     const attachment = ws.deserializeAttachment() as SocketAttachment | null;
     const role = attachment?.role;
-    if (role === "viewer" || !role) return; // viewers cannot mutate
+    if (!role) return; // socket has no role yet; ignore
+
+    // Presence (Phase 3): ephemeral identity for the avatar stack. Allowed for
+    // every role (viewers are present too); stored only in the attachment.
+    if (msg.t === "presence.update") {
+      const clientId = typeof msg.clientId === "string" ? msg.clientId : undefined;
+      if (!clientId) return; // need a stable id to roster
+      const next: SocketAttachment = {
+        role,
+        clientId,
+        name: typeof msg.name === "string" ? msg.name.slice(0, 80) : undefined,
+        color: typeof msg.color === "string" ? msg.color.slice(0, 32) : undefined,
+      };
+      ws.serializeAttachment(next);
+      this.broadcastPresence();
+      return;
+    }
+
+    if (msg.t !== "doc.push") return; // only doc.push / presence.update handled
+    if (role === "viewer") return; // viewers cannot mutate
 
     const journeys = Array.isArray(msg.journeys) ? msg.journeys : [];
     const docJson = JSON.stringify(journeys);
@@ -140,10 +171,41 @@ export class MapRoom {
     } catch {
       /* already closed */
     }
+    // Tell remaining peers this socket has left (exclude the departing one).
+    this.broadcastPresence(ws);
   }
 
-  async webSocketError(_ws: WebSocket, _err: unknown): Promise<void> {
-    // Nothing to clean up: role lives in the socket attachment, not memory.
+  async webSocketError(ws: WebSocket, _err: unknown): Promise<void> {
+    // Presence lives in the attachment; just refresh the roster for the peers
+    // (excluding the failing socket, which may still appear in getWebSockets()).
+    this.broadcastPresence(ws);
+  }
+
+  /**
+   * Build and broadcast the current presence roster (Phase 3). Reads each
+   * socket's attachment, includes only those that have announced a clientId,
+   * and sends the full roster to every socket (clients filter out their own
+   * clientId). `except` skips one socket — used on close/error so a departing
+   * socket is not counted even if it still lingers in getWebSockets().
+   */
+  private broadcastPresence(except?: WebSocket): void {
+    const sockets = this.state.getWebSockets();
+    const peers: Array<{ clientId: string; name?: string; color?: string }> = [];
+    for (const s of sockets) {
+      if (s === except) continue;
+      const a = s.deserializeAttachment() as SocketAttachment | null;
+      if (!a || !a.clientId) continue;
+      peers.push({ clientId: a.clientId, name: a.name, color: a.color });
+    }
+    const frame = JSON.stringify({ t: "presence", peers });
+    for (const s of sockets) {
+      if (s === except) continue;
+      try {
+        s.send(frame);
+      } catch {
+        /* peer going away; ignore */
+      }
+    }
   }
 
   /** Build a doc.sync / doc.update / doc.reject envelope from current state. */

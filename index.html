@@ -89,6 +89,10 @@
         .ab-btn:hover{background:var(--surface-2);border-color:var(--border)}
         .ab-btn:disabled{opacity:.4;cursor:not-allowed}
         .history-actions{display:inline-flex;align-items:center;gap:1px}
+        .presence-stack{display:inline-flex;align-items:center;flex-shrink:0}
+        .presence-av{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;border:2px solid var(--surface);margin-left:-7px;box-shadow:0 1px 2px oklch(20% .006 70 / .18);cursor:default;user-select:none;text-shadow:0 1px 1px oklch(20% .006 70 / .35)}
+        .presence-av:first-child{margin-left:0}
+        .presence-av.more{background:var(--surface-2);color:var(--text-sec);text-shadow:none}
         .history-btn{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:7px;background:transparent;cursor:pointer;padding:0;transition:background .15s,border-color .15s,opacity .15s}
         .history-btn:hover:not(:disabled){background:var(--surface-2);border-color:var(--border)}
         .history-btn:disabled{cursor:not-allowed;opacity:.34}
@@ -1012,6 +1016,53 @@ function routeMapId() {
     return new URLSearchParams(window.location.search).get(ROUTE_MAP_PARAM) || null;
 }
 
+// ── Presence identity (Phase 3) ──
+// A stable, ephemeral identity for the presence avatar stack: a per-browser
+// clientId, a friendly anonymous name, and a deterministic color (HSL hue
+// hashed from the clientId). Persisted in localStorage so a refresh keeps the
+// same identity; falls back to an in-memory value if storage is unavailable.
+const PRESENCE_ANIMALS = ["Otter", "Heron", "Lynx", "Fox", "Wren", "Tapir", "Ibis", "Koel", "Gull", "Mole", "Vole", "Newt", "Crane", "Finch", "Marten"];
+const presenceIdKey = "sjm:presenceId";
+const presenceNameKey = "sjm:presenceName";
+
+function hashHue(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    return h % 360;
+}
+
+let _presenceIdentity = null;
+function getPresenceIdentity() {
+    if (_presenceIdentity) return _presenceIdentity;
+    let clientId = null;
+    let name = null;
+    try {
+        clientId = localStorage.getItem(presenceIdKey);
+        name = localStorage.getItem(presenceNameKey);
+    } catch { /* storage unavailable */ }
+    if (!clientId) {
+        clientId = (crypto.randomUUID ? crypto.randomUUID() : `c_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`);
+        try { localStorage.setItem(presenceIdKey, clientId); } catch { /* ignore */ }
+    }
+    if (!name) {
+        const animal = PRESENCE_ANIMALS[hashHue(clientId) % PRESENCE_ANIMALS.length];
+        name = `Anonymous ${animal}`;
+        try { localStorage.setItem(presenceNameKey, name); } catch { /* ignore */ }
+    }
+    const hue = hashHue(clientId);
+    const color = `hsl(${hue} 62% 48%)`;
+    _presenceIdentity = { clientId, name, color };
+    return _presenceIdentity;
+}
+
+// Initials for an avatar badge ("Anonymous Otter" -> "AO", "Guest-12" -> "G").
+function presenceInitials(name) {
+    if (!name) return "?";
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.trim().slice(0, 2).toUpperCase();
+}
+
 // The owner/edit token is kept in localStorage keyed by map id, never left in
 // the URL after first use.
 const mapTokenKey = (mapId) => `sjm:mapToken:${mapId}`;
@@ -1450,10 +1501,32 @@ function ShareControl({ sync, onEnableSync }) {
     );
 }
 
+// Presence avatar stack (Phase 3): a compact, overlapping row of badges for the
+// other people currently in this map. Caps at 5 avatars + a "+N" badge.
+function PresenceStack({ peers }) {
+    if (!peers || peers.length === 0) return null;
+    const MAX = 5;
+    const shown = peers.slice(0, MAX);
+    const extra = peers.length - shown.length;
+    return (
+        <div className="presence-stack" aria-label={`${peers.length} other ${peers.length === 1 ? "person" : "people"} here`}>
+            {shown.map((p) => (
+                <span key={p.clientId} className="presence-av" title={p.name || "Anonymous"}
+                    style={{ background: p.color || "var(--text-sec)" }}>
+                    {presenceInitials(p.name)}
+                </span>
+            ))}
+            {extra > 0 && (
+                <span className="presence-av more" title={`${extra} more`}>+{extra}</span>
+            )}
+        </div>
+    );
+}
+
 function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadSheet, onDownloadProject, onStandaloneExport, onPromptSheet, onPromptProject, canExport, hasMultipleSheets, saveState, lastSaved,
         viewOnly,
         editMode, onSetEdit, canUndo, canRedo, onUndo, onRedo,
-        sync, onEnableSync }) {
+        sync, onEnableSync, peers }) {
     const [promptCopied, setPromptCopied] = useState(false);
     const copyPrompt = async (close, scope) => {
         await (scope === "project" ? onPromptProject() : onPromptSheet());
@@ -1475,6 +1548,9 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                 </div>
                 <div className="ab-spacer" />
                 <div className="ab-actions">
+                    {sync.status === "synced" && peers && peers.length > 0 && (
+                        <PresenceStack peers={peers} />
+                    )}
                     {!viewOnly && (
                         <div className="history-actions" aria-label="History controls">
                             <button className="history-btn" onClick={onUndo} disabled={!canUndo} title="Undo (⌘/Ctrl+Z)" aria-label="Undo">
@@ -2645,6 +2721,9 @@ function App() {
     const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
     // Collaborative sync. status: "off" | "enabling" | "synced" | "error".
     const [sync, setSync] = useState({ mapId: null, role: null, status: "off", error: null });
+    // Presence (Phase 3): other people currently in this map. Ephemeral roster
+    // pushed by the DO; excludes our own clientId. [{clientId, name, color}].
+    const [peers, setPeers] = useState([]);
     const syncVersionRef = useRef(0);
     // Live WebSocket channel (Phase 2). wsRef holds the open socket; a pending
     // remote payload is stashed when a peer update arrives while the local user
@@ -2933,7 +3012,14 @@ function App() {
             let ws;
             try { ws = new WebSocket(url); } catch { scheduleReconnect(); return; }
             wsRef.current = ws;
-            ws.onopen = () => { retries = 0; };
+            ws.onopen = () => {
+                retries = 0;
+                // Announce our presence so peers see us (and we get the roster).
+                const me = getPresenceIdentity();
+                try {
+                    ws.send(JSON.stringify({ t: "presence.update", clientId: me.clientId, name: me.name, color: me.color }));
+                } catch { /* socket going away; reconnect will retry */ }
+            };
             ws.onmessage = (ev) => {
                 let parsed;
                 try { parsed = JSON.parse(ev.data); } catch { return; }
@@ -2941,9 +3027,12 @@ function App() {
                 // and are applied the same way (reject also adopts server version).
                 if (parsed.t === "doc.sync" || parsed.t === "doc.update" || parsed.t === "doc.reject") {
                     applyOrDeferRemote(parsed);
+                } else if (parsed.t === "presence" && Array.isArray(parsed.peers)) {
+                    const myId = getPresenceIdentity().clientId;
+                    setPeers(parsed.peers.filter((p) => p && p.clientId && p.clientId !== myId));
                 }
             };
-            ws.onclose = () => { if (wsRef.current === ws) wsRef.current = null; scheduleReconnect(); };
+            ws.onclose = () => { if (wsRef.current === ws) { wsRef.current = null; setPeers([]); } scheduleReconnect(); };
             ws.onerror = () => { try { ws.close(); } catch { /* ignore */ } };
         };
 
@@ -2961,6 +3050,7 @@ function App() {
             clearTimeout(reconnectTimer);
             const ws = wsRef.current;
             wsRef.current = null;
+            setPeers([]); // leaving this map; drop the roster
             if (ws) { ws.onclose = null; ws.onerror = null; try { ws.close(); } catch { /* ignore */ } }
         };
     }, [sync.status, sync.mapId, applyOrDeferRemote]);
@@ -3533,7 +3623,7 @@ function App() {
                 editMode={editMode} onSetEdit={(v) => setEditMode(v)}
                 canUndo={historyState.canUndo} canRedo={historyState.canRedo}
                 onUndo={undo} onRedo={redo}
-                sync={sync} onEnableSync={enableSync} />
+                sync={sync} onEnableSync={enableSync} peers={peers} />
             {!viewOnly && editMode && journeys.length > 0 && (
                 <FormatToolbar cell={selectedCell} selectedKey={selectedKey}
                     onMode={(m) => selected && handleCellMode(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, m)}

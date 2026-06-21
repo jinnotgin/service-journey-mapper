@@ -8,11 +8,94 @@ See `collab-sync.md` for the design.
 - [x] **Phase 1 (backend)** — Worker skeleton + `POST /api/maps` + `GET /api/maps/:id` (HTTP) — verified locally
 - [x] **Phase 1 (client)** — `?map=` init branch, "Enable sync" + Share UI, hydrate over HTTP — verified in browser
 - [x] **Phase 2** — WebSocket live updates (`doc.sync/update/reject`) — verified locally (Worker + browser)
-- [ ] **Phase 3** — Presence
+- [x] **Phase 3** — Presence (anonymous names + avatar stack) — verified locally (Worker + browser)
 - [ ] **Phase 4** — View vs edit links + rotate/disable
 - [ ] **Phase 5** — (optional) password-gated links
 
 ## Log
+
+### 2026-06-21 — Phase 3 done (Presence)
+
+Ephemeral presence: who else is currently in a shared map, shown as an avatar
+stack in the app bar. Presence is **never persisted** — it lives only in each
+socket's attachment (in-memory across hibernation) and is broadcast as a roster;
+no SQLite, no cursors (cursors remain explicitly out of scope for later).
+
+Wire format added (minimal):
+
+- `client -> server  { t:"presence.update", clientId, name, color }` — sent on
+  socket open and (future) when the name changes.
+- `server -> client  { t:"presence", peers:[{clientId,name,color}, ...] }` —
+  the full roster; clients filter out their own `clientId`.
+
+Worker (`worker/src/MapRoom.ts`):
+
+- `SocketAttachment` extended to `{ role; clientId?; name?; color? }` — presence
+  identity rides alongside the existing role, still only in `serializeAttachment`.
+- `webSocketMessage` now branches on `presence.update` **before** the `doc.push`
+  gate: it requires a role (any role — viewers included, presence is **not**
+  role-gated), merges `clientId`/`name`/`color` into the attachment (preserving
+  `role`, with length caps), then calls `broadcastPresence()`. `doc.push` is still
+  owner/editor-only. Malformed/unknown frames and roleless sockets are ignored.
+- New `broadcastPresence(except?)` helper: iterates `this.state.getWebSockets()`,
+  reads each `deserializeAttachment()` (cast + null-guarded), includes only
+  sockets that have announced a `clientId`, and sends `{t:"presence",peers}` to
+  every socket (optionally excluding one). Because the announcing socket is
+  included, a late joiner gets the current roster immediately after its first
+  `presence.update`.
+- `webSocketClose` / `webSocketError` now call `broadcastPresence(ws)` (excluding
+  the departing socket explicitly, so peers see the departure even if the closing
+  socket still lingers in `getWebSockets()`).
+- `cd worker && npx tsc --noEmit` passes.
+
+Client (`index.html`, no grid/cell/stage logic touched):
+
+- Presence identity helpers near the sync config: `getPresenceIdentity()` returns
+  a stable per-browser `{clientId, name, color}` — `clientId` via
+  `crypto.randomUUID()`, a friendly `"Anonymous <animal>"` name, and a
+  deterministic HSL `color` (hue hashed from the clientId via `hashHue`). Both
+  clientId and name are persisted in `localStorage` (`sjm:presenceId` /
+  `sjm:presenceName`) so a refresh keeps the same identity; `presenceInitials()`
+  derives the badge text.
+- New `peers` `useState` in `App` (roster excluding self).
+- WS lifecycle effect: `ws.onopen` now also sends a `presence.update`; the
+  `onmessage` handler routes `{t:"presence"}` to `setPeers(peers filtered by
+  myId)`. `peers` is cleared on socket close and on effect cleanup (leaving the
+  map).
+- New `PresenceStack` component (overlapping circular badges, color + initials,
+  `title` = full name, capped at 5 + a "+N" badge) rendered inside `.ab-actions`
+  in `TopBar`, gated on `sync.status === "synced" && peers.length > 0` — **not**
+  on `!viewOnly`, so it shows for viewers too. CSS: `.presence-stack` /
+  `.presence-av` reusing `--surface` / `--surface-2` / `--text-sec` tokens.
+
+Verification (local: `wrangler dev --local` :8787 + static server :8755 +
+throwaway Node `WebSocket` clients, all now deleted):
+
+- Server-side (`/tmp/presence-test.mjs`, all assertions PASS): A announces →
+  A's own roster has 1 entry (A). B announces → both A and B receive a 2-entry
+  roster each containing the OTHER peer (and B sees A's name). A **viewer**-token
+  socket announces and appears in the roster (presence not gated by role). B
+  disconnects → A and the viewer receive an updated roster **without** B.
+- Browser (real app via preview): enabled sync (URL → `?map=`, owner token +
+  `sjm:presenceId`/`sjm:presenceName` in localStorage), then a Node owner-peer
+  connected to the same map → the avatar stack appears with a blue "AH"
+  badge, `title="Anonymous Heron"`, aria-label "1 other person here"
+  (screenshot captured); when the peer left, the stack disappeared. Opened a
+  **viewer link** (`?map=…&token=<viewer>`): Library/Share controls hidden
+  (view-only), but with a peer connected the presence stack still renders the
+  "AH" badge — confirming presence shows in view-only mode. No console errors
+  throughout (a temporary debug `console.log` confirmed `frame peers=2 …
+  filtered=1` and was removed).
+
+Limitations / follow-ups:
+- Anonymous identity only; no editable display name UI yet (name is persisted but
+  not user-settable in the UI). `presence.update` is sent only on open, so a name
+  change would currently require a reconnect.
+- No live cursors (deliberately deferred per the design).
+- Roster is rebuilt from `getWebSockets()` on every change; fine at MVP scale.
+- Reconnects can briefly leave stale sockets in `getWebSockets()` until the DO
+  evicts them; the `except`-on-close broadcast plus client-side self-filtering
+  keep the visible roster correct.
 
 ### 2026-06-21 — Phase 2 done (WebSocket live channel)
 
