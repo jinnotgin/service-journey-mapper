@@ -1106,6 +1106,25 @@ async function apiGetMap(mapId, token) {
     return res.json();
 }
 
+// POST /api/maps/:id/links — owner-only link management (Phase 4). Returns
+// { links: { editor:{token,enabled}, viewer:{token,enabled} } }.
+async function apiManageLink(mapId, ownerToken, body) {
+    const res = await fetch(`${SYNC_API_BASE}/api/maps/${encodeURIComponent(mapId)}/links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: ownerToken, ...body }),
+    });
+    if (res.status === 403) throw new Error("Only the map owner can manage links.");
+    if (res.status === 404) throw new Error("This map no longer exists.");
+    if (!res.ok) throw new Error(`Could not manage links (${res.status})`);
+    return res.json();
+}
+
+// Fetch the current edit/view share links for the owner.
+async function apiGetLinks(mapId, ownerToken) {
+    return apiManageLink(mapId, ownerToken, { action: "get" });
+}
+
 function InlineTitleEdit({ value, fallback, className, inputClassName, disabled, onCommit }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(value || "");
@@ -1448,24 +1467,114 @@ function LucideIcon({ name }) {
 
 // Share / enable-sync control in the app bar. Phase 1: turns a local project
 // into a cloud map and surfaces shareable edit/view links.
+// Build a shareable link for a map + token (?map=<id>&token=<token>).
+function mapLinkFor(mapId, token) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete(ROUTE_PROJECT_PARAM);
+    url.searchParams.set(ROUTE_MAP_PARAM, mapId || "");
+    if (token) url.searchParams.set("token", token);
+    else url.searchParams.delete("token");
+    return url.toString();
+}
+
+// Owner-only management of one share link (edit or view): copy, enable/disable,
+// rotate. Lives inside the Share menu. State is driven by the server-fetched
+// link, so it works after a reload (no in-memory token dependency).
+function ShareLinkRow({ mapId, kind, link, onChange }) {
+    const [copied, setCopied] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [confirmRotate, setConfirmRotate] = useState(false);
+    const role = kind === "edit" ? "editor" : "viewer";
+    const label = kind === "edit" ? "Edit link" : "View-only link";
+    const enabled = !!link?.enabled;
+    const ownerToken = getMapToken(mapId);
+
+    const copy = async () => {
+        if (!enabled || !link?.token) return;
+        try {
+            await navigator.clipboard.writeText(mapLinkFor(mapId, link.token));
+            setCopied(true); setTimeout(() => setCopied(false), 1600);
+        } catch { /* ignore */ }
+    };
+    const toggle = async () => {
+        setBusy(true);
+        try {
+            const { links } = await apiManageLink(mapId, ownerToken, { action: "setEnabled", role, enabled: !enabled });
+            onChange(links);
+        } catch (e) { /* surfaced by caller status */ } finally { setBusy(false); }
+    };
+    const rotate = async () => {
+        setBusy(true);
+        try {
+            const { links } = await apiManageLink(mapId, ownerToken, { action: "rotate", role });
+            onChange(links);
+            setConfirmRotate(false);
+        } catch (e) { /* ignore */ } finally { setBusy(false); }
+    };
+
+    return (
+        <div style={{ display: "grid", gap: 5 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-sec)" }}>{label}</span>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: enabled ? "var(--text-sec)" : "var(--muted)" }}>
+                    {enabled ? "Active" : "Disabled"}
+                </span>
+            </div>
+            <button className="menu-item" onClick={copy} disabled={!enabled || busy}>
+                {copied ? "Copied ✓" : (enabled ? `Copy ${kind} link` : "Link disabled")}
+            </button>
+            <div style={{ display: "flex", gap: 6 }}>
+                <button className="menu-item" style={{ flex: 1 }} onClick={toggle} disabled={busy}>
+                    {enabled ? "Disable" : "Enable"}
+                </button>
+                {confirmRotate ? (
+                    <button className="menu-item danger" style={{ flex: 1 }} onClick={rotate} disabled={busy}>
+                        {busy ? "Rotating…" : "Confirm rotate"}
+                    </button>
+                ) : (
+                    <button className="menu-item" style={{ flex: 1 }} onClick={() => setConfirmRotate(true)} disabled={busy}
+                        title="Invalidate the current link and generate a new one">
+                        Rotate
+                    </button>
+                )}
+            </div>
+            {confirmRotate && (
+                <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                    Rotating invalidates the old {kind} link.{" "}
+                    <button className="link-btn" onClick={() => setConfirmRotate(false)}
+                        style={{ background: "none", border: "none", padding: 0, color: "var(--text-sec)", cursor: "pointer", textDecoration: "underline", fontSize: "11px", fontFamily: "inherit" }}>
+                        Cancel
+                    </button>
+                </span>
+            )}
+        </div>
+    );
+}
+
 function ShareControl({ sync, onEnableSync }) {
-    const [open, setOpen] = useState(false);
-    const [tokens, setTokens] = useState(null); // {owner,editor,viewer} captured at enable time
-    const [copied, setCopied] = useState("");
-    const linkFor = (token) => {
-        const url = new URL(window.location.href);
-        url.searchParams.delete(ROUTE_PROJECT_PARAM);
-        url.searchParams.set(ROUTE_MAP_PARAM, sync.mapId || "");
-        if (token) url.searchParams.set("token", token);
-        else url.searchParams.delete("token");
-        return url.toString();
-    };
-    const copy = async (label, text) => {
-        try { await navigator.clipboard.writeText(text); setCopied(label); setTimeout(() => setCopied(""), 1600); } catch { /* ignore */ }
-    };
-    const handleEnable = async () => {
-        const res = await onEnableSync();
-        if (res?.tokens) { setTokens(res.tokens); setOpen(true); }
+    const [links, setLinks] = useState(null); // {editor:{token,enabled}, viewer:{...}}
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const [copiedSelf, setCopiedSelf] = useState(false);
+    const isOwner = sync.role === "owner";
+
+    const loadLinks = useCallback(async () => {
+        if (!isOwner || !sync.mapId) return;
+        setLoading(true); setError("");
+        try {
+            const { links } = await apiGetLinks(sync.mapId, getMapToken(sync.mapId));
+            setLinks(links);
+        } catch (e) {
+            setError(e.message || "Could not load links");
+        } finally { setLoading(false); }
+    }, [isOwner, sync.mapId]);
+
+    const handleEnable = async () => { await onEnableSync(); };
+    const copySelf = async () => {
+        try {
+            await navigator.clipboard.writeText(mapLinkFor(sync.mapId, getMapToken(sync.mapId)));
+            setCopiedSelf(true); setTimeout(() => setCopiedSelf(false), 1600);
+        } catch { /* ignore */ }
     };
 
     if (sync.status !== "synced") {
@@ -1476,25 +1585,33 @@ function ShareControl({ sync, onEnableSync }) {
             </button>
         );
     }
+
     return (
-        <Menu trigger={open ? "Share ▾" : "Share ▾"} align="right">
+        <Menu trigger="Share ▾" align="right" onOpen={loadLinks}>
             {() => (
-                <div style={{ padding: "10px 12px", minWidth: 280, display: "grid", gap: 10 }}>
+                <div style={{ padding: "10px 12px", minWidth: 280, display: "grid", gap: 12 }}>
                     <div className="menu-label">Anyone with a link can join</div>
-                    <div style={{ display: "grid", gap: 4 }}>
-                        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-sec)" }}>Edit link</span>
-                        <button className="menu-item" onClick={() => copy("edit", linkFor(tokens?.editor))}
-                            disabled={!tokens?.editor}>
-                            {copied === "edit" ? "Copied ✓" : (tokens?.editor ? "Copy edit link" : "Reopen to get links")}
-                        </button>
-                    </div>
-                    <div style={{ display: "grid", gap: 4 }}>
-                        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-sec)" }}>View-only link</span>
-                        <button className="menu-item" onClick={() => copy("view", linkFor(tokens?.viewer))}
-                            disabled={!tokens?.viewer}>
-                            {copied === "view" ? "Copied ✓" : (tokens?.viewer ? "Copy view link" : "Reopen to get links")}
-                        </button>
-                    </div>
+                    {!isOwner ? (
+                        <div style={{ display: "grid", gap: 6 }}>
+                            <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-sec)" }}>
+                                You're in this shared map as {sync.role}.
+                            </span>
+                            <button className="menu-item" onClick={copySelf}>
+                                {copiedSelf ? "Copied ✓" : "Copy this link"}
+                            </button>
+                        </div>
+                    ) : loading && !links ? (
+                        <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-sec)" }}>Loading links…</span>
+                    ) : error ? (
+                        <span style={{ fontSize: "var(--fs-sm)", color: "var(--red)" }}>{error}</span>
+                    ) : links ? (
+                        <>
+                            <ShareLinkRow mapId={sync.mapId} kind="edit" link={links.editor} onChange={setLinks} />
+                            <ShareLinkRow mapId={sync.mapId} kind="view" link={links.viewer} onChange={setLinks} />
+                        </>
+                    ) : (
+                        <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-sec)" }}>No links available.</span>
+                    )}
                 </div>
             )}
         </Menu>
@@ -1927,7 +2044,7 @@ function TabBar({ journeys, activeTab, setActiveTab, onNew, onLoad, onDelete, vi
 // ═══════════════════════════════════════
 // DROPDOWN MENU (click-away)
 // ═══════════════════════════════════════
-function Menu({ trigger, align, children }) {
+function Menu({ trigger, align, children, onOpen }) {
     const [open, setOpen] = useState(false);
     const [pos, setPos] = useState(null);
     const triggerRef = useRef(null);
@@ -1962,7 +2079,7 @@ function Menu({ trigger, align, children }) {
     return (
         <span className="menu-wrap" ref={triggerRef}>
             <button className="menu-trigger" title="Options" aria-label="Options"
-                onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>{trigger || <LucideIcon name="moreVertical" />}</button>
+                onClick={(e) => { e.stopPropagation(); setOpen((o) => { if (!o) onOpen?.(); return !o; }); }}>{trigger || <LucideIcon name="moreVertical" />}</button>
             {open && pos && createPortal(
                 <div ref={popRef} className="menu-pop menu-portal"
                     style={align === "right" ? { top: pos.top, right: pos.right, left: "auto" } : { top: pos.top, left: pos.left }}

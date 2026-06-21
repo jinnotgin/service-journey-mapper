@@ -3,13 +3,28 @@
 // storage + auth over an internal HTTP interface; Phase 2 adds the WebSocket
 // live channel (whole-document, last-write-wins) using the Hibernation API.
 
-import { Role, sha256Hex, safeEqual } from "./util";
+import { Role, sha256Hex, safeEqual, randomSecret } from "./util";
 
 interface InitBody {
   mapId: string;
   name: string;
   journeys: unknown[];
   tokenHashes: { owner: string; editor: string; viewer: string };
+  // Raw editor/viewer share secrets. SECURITY TRADE-OFF (Phase 4): unlike the
+  // owner key (hash-only), the editor/viewer tokens are stored raw in `meta` so
+  // the owner can re-read and copy the share links after a reload, and so
+  // "rotate" can replace them. These are share secrets the owner is entitled to
+  // see; the owner key itself is never stored raw. Pragmatic choice for an
+  // anonymous-collaboration MVP — see docs/collab-sync.md / progress log.
+  shareTokens: { editor: string; viewer: string };
+}
+
+// Body for the owner-only link-management endpoint (POST /links).
+interface LinksBody {
+  token?: string;
+  action?: "get" | "rotate" | "setEnabled";
+  role?: "editor" | "viewer";
+  enabled?: boolean;
 }
 
 // Per-socket data persisted across hibernation via serializeAttachment.
@@ -62,6 +77,8 @@ export class MapRoom {
         return this.handleInit(await request.json());
       case "GET /doc":
         return this.handleGetDoc(url.searchParams.get("token"));
+      case "POST /links":
+        return this.handleLinks(await request.json());
       default:
         return new Response("Not found", { status: 404 });
     }
@@ -245,6 +262,13 @@ export class MapRoom {
         body.tokenHashes[role],
       );
     }
+    // Store the raw editor/viewer share tokens so the owner can retrieve/copy
+    // the share links after a reload and so rotate can replace them. The owner
+    // raw token is deliberately NOT stored (hash-only). See the InitBody comment.
+    if (body.shareTokens) {
+      this.setMeta("token:editor", body.shareTokens.editor);
+      this.setMeta("token:viewer", body.shareTokens.viewer);
+    }
     return new Response(JSON.stringify({ ok: true, version: 1 }), {
       headers: { "Content-Type": "application/json" },
     });
@@ -269,6 +293,83 @@ export class MapRoom {
       }),
       { headers: { "Content-Type": "application/json" } },
     );
+  }
+
+  // ── owner-only link management (Phase 4) ─────────────────────────────
+
+  /**
+   * Manage the editor/viewer share links. Owner-only: the caller must present
+   * the owner token. Actions:
+   *   - "get":        return both links { editor:{token,enabled}, viewer:{...} }
+   *   - "rotate":     mint a new secret for `role`, replace the stored raw token
+   *                   and its capability hash, force enabled=1. Old link dies.
+   *   - "setEnabled": flip capabilities.enabled for `role` (0/1). A disabled
+   *                   token is rejected by roleForToken (WHERE enabled = 1).
+   * NOTE: rotating/disabling does not force-disconnect currently-connected
+   * editor/viewer WebSockets; they keep their session until they reconnect, at
+   * which point the new auth rules apply. Acceptable for the MVP.
+   */
+  private async handleLinks(body: LinksBody): Promise<Response> {
+    if (!this.getMeta("mapId")) {
+      return new Response(JSON.stringify({ error: "Map not found" }), { status: 404 });
+    }
+    // Owner-only gate: verify the presented token resolves to the owner role.
+    const role = await this.roleForToken(body.token ?? null);
+    if (role !== "owner") {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const action = body.action;
+    if (action === "rotate" || action === "setEnabled") {
+      const target = body.role;
+      if (target !== "editor" && target !== "viewer") {
+        return new Response(JSON.stringify({ error: "Invalid role" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (action === "rotate") {
+        const fresh = randomSecret();
+        const hash = await sha256Hex(fresh);
+        this.setMeta(`token:${target}`, fresh);
+        this.sql.exec(
+          "UPDATE capabilities SET token_hash = ?, enabled = 1 WHERE role = ?",
+          hash,
+          target,
+        );
+      } else {
+        this.sql.exec(
+          "UPDATE capabilities SET enabled = ? WHERE role = ?",
+          body.enabled ? 1 : 0,
+          target,
+        );
+      }
+    }
+
+    // Every action returns the current state of both links.
+    return new Response(JSON.stringify({ links: this.readLinks() }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  /** Read the editor/viewer raw tokens + enabled flags for the owner UI. */
+  private readLinks(): {
+    editor: { token: string | null; enabled: boolean };
+    viewer: { token: string | null; enabled: boolean };
+  } {
+    const enabledFor = (role: "editor" | "viewer"): boolean => {
+      const row = this.sql
+        .exec("SELECT enabled FROM capabilities WHERE role = ?", role)
+        .toArray()[0];
+      return row ? Number(row.enabled) === 1 : false;
+    };
+    return {
+      editor: { token: this.getMeta("token:editor"), enabled: enabledFor("editor") },
+      viewer: { token: this.getMeta("token:viewer"), enabled: enabledFor("viewer") },
+    };
   }
 
   // ── helpers ──────────────────────────────────────────────────────────

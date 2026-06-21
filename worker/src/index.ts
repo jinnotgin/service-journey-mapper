@@ -54,6 +54,17 @@ export default {
         return await stub.fetch(`https://do/sync?token=${encodeURIComponent(url.searchParams.get("token") || "")}`, request);
       }
 
+      // POST /api/maps/:id/links  — owner-only link management (Phase 4)
+      if (
+        request.method === "POST" &&
+        parts.length === 4 &&
+        parts[0] === "api" &&
+        parts[1] === "maps" &&
+        parts[3] === "links"
+      ) {
+        return await manageLinks(parts[2], request, env, cors);
+      }
+
       // GET /api/maps/:id  — hydrate
       if (request.method === "GET" && parts.length === 3 && parts[0] === "api" && parts[1] === "maps") {
         return await getMap(parts[2], url, env, cors);
@@ -88,7 +99,15 @@ async function createMap(request: Request, env: Env, cors: Record<string, string
   const stub = env.MAP_ROOM.get(env.MAP_ROOM.idFromName(mapId));
   const initRes = await stub.fetch("https://do/init", {
     method: "POST",
-    body: JSON.stringify({ mapId, name, journeys, tokenHashes }),
+    // shareTokens: raw editor/viewer secrets stored in the DO so the owner can
+    // re-read/copy share links after a reload (the owner key stays hash-only).
+    body: JSON.stringify({
+      mapId,
+      name,
+      journeys,
+      tokenHashes,
+      shareTokens: { editor: tokens.editor, viewer: tokens.viewer },
+    }),
   });
   if (!initRes.ok) {
     return errorJson(initRes.status, "Could not create map", cors);
@@ -106,6 +125,29 @@ async function getMap(
   const token = url.searchParams.get("token");
   const stub = env.MAP_ROOM.get(env.MAP_ROOM.idFromName(mapId));
   const res = await stub.fetch(`https://do/doc?token=${encodeURIComponent(token || "")}`);
+  const text = await res.text();
+  return new Response(text, {
+    status: res.status,
+    headers: { "Content-Type": "application/json", ...cors },
+  });
+}
+
+// POST /api/maps/:id/links — forward the owner-only link-management request to
+// the DO and return its JSON (with CORS). This is a normal JSON endpoint, not a
+// WebSocket. The DO enforces the owner-only auth check.
+async function manageLinks(
+  mapId: string,
+  request: Request,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const bodyText = await request.text();
+  const stub = env.MAP_ROOM.get(env.MAP_ROOM.idFromName(mapId));
+  const res = await stub.fetch("https://do/links", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: bodyText,
+  });
   const text = await res.text();
   return new Response(text, {
     status: res.status,

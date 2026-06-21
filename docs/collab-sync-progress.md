@@ -9,10 +9,106 @@ See `collab-sync.md` for the design.
 - [x] **Phase 1 (client)** — `?map=` init branch, "Enable sync" + Share UI, hydrate over HTTP — verified in browser
 - [x] **Phase 2** — WebSocket live updates (`doc.sync/update/reject`) — verified locally (Worker + browser)
 - [x] **Phase 3** — Presence (anonymous names + avatar stack) — verified locally (Worker + browser)
-- [ ] **Phase 4** — View vs edit links + rotate/disable
+- [x] **Phase 4** — View vs edit links + rotate/disable — verified locally (Worker curl + browser)
 - [ ] **Phase 5** — (optional) password-gated links
 
 ## Log
+
+### 2026-06-22 — Phase 4 done (View vs edit links + rotate/disable)
+
+Owner-only management of the editor/viewer share links: retrieve (after a
+reload), enable/disable, and rotate. This closes the Phase 1 gap where the
+editor/viewer tokens were only available in memory right after enabling and were
+lost on reload ("Reopen to get links").
+
+**Security trade-off (explicit & documented).** Tokens are still hash-only in
+the `capabilities` table, but the DO now ALSO stores the raw **editor** and
+**viewer** secrets in `meta` (`token:editor` / `token:viewer`). This is the only
+way to let the owner re-read and copy the share links after a reload (you cannot
+recover a raw token from its hash), and it lets "rotate" replace the stored raw
+token. The **owner** key is deliberately never stored raw — only its hash. The
+editor/viewer tokens are share secrets the owner is entitled to see, so storing
+them raw, gated behind owner-only auth, is an acceptable MVP trade-off. Recorded
+in code comments (`InitBody` in `MapRoom.ts`, the `createMap` init call in
+`index.ts`) and here.
+
+Worker (`worker/`):
+
+- `src/MapRoom.ts`:
+  - `InitBody` extended with `shareTokens:{editor,viewer}`; `handleInit` now
+    `setMeta("token:editor"/"token:viewer", …)` alongside the existing hash rows.
+  - New `handleLinks(body)` (routed from `POST /links` in `fetch`): owner-only
+    (verifies `roleForToken(token) === "owner"`, else 403). Actions: `get`
+    (returns both links), `rotate` (mint new `randomSecret()`, update `meta` raw
+    token + `capabilities.token_hash`, force `enabled=1`), `setEnabled`
+    (flip `capabilities.enabled`). Every action returns the current
+    `{ links:{ editor:{token,enabled}, viewer:{token,enabled} } }` via the new
+    `readLinks()` helper. Imports `randomSecret` from `./util`.
+  - Existing `roleForToken` already filters `WHERE enabled = 1`, so a disabled
+    token is rejected with no change needed (verified).
+- `src/index.ts`:
+  - `createMap` now passes `shareTokens:{editor,viewer}` into the DO `init`.
+  - New route `POST /api/maps/:id/links` → `manageLinks()` forwards the JSON body
+    to the DO `POST /links` and returns its JSON with CORS (normal JSON endpoint,
+    not a WebSocket). The DO enforces owner-only auth.
+- `cd worker && npx tsc --noEmit` passes.
+
+Client (`index.html`, no grid/cell/stage logic touched):
+
+- New fetch wrappers after `apiGetMap`: `apiManageLink(mapId, ownerToken,
+  {action,role,enabled})` (POSTs `/api/maps/:id/links`, maps 403→"Only the map
+  owner…") and `apiGetLinks(mapId, ownerToken)`.
+- `Menu` gained an `onOpen` callback (fired when the menu opens) so the Share
+  menu can lazily fetch links on open.
+- `mapLinkFor(mapId, token)` extracted (builds `?map=<id>&token=<token>`).
+- New `ShareLinkRow` component: per-link (edit/view) Copy (disabled when the link
+  is disabled), Enable/Disable toggle, and a two-step Rotate (Rotate → "Confirm
+  rotate", since it invalidates the old link). Each action calls
+  `apiManageLink` and feeds the returned `links` back up via `onChange`.
+- `ShareControl` reworked: when synced **and** `sync.role === "owner"`, it
+  fetches the current links on menu-open (`getMapToken(mapId)` for the owner
+  token) and renders two `ShareLinkRow`s — works **after a reload** (reads from
+  the server, not memory). The old in-memory `tokens` captured at enable time is
+  removed. Non-owners never see management UI: `ShareControl` is rendered only
+  `{!viewOnly && …}`, so for viewers (viewOnly) the Share menu is hidden
+  entirely (server also enforces owner-only). The not-synced "Enable sync"
+  button is unchanged; `enableSync` still works (its return value is no longer
+  needed for links).
+
+**Verification (local: `wrangler dev --local` :8787 + static server :8755 +
+browser preview; all servers/throwaway tokens cleaned up after):**
+
+- Worker (curl), all PASS:
+  - Create map → `{mapId, tokens:{owner,editor,viewer}}`.
+  - (simulated reload) `POST /links {action:"get"}` with owner token → returns
+    editor+viewer tokens, both `enabled:true`.
+  - `setEnabled viewer false` → `GET /api/maps/:id?token=<viewer>` = **403**;
+    re-enable → **200**.
+  - `rotate editor` → old editor token **403**, new editor token **200**.
+  - Non-owner (editor) token on `/links` → **403**; bad token → **403**.
+- Browser (real app via preview), no console errors:
+  - Opened a project → "Enable sync" → URL `?map=…`, owner token in
+    localStorage. **Reloaded** the `?map=` URL → opened straight into the synced
+    project. Opened the Share menu → it fetched and listed both **Edit link** and
+    **View-only link** as "Active" with Copy / Disable / Rotate — proving links
+    are retrievable after a reload.
+  - Clicked Disable on the view link → row shows "Disabled" + "Link disabled"
+    (copy disabled) + an Enable button. Re-enabled it → "Active" again.
+  - Clicked Rotate → "Confirm rotate" → confirmed; a server `get` confirmed the
+    editor token changed and the link stayed active.
+  - Opened a **viewer** link (`?map=…&token=<viewer>`): app rendered view-only,
+    Share menu and Library button hidden (no management UI for non-owners); token
+    consumed + stripped from the URL.
+
+Limitations / follow-ups:
+- Rotating or disabling a link does **not** force-disconnect currently-connected
+  editor/viewer WebSockets; an existing live socket keeps its session until it
+  reconnects, at which point the new auth applies. Acceptable for the MVP (no
+  forced-disconnect machinery added on purpose).
+- The Share popup can be clipped on very narrow viewports (right-aligned body
+  portal near the left edge); content is correct, only off-screen on ~800px —
+  cosmetic, not a Phase 4 regression.
+- No password-gated links yet (Phase 5).
 
 ### 2026-06-21 — Phase 3 done (Presence)
 
