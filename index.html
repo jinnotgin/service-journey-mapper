@@ -995,6 +995,66 @@ function writeRoute(projectId, { replace = false } = {}) {
     window.history[replace ? "replaceState" : "pushState"](state, "", url);
 }
 
+// ═══════════════════════════════════════
+// COLLABORATIVE SYNC (client)
+// ═══════════════════════════════════════
+// Whole-document, last-write-wins sync against the Lanescape sync Worker.
+// See docs/collab-sync.md. Phase 1 is HTTP only (create + hydrate); the live
+// WebSocket channel arrives in Phase 2.
+const ROUTE_MAP_PARAM = "map";
+// API base: localhost during dev, the deployed Worker in production.
+// Paste your workers.dev subdomain here once deployed.
+const SYNC_API_BASE = /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)
+    ? "http://localhost:8787"
+    : "https://lanescape-sync.YOUR-SUBDOMAIN.workers.dev";
+
+function routeMapId() {
+    return new URLSearchParams(window.location.search).get(ROUTE_MAP_PARAM) || null;
+}
+
+// The owner/edit token is kept in localStorage keyed by map id, never left in
+// the URL after first use.
+const mapTokenKey = (mapId) => `sjm:mapToken:${mapId}`;
+const getMapToken = (mapId) => {
+    try { return localStorage.getItem(mapTokenKey(mapId)); } catch { return null; }
+};
+const setMapToken = (mapId, token) => {
+    try { localStorage.setItem(mapTokenKey(mapId), token); } catch { /* ignore */ }
+};
+
+function writeMapRoute(mapId, { replace = false } = {}) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete(ROUTE_PROJECT_PARAM);
+    if (mapId == null) url.searchParams.delete(ROUTE_MAP_PARAM);
+    else url.searchParams.set(ROUTE_MAP_PARAM, mapId);
+    // Tokens accepted via ?token= on first open are consumed into localStorage
+    // and stripped from the address bar.
+    url.searchParams.delete("token");
+    const state = { serviceJourneyMapper: true, view: mapId == null ? "library" : "project", mapId: mapId ?? null };
+    window.history[replace ? "replaceState" : "pushState"](state, "", url);
+}
+
+// POST /api/maps — mint a cloud map from the current journeys. Returns
+// { mapId, version, tokens:{owner,editor,viewer} }.
+async function apiCreateMap({ name, journeys }) {
+    const res = await fetch(`${SYNC_API_BASE}/api/maps`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, journeys }),
+    });
+    if (!res.ok) throw new Error(`Could not enable sync (${res.status})`);
+    return res.json();
+}
+
+// GET /api/maps/:id — hydrate. Returns { journeys, version, role, name }.
+async function apiGetMap(mapId, token) {
+    const res = await fetch(`${SYNC_API_BASE}/api/maps/${encodeURIComponent(mapId)}?token=${encodeURIComponent(token || "")}`);
+    if (res.status === 403) throw new Error("This link is not valid or has been disabled.");
+    if (res.status === 404) throw new Error("This map no longer exists.");
+    if (!res.ok) throw new Error(`Could not load map (${res.status})`);
+    return res.json();
+}
+
 function InlineTitleEdit({ value, fallback, className, inputClassName, disabled, onCommit }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(value || "");
@@ -1335,9 +1395,65 @@ function LucideIcon({ name }) {
     );
 }
 
+// Share / enable-sync control in the app bar. Phase 1: turns a local project
+// into a cloud map and surfaces shareable edit/view links.
+function ShareControl({ sync, onEnableSync }) {
+    const [open, setOpen] = useState(false);
+    const [tokens, setTokens] = useState(null); // {owner,editor,viewer} captured at enable time
+    const [copied, setCopied] = useState("");
+    const linkFor = (token) => {
+        const url = new URL(window.location.href);
+        url.searchParams.delete(ROUTE_PROJECT_PARAM);
+        url.searchParams.set(ROUTE_MAP_PARAM, sync.mapId || "");
+        if (token) url.searchParams.set("token", token);
+        else url.searchParams.delete("token");
+        return url.toString();
+    };
+    const copy = async (label, text) => {
+        try { await navigator.clipboard.writeText(text); setCopied(label); setTimeout(() => setCopied(""), 1600); } catch { /* ignore */ }
+    };
+    const handleEnable = async () => {
+        const res = await onEnableSync();
+        if (res?.tokens) { setTokens(res.tokens); setOpen(true); }
+    };
+
+    if (sync.status !== "synced") {
+        return (
+            <button className="ab-back" onClick={handleEnable} disabled={sync.status === "enabling"}
+                title="Create a shareable cloud copy of this map">
+                {sync.status === "enabling" ? "Enabling…" : "Enable sync"}
+            </button>
+        );
+    }
+    return (
+        <Menu trigger={open ? "Share ▾" : "Share ▾"} align="right">
+            {() => (
+                <div style={{ padding: "10px 12px", minWidth: 280, display: "grid", gap: 10 }}>
+                    <div className="menu-label">Anyone with a link can join</div>
+                    <div style={{ display: "grid", gap: 4 }}>
+                        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-sec)" }}>Edit link</span>
+                        <button className="menu-item" onClick={() => copy("edit", linkFor(tokens?.editor))}
+                            disabled={!tokens?.editor}>
+                            {copied === "edit" ? "Copied ✓" : (tokens?.editor ? "Copy edit link" : "Reopen to get links")}
+                        </button>
+                    </div>
+                    <div style={{ display: "grid", gap: 4 }}>
+                        <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-sec)" }}>View-only link</span>
+                        <button className="menu-item" onClick={() => copy("view", linkFor(tokens?.viewer))}
+                            disabled={!tokens?.viewer}>
+                            {copied === "view" ? "Copied ✓" : (tokens?.viewer ? "Copy view link" : "Reopen to get links")}
+                        </button>
+                    </div>
+                </div>
+            )}
+        </Menu>
+    );
+}
+
 function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadSheet, onDownloadProject, onStandaloneExport, onPromptSheet, onPromptProject, canExport, hasMultipleSheets, saveState, lastSaved,
         viewOnly,
-        editMode, onSetEdit, canUndo, canRedo, onUndo, onRedo }) {
+        editMode, onSetEdit, canUndo, canRedo, onUndo, onRedo,
+        sync, onEnableSync }) {
     const [promptCopied, setPromptCopied] = useState(false);
     const copyPrompt = async (close, scope) => {
         await (scope === "project" ? onPromptProject() : onPromptSheet());
@@ -1369,6 +1485,7 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                             </button>
                         </div>
                     )}
+                    {!viewOnly && <ShareControl sync={sync} onEnableSync={onEnableSync} />}
                     {!viewOnly && <div className="ab-status" aria-live="polite">
                         {saveState === "saving" ? (
                             <span className="save-state save-saving">Saving...</span>
@@ -2526,6 +2643,9 @@ function App() {
     const [selected, setSelected] = useState(null);
     const [lastSaved, setLastSaved] = useState(null);
     const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
+    // Collaborative sync. status: "off" | "enabling" | "synced" | "error".
+    const [sync, setSync] = useState({ mapId: null, role: null, status: "off", error: null });
+    const syncVersionRef = useRef(0);
     const appBarRef = useRef(null);
     const saveTimer = useRef(null);
     const lastSavedRef = useRef(null);
@@ -2599,6 +2719,28 @@ function App() {
 
     const currentName = projects.find((p) => p.id === currentId)?.name || standaloneName || null;
 
+    // Enable sync: mint a cloud map from the current journeys, keep the local
+    // (Dexie) project as a mirror, and switch the URL to ?map=<id>. Returns the
+    // share tokens (shown to the user once).
+    const enableSync = useCallback(async () => {
+        if (sync.status === "enabling" || sync.status === "synced") return null;
+        setSync((s) => ({ ...s, status: "enabling", error: null }));
+        try {
+            const { mapId, version, tokens } = await apiCreateMap({
+                name: currentName || "Untitled",
+                journeys: journeysRef.current,
+            });
+            setMapToken(mapId, tokens.owner);
+            syncVersionRef.current = version;
+            setSync({ mapId, role: "owner", status: "synced", error: null });
+            writeMapRoute(mapId, { replace: true });
+            return { mapId, tokens };
+        } catch (err) {
+            setSync((s) => ({ ...s, status: "error", error: err.message }));
+            return null;
+        }
+    }, [sync.status, currentName]);
+
     useEffect(() => {
         document.title = currentName && view === "project"
             ? `${currentName} - Lanescape`
@@ -2622,6 +2764,37 @@ function App() {
                 setSaveState("idle");
                 setReady(true);
                 return;
+            }
+
+            // Open a shared cloud map from ?map=<id>. A ?token= in the URL (from
+            // a freshly pasted share link) is consumed into localStorage, then
+            // stripped from the address bar.
+            const mapId = routeMapId();
+            if (mapId) {
+                const urlToken = new URLSearchParams(window.location.search).get("token");
+                if (urlToken) setMapToken(mapId, urlToken);
+                const token = getMapToken(mapId);
+                try {
+                    const data = await apiGetMap(mapId, token);
+                    setCurrentId(null);
+                    setStandaloneName(data.name || "Shared map");
+                    syncVersionRef.current = data.version || 0;
+                    setSync({ mapId, role: data.role, status: "synced", error: null });
+                    const isViewer = data.role === "viewer";
+                    setViewOnly(isViewer);
+                    setEditMode(!isViewer);
+                    replaceJourneys(hydrate(data.journeys || []), { skipSave: true });
+                    clearHistory();
+                    setView("project");
+                    setSaveState("idle");
+                    writeMapRoute(mapId, { replace: true });
+                    setReady(true);
+                    return;
+                } catch (err) {
+                    setSync({ mapId: null, role: null, status: "error", error: err.message });
+                    writeMapRoute(null, { replace: true });
+                    // fall through to the library
+                }
             }
 
             // Land on the library; the user picks (or creates) a project to enter.
@@ -3256,7 +3429,8 @@ function App() {
                 viewOnly={viewOnly}
                 editMode={editMode} onSetEdit={(v) => setEditMode(v)}
                 canUndo={historyState.canUndo} canRedo={historyState.canRedo}
-                onUndo={undo} onRedo={redo} />
+                onUndo={undo} onRedo={redo}
+                sync={sync} onEnableSync={enableSync} />
             {!viewOnly && editMode && journeys.length > 0 && (
                 <FormatToolbar cell={selectedCell} selectedKey={selectedKey}
                     onMode={(m) => selected && handleCellMode(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, m)}

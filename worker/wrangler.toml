@@ -1,0 +1,17 @@
+name = "lanescape-sync"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+# One Durable Object per map. SQLite-backed (Cloudflare's recommended class for
+# new namespaces) so each map gets transactional, strongly-consistent storage.
+[[durable_objects.bindings]]
+name = "MAP_ROOM"
+class_name = "MapRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MapRoom"]
+
+# Origins allowed to call the API (CORS). Override per-env as needed.
+[vars]
+ALLOWED_ORIGINS = "https://lanescape.pages.dev,http://localhost:8788,http://localhost:3000"

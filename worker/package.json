@@ -1,0 +1,16 @@
+{
+  "name": "lanescape-sync",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker + Durable Object backing Lanescape collaborative sync",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240821.1",
+    "typescript": "^5.5.4",
+    "wrangler": "^3.78.0"
+  }
+}
