@@ -2114,6 +2114,7 @@ function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPr
                         onDeselect={onDeselect} />
                 ))
             )}
+            {editMode && <td className="add-col-c" aria-hidden="true" />}
         </tr>
     );
 }
@@ -2466,8 +2467,8 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
             {journey.subJourneys.map((sj, si) => (
                 <div key={si}>
                     <div className="bpw" data-ss="">
-                        <table className="bp" style={{ minWidth: tw }}>
-                            <BlueprintColGroup total={total} />
+                        <table className="bp" style={{ minWidth: hdrW }}>
+                            <BlueprintColGroup total={total} includeAddColumn={editMode} />
                             <tbody>
                                 {sj.rows.map((row, ri) => (
                                     <BlueprintRow key={ri} row={row} rowIdx={ri}
