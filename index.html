@@ -2398,7 +2398,7 @@ function ShareControl({ sync, onEnableSync, onStopSharing }) {
         return (
             <button className="ab-back" onClick={handleEnable} disabled={sync.status === "enabling"}
                 title="Create a shareable cloud copy of this map">
-                {sync.status === "enabling" ? "Enabling…" : "Enable sync"}
+                {sync.status === "enabling" ? "Sharing…" : "Share map"}
             </button>
         );
     }
@@ -2940,9 +2940,9 @@ function LibraryScreen({ projects, sharedMaps, currentId, profile, onProfileRena
             </div>
             <div className="lib-head">
                 <div>
-                    <div className="lib-eyebrow">Local AI-assisted mapping workspace</div>
+                    <div className="lib-eyebrow">AI-assisted mapping workspace</div>
                     <h1>Lanescape - Service Journey Mapper</h1>
-                    <p>Create and refine service journey maps, work with any AI model to assist with mapping, and keep projects saved locally in this browser.</p>
+                    <p>Create and refine service journey maps, work with any AI model to assist with mapping, and keep projects in your browser or sync them to the cloud to collaborate and share.</p>
                 </div>
                 <div className="lib-actions">
                     <button className="btn-s" onClick={onLoad}>Load JSON</button>
@@ -2983,7 +2983,7 @@ function LibraryScreen({ projects, sharedMaps, currentId, profile, onProfileRena
                 </div>
                 <div className="lib-privacy">
                     <LucideIcon name="shieldCheck" />
-                    <span>Private by default. All data is saved in this browser only.</span>
+                    <span>Private by default. Projects stay in your browser until you share them to the cloud.</span>
                 </div>
             </footer>
         </div>
