@@ -94,9 +94,9 @@
         .cloud-badge svg{width:15px;height:15px;stroke:currentColor}
         .ab-spacer{flex:1 1 auto;min-width:8px}
         .inline-title{cursor:default}
-        .inline-title.editable{cursor:text;border-radius:5px;transition:background .12s,box-shadow .12s}
+        .inline-title.editable{position:relative;cursor:text;border-radius:5px;transition:background .12s,box-shadow .12s}
         .inline-title.editable:hover{background:var(--accent-soft);box-shadow:0 0 0 4px var(--accent-soft)}
-        .inline-title.editable::after{content:"✎";display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-left:8px;border-radius:5px;font-size:.68em;opacity:0;transition:opacity .12s,background .12s;vertical-align:middle;color:var(--text-sec);background:var(--surface-2)}
+        .inline-title.editable::after{content:"✎";position:absolute;top:50%;right:-22px;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;font-size:.68em;opacity:0;transition:opacity .12s,background .12s;color:var(--text-sec);background:var(--surface-2);pointer-events:none}
         .inline-title.editable:hover::after{opacity:1}
         .inline-title-input{font:inherit;font-weight:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:4px 8px;min-width:260px;max-width:100%;outline:none}
         .ab-brand .inline-title-input{width:min(720px,52vw);min-width:min(520px,52vw)}
