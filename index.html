@@ -348,11 +348,14 @@
 
         /* ===== LIBRARY (home screen) ===== */
         .lib{max-width:1120px;margin:0 auto;padding:48px 24px 86px}
-        .lib-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:28px;margin-bottom:26px}
-        .profile-wrap{display:flex;justify-content:flex-end;margin-bottom:14px}
+        .lib-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;gap:28px;margin-bottom:26px}
+        .lib-right{display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between}
+        .lib-eyebrow-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+        .lib-eyebrow-row .lib-eyebrow{margin-bottom:0}
+        .profile-wrap{display:inline-flex}
         .profile-wrap .menu-trigger{width:auto;height:auto;padding:0;border:0;background:transparent;box-shadow:none}
         .profile-wrap .menu-trigger:hover{background:transparent}
-        .profile-trigger{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font:inherit;font-size:var(--fs-xs);font-weight:700;cursor:pointer;box-shadow:0 1px 1px oklch(20% .006 70 / .05)}
+        .profile-trigger{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font:inherit;font-size:var(--fs-xs);font-weight:700;cursor:pointer;box-shadow:0 1px 1px oklch(20% .006 70 / .05);white-space:nowrap}
         .profile-trigger:hover{background:var(--surface-2)}
         .profile-trigger .presence-av{margin-left:0;width:22px;height:22px;border-width:0;font-size:9px}
         .profile-form{display:grid;gap:8px;padding:8px;min-width:230px}
@@ -2907,6 +2910,7 @@ function ProfileMenu({ identity, onRename }) {
     const [draft, setDraft] = useState(identity.name || "");
     useEffect(() => setDraft(identity.name || ""), [identity.name]);
     return (
+        <span className="profile-wrap">
         <Menu trigger={
             <span className="profile-trigger">
                 <span className="presence-av" style={{ background: identity.color || "var(--text-sec)" }}>{presenceInitials(identity.name)}</span>
@@ -2929,24 +2933,25 @@ function ProfileMenu({ identity, onRename }) {
                 </div>
             )}
         </Menu>
+        </span>
     );
 }
 
 function LibraryScreen({ projects, sharedMaps, currentId, profile, onProfileRename, onOpen, onOpenShared, onNew, onRename, onDelete, onLoad }) {
     return (
         <div className="lib">
-            <div className="profile-wrap">
-                <ProfileMenu identity={profile} onRename={onProfileRename} />
-            </div>
             <div className="lib-head">
                 <div>
                     <div className="lib-eyebrow">AI-assisted mapping workspace</div>
                     <h1>Lanescape - Service Journey Mapper</h1>
                     <p>Create and refine service journey maps, work with any AI model to assist with mapping, and keep projects in your browser or sync them to the cloud to collaborate and share.</p>
                 </div>
-                <div className="lib-actions">
-                    <button className="btn-s" onClick={onLoad}>Load JSON</button>
-                    <button className="btn-p" onClick={onNew}>＋ New project</button>
+                <div className="lib-right">
+                    <ProfileMenu identity={profile} onRename={onProfileRename} />
+                    <div className="lib-actions">
+                        <button className="btn-s" onClick={onLoad}>Load JSON</button>
+                        <button className="btn-p" onClick={onNew}>＋ New project</button>
+                    </div>
                 </div>
             </div>
             <section className="library-section">
