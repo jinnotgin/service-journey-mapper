@@ -31,9 +31,9 @@
             --fs-2xl: 26px;
             /* Warm-neutral ramp, close to shadcn's black and white default */
             --ink-bar:     oklch(99% .002 70);
-            --ink-stage:   oklch(95.5% .004 70);
-            --ink-sub:     oklch(92.5% .004 70);
-            --ink-divider: oklch(48% .008 70);
+            --ink-stage:   oklch(96.2% .006 70);
+            --ink-sub:     oklch(93.8% .006 70);
+            --ink-divider: oklch(60% .008 70);
             /* Primary action is restrained and neutral; semantic row colors stay separate */
             --accent:        oklch(24% .006 70);
             --accent-strong: oklch(18% .006 70);
@@ -53,12 +53,29 @@
             --surface-2: oklch(96.5% .004 70);
             --border: oklch(89% .006 70);
             --border-light: oklch(93.5% .004 70);
+            --grid-line: oklch(91% .004 70 / .62);
+            --grid-strong: oklch(83% .008 70);
+            --note: oklch(99.2% .003 70);
+            /* Filled notes use a translucent fill so the lane tint reads through:
+               the note lifts off the lane rather than punching a white hole in it. */
+            --note-fill: oklch(100% 0 0 / .4);
+            --note-border: oklch(84% .008 70 / .55);
+            --note-shadow: 0 1px 2px oklch(20% .006 70 / .04), 0 4px 12px oklch(20% .006 70 / .035);
             --text: oklch(27% .008 70);
             --text-sec: oklch(52% .006 70);
             --shadow-sm: 0 1px 2px oklch(20% .006 70 / .05), 0 1px 3px oklch(20% .006 70 / .07);
             --shadow-md: 0 8px 24px oklch(20% .006 70 / .11);
             --shadow-lg: 0 18px 50px oklch(20% .006 70 / .2);
             --radius: 10px;
+            /* Canvas track model: lanes are rounded objects floating on the page,
+               separated by whitespace gutters. No continuous grid lines. */
+            --canvas: oklch(96.8% .004 70);
+            --lane-gap: 9px;
+            --lane-r: 13px;
+            --canvas-pad: 10px;
+            --lane-w: 180px;
+            /* Sticky offset for stage/step labels: clears the sticky lane rail. */
+            --stage-label-left: 192px;
             --appbar-h: 52px;
             --toolbar-h: 0px;
         }
@@ -144,35 +161,63 @@
         .ch-hdr h2{font-size:var(--fs-xl);color:var(--text);font-weight:700;letter-spacing:-.015em}
 
         /* ===== STAGE HDR (STICKY) ===== */
-        .stage-outer{position:sticky;top:calc(var(--appbar-h,52px) + var(--toolbar-h,0px));z-index:35;background:var(--ink-stage);border-bottom:1px solid var(--border);box-shadow:0 3px 8px oklch(20% .006 70 / .08)}
+        .stage-outer{position:sticky;top:calc(var(--appbar-h,52px) + var(--toolbar-h,0px));z-index:35;background:var(--canvas);padding:4px var(--canvas-pad) 0;box-shadow:0 10px 16px -8px oklch(20% .006 70 / .12)}
         .scroll-hide{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
         .scroll-hide::-webkit-scrollbar{display:none}
 
         /* ===== SUB-JOURNEY HDR ===== */
-        .sj-scroll{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;background:var(--ink-sub);border:1px solid var(--border);border-top:none}
+        .sj-scroll{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;background:var(--canvas)}
         .sj-scroll::-webkit-scrollbar{display:none}
 
         /* ===== BP TABLE ===== */
-        .bp{border-collapse:collapse;table-layout:fixed;width:max-content}
-        .bp td{border:1px solid var(--border-light);padding:11px 13px;vertical-align:top;text-align:left;font-size:var(--fs-sm)}
+        /* No grid lines anywhere. The table is pure column-alignment plumbing;
+           lanes read as rounded tracks separated by vertical gutters. */
+        .bp{border-collapse:separate;border-spacing:0;table-layout:fixed;width:max-content}
+        .bp td{border:0;padding:11px 13px;vertical-align:top;text-align:left;font-size:var(--fs-sm)}
+
+        /* Body lanes float on the canvas with whitespace gutters between them. */
+        .bpw .bp{border-spacing:0 var(--lane-gap)}
+        /* Round each lane into one continuous track: left corners on the sticky
+           label, right corners on the trailing data cell (mode-aware via :has). */
+        .bpw .bp td.ll{border-top-left-radius:var(--lane-r);border-bottom-left-radius:var(--lane-r)}
+        .bpw .bp tr>td:last-child:not(.add-col-c),
+        .bpw .bp tr>td:has(+ .add-col-c){border-top-right-radius:var(--lane-r);border-bottom-right-radius:var(--lane-r)}
+        /* Trailing add-column lane in the body is pure empty space: no fill, no
+           border, no rounding. The "+" lives only in the sticky stage header. */
+        .bpw .bp .add-col-c{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important}
 
         /* Lane label */
-        .ll{width:180px;min-width:180px;max-width:180px;position:sticky;left:0;z-index:10;font-weight:700;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:.6px;background:var(--surface);border-right:2px solid var(--border)}
+        .ll{width:var(--lane-w);min-width:var(--lane-w);max-width:var(--lane-w);position:sticky;left:0;z-index:10;font-weight:720;font-size:var(--fs-2xs);text-transform:none;letter-spacing:0;background:var(--surface);padding:16px 14px 16px 17px!important}
+        .lane-label{display:flex;align-items:flex-start;gap:9px;line-height:1.25;min-width:0}
+        .lane-icon{width:20px;height:20px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:oklch(99% .002 70 / .78);color:currentColor;border:1px solid oklch(100% 0 0 / .52);box-shadow:0 1px 2px oklch(20% .006 70 / .04)}
+        .lane-icon svg{width:14px;height:14px;stroke:currentColor}
+        .lane-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
+        .lane-kicker{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:color-mix(in oklch, currentColor 58%, var(--text-sec))}
+        .lane-main{font-size:var(--fs-xs);font-weight:800;letter-spacing:.025em;text-transform:uppercase;overflow-wrap:anywhere;color:currentColor}
 
-        /* Stage header cells */
-        .stg-ll{background:var(--ink-stage)!important;color:var(--text-sec)!important;border:1px solid var(--border)!important;border-right:2px solid var(--border)!important;text-align:left!important}
-        .stg-c{min-width:260px;background:var(--ink-stage)!important;color:var(--text)!important;font-weight:700!important;font-size:var(--fs-md)!important;letter-spacing:-.005em!important;text-align:center!important;vertical-align:middle!important;border:1px solid var(--border)!important}
+        /* Stage header cells. The label rail stays an OPAQUE canvas tile so
+           columns scrolling underneath it never bleed through. */
+        .stg-ll{background:var(--canvas)!important;color:var(--text-sec)!important;text-align:left!important}
+        .stg-c{min-width:260px;background:transparent!important;color:var(--text)!important;font-weight:700!important;font-size:var(--fs-md)!important;letter-spacing:0!important;text-align:left!important;vertical-align:middle!important;padding:9px 6px!important}
+        /* Stage card spans the full stage width (shows coverage); the label
+           inside is sticky so it stays readable across a wide stage. */
+        .stage-card{display:flex;align-items:center;justify-content:flex-start;gap:9px;min-height:36px;margin:0 3px;padding:7px 11px 7px 8px;border:1px solid oklch(84% .01 70 / .78);border-radius:9px;background:oklch(98.4% .005 70);box-shadow:0 1px 2px oklch(20% .006 70 / .04);text-align:left}
+        .stage-card-label{position:sticky;left:var(--stage-label-left);display:inline-flex;align-items:center;gap:9px;min-width:0;max-width:100%}
+        .stage-title{line-height:1.25;overflow-wrap:anywhere}
 
         /* SJ header cells */
-        .sj-ll{background:var(--ink-sub)!important;color:var(--text-sec)!important;border:1px solid var(--border)!important;border-right:2px solid var(--border)!important;font-size:var(--fs-2xs)!important;text-align:left!important}
-        .sj-tc{background:var(--ink-sub)!important;color:var(--text-sec)!important;font-weight:650!important;font-size:var(--fs-2xs)!important;text-transform:uppercase!important;letter-spacing:1.4px!important;text-align:center!important;padding:8px 12px!important;border:1px solid var(--border)!important}
+        .sj-ll{background:var(--canvas)!important;color:var(--text-sec)!important;font-size:var(--fs-2xs)!important;text-align:left!important}
+        .sj-tc{background:transparent!important;color:var(--text-sec)!important;font-weight:650!important;font-size:var(--fs-2xs)!important;text-transform:uppercase!important;letter-spacing:1.4px!important;text-align:center!important;padding:8px 12px!important}
 
         /* Data cell */
-        .dc{min-width:260px}
+        .dc{min-width:260px;min-height:82px;position:relative;padding:13px 14px!important;background-clip:padding-box;transition:background .12s ease-out,box-shadow .12s ease-out}
         .dc-span{min-width:auto!important;width:auto!important}
 
         /* Wrapper */
-        .bpw{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-top:none}
+        /* Canvas inset lives on the non-scrolling wrapper, NOT the scroll
+           container, so nothing can scroll into the gap left of the sticky rail. */
+        .bp-lane-wrap{padding:0 var(--canvas-pad);background:var(--canvas)}
+        .bpw{overflow-x:auto;background:var(--canvas);padding:0 0 var(--lane-gap)}
         .bpw::-webkit-scrollbar{height:10px}
         .bpw::-webkit-scrollbar-track{background:var(--surface-2)}
         .bpw::-webkit-scrollbar-thumb{background:var(--border);border-radius:5px;border:2px solid var(--surface-2)}
@@ -182,8 +227,8 @@
         /* ===== ROW TYPES =====
            Label column carries a soft tint + readable colored label; the data
            column stays near-white so written content always leads. */
-        .row-parties>.ll{background:oklch(96% .004 256);color:var(--text-sec)}
-        .row-parties>.dc{background:var(--surface-2)}
+        .row-parties>.ll{background:oklch(96.5% .012 250);color:oklch(42% .075 250)}
+        .row-parties>.dc{background:oklch(98.3% .006 250)}
 
         .row-operator>.ll{background:var(--surface);color:var(--text)}
         .row-operator>.dc{background:var(--surface)}
@@ -194,8 +239,19 @@
         .row-fs-system>.ll{background:oklch(93% .035 245);color:oklch(45% .11 250)}
         .row-fs-system>.dc{background:oklch(98% .012 245)}
 
-        .row-divider>.ll{background:var(--ink-divider);color:oklch(94% .004 70);border-right-color:oklch(100% 0 0 / .25)}
-        .row-divider>.dc{background:var(--ink-divider);color:oklch(94% .004 70);font-weight:600;text-align:center;padding:7px 12px;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:1.6px}
+        /* Line of visibility = the blueprint's defining moment. A tall, quiet
+           band of canvas separates the frontstage cluster from the backstage
+           cluster, with a single dashed boundary floating through it. */
+        .row-divider>.ll{background:var(--canvas)!important;color:var(--text-sec)!important;border-bottom:0!important}
+        .row-divider>.dc{background:transparent!important;color:var(--text-sec);font-weight:700;text-align:center;padding:16px 12px!important;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:1.3px;border-bottom:0!important}
+        .row-divider .lane-label{align-items:center}
+        .row-divider .lane-main{color:var(--text-sec)}
+        /* The divider is a pure boundary: any cell content is made weightless
+           (font-size:0) so it can never inflate the row, and the dashed line is
+           a plain full-width block. */
+        .row-divider .cell-note{min-height:0;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;display:block;color:transparent;font-size:0;line-height:0;position:relative}
+        .row-divider .cell-note::before{content:"";display:block;width:100%;border-top:1.5px dashed oklch(64% .01 70 / .7)}
+        .row-divider .cell-note:focus{outline:none;box-shadow:none!important}
 
         .row-bs-human>.ll{background:oklch(94% .04 80);color:oklch(48% .1 65)}
         .row-bs-human>.dc{background:oklch(98.5% .012 80)}
@@ -231,12 +287,18 @@
         .emotion-text{font-size:var(--fs-xs);font-weight:600}
         .emotion-neg{color:var(--red)}.emotion-pos{color:var(--green)}.emotion-neu{color:var(--gold)}
 
-        .stage-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--accent-strong);color:var(--accent-ink);border:1px solid var(--accent-strong);font-weight:700;font-size:var(--fs-sm)}
+        .stage-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--accent-strong);color:var(--accent-ink);border:1px solid var(--accent-strong);font-weight:800;font-size:var(--fs-xs);font-variant-numeric:tabular-nums}
 
         /* ===== EDITABLE ===== */
-        td[contenteditable="true"]{cursor:text;outline:none;transition:box-shadow .12s,background .12s}
-        td[contenteditable="true"]:hover{box-shadow:inset 0 0 0 1.5px var(--accent-line)}
-        td[contenteditable="true"]:focus{box-shadow:inset 0 0 0 2px var(--accent)}
+        .cell-note{min-height:70px;width:100%;border-radius:8px;padding:10px 11px;outline:none;cursor:text;transition:box-shadow .12s ease-out,background .12s ease-out,border-color .12s ease-out;color:var(--text)}
+        .cell-note:empty::before{content:attr(data-placeholder);color:oklch(62% .006 70 / .65);font-weight:600;opacity:0;transition:opacity .12s ease-out;pointer-events:none}
+        .dc:hover .cell-note:empty::before,.dc.cell-sel .cell-note:empty::before{opacity:1}
+        /* Only plain text / bullet notes get a surface, and it is translucent.
+           Boxes carry their own item surfaces; tags carry their own chips. */
+        .dc.cell-filled:not(.cell-boxes):not(.cell-tags-mode) .cell-note{background:var(--note-fill);border:1px solid var(--note-border);box-shadow:var(--note-shadow)}
+        .dc:hover .cell-note{box-shadow:inset 0 0 0 1px var(--accent-line)}
+        .cell-note:focus{background:var(--note);box-shadow:0 0 0 3px var(--accent-soft), inset 0 0 0 2px var(--accent)!important;border-color:transparent}
+        .row-divider .cell-note:empty::before{content:""!important;opacity:1!important;display:block;width:100%;border-top:1.5px dashed oklch(64% .01 70 / .7)}
 
         /* ===== TAB BAR ===== */
         .tab-bar{position:fixed;bottom:0;left:0;right:0;height:42px;background:var(--surface-2);border-top:1px solid var(--border);display:flex;align-items:flex-end;padding:0 8px;z-index:100}
@@ -292,7 +354,7 @@
         .project-list{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:0 12px 30px oklch(30% .012 70 / .08)}
         .project-row{width:100%;display:grid;grid-template-columns:minmax(0,1fr) 118px 168px 38px;align-items:center;gap:18px;text-align:left;background:var(--surface);border:0;border-bottom:1px solid var(--border-light);padding:17px 18px 17px 20px;cursor:pointer;font-family:inherit;color:var(--text);transition:background .15s,box-shadow .15s}
         .project-row:last-child{border-bottom:0}
-        .project-row:hover{background:oklch(97% .006 70);box-shadow:inset 3px 0 0 oklch(55% .12 220)}
+        .project-row:hover{background:oklch(97% .006 70)}
         .project-row.current{background:oklch(97.5% .012 220)}
         .project-row.current:hover{background:oklch(96.5% .015 220)}
         .project-row.add{grid-template-columns:1fr;justify-items:center;color:var(--text-sec);border-top:1px dashed var(--border);font-weight:700;background:oklch(98.5% .003 70);padding:15px 18px}
@@ -341,26 +403,26 @@
             .lib-privacy{justify-content:center}
         }
         @media print{
-            .tab-bar,.m-ov,.ab-actions,.cell-toolbar,.menu-wrap,.add-col-c,.add-row-bar{display:none}
+            .tab-bar,.m-ov,.ab-actions,.cell-toolbar,.menu-wrap,.add-col-c,.add-row-bar,.insert-zone,.ins-btn,.edit-bottom-pad{display:none}
             .app-bar,.stage-outer{position:static}
             .ll{position:static}
         }
 
         /* ===== EDIT MODE ===== */
-        .cell-toolbar{position:fixed;z-index:320;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;padding:7px;background:oklch(32% .008 70);border:1px solid oklch(40% .006 70);border-radius:8px;box-shadow:var(--shadow-md);width:max-content;max-width:none;white-space:nowrap}
+        .cell-toolbar{position:fixed;z-index:320;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;padding:7px;background:oklch(99% .003 70);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);width:max-content;max-width:none;white-space:nowrap}
         .tb-group{display:flex;align-items:center;gap:3px}
-        .tb-sep{width:1px;height:20px;background:oklch(46% .006 70);margin:0 5px}
-        .tb-btn{background:oklch(38% .008 70);border:1px solid oklch(47% .006 70);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;color:oklch(82% .005 70);font-family:inherit;line-height:1.1;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:30px;transition:background .13s ease-out,border-color .13s ease-out,color .13s ease-out,transform .13s ease-out}
+        .tb-sep{width:1px;height:20px;background:var(--border-light);margin:0 5px}
+        .tb-btn{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);font-weight:650;cursor:pointer;color:var(--text-sec);font-family:inherit;line-height:1.1;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:30px;transition:background .13s ease-out,border-color .13s ease-out,color .13s ease-out,transform .13s ease-out}
         .tb-btn svg{width:15px;height:15px;display:block;stroke:currentColor;flex:0 0 auto}
         .tb-btn.icon-only{width:32px;padding:0}
-        .tb-btn:hover:not(:disabled){background:oklch(51% .011 70);border-color:oklch(64% .008 70);color:oklch(99% .002 70)}
-        .tb-btn:active:not(:disabled){transform:translateY(.5px);background:oklch(46% .01 70)}
-        .tb-btn:focus-visible{outline:2px solid oklch(80% .09 250);outline-offset:1px}
-        .tb-btn.active{background:oklch(96% .003 70);border-color:oklch(96% .003 70);color:oklch(22% .006 70)}
-        .tb-btn.active:hover:not(:disabled){background:oklch(88% .004 70);border-color:oklch(84% .005 70);color:oklch(20% .006 70)}
-        .tb-btn.active:active:not(:disabled){background:oklch(82% .005 70);transform:translateY(.5px)}
+        .tb-btn:hover:not(:disabled){background:var(--surface-2);border-color:var(--text-sec);color:var(--text)}
+        .tb-btn:active:not(:disabled){transform:translateY(.5px);background:oklch(94% .004 70)}
+        .tb-btn:focus-visible{outline:2px solid oklch(62% .08 250);outline-offset:1px}
+        .tb-btn.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+        .tb-btn.active:hover:not(:disabled){background:var(--accent-strong);border-color:var(--accent-strong);color:var(--accent-ink)}
+        .tb-btn.active:active:not(:disabled){background:var(--accent-strong);transform:translateY(.5px)}
         .tb-btn:disabled{opacity:.4;cursor:not-allowed}
-        .tb-hint{font-size:var(--fs-xs);color:oklch(62% .005 70);padding:0 4px;white-space:nowrap}
+        .tb-hint{font-size:var(--fs-xs);color:var(--text-sec);padding:0 4px;white-space:nowrap}
 
         /* dropdown menus */
         .menu-wrap{position:relative;display:inline-block}
@@ -401,8 +463,9 @@
         .stg-c:hover>.menu-wrap,.stg-c:focus-within>.menu-wrap,
         .sub-c:hover>.menu-wrap,.sub-c:focus-within>.menu-wrap,
         .ll:hover .row-menu,.ll:focus-within .row-menu{opacity:1;pointer-events:auto}
-        .hdr-edit{outline:none;cursor:text}
-        .hdr-edit:focus{box-shadow:inset 0 0 0 2px var(--accent);border-radius:4px}
+        .hdr-edit{outline:none;cursor:text;border-radius:5px;transition:background .12s ease-out,box-shadow .12s ease-out}
+        .hdr-edit:hover{background:var(--accent-soft);box-shadow:0 0 0 4px var(--accent-soft)}
+        .hdr-edit:focus{background:var(--surface);box-shadow:0 0 0 3px var(--accent-soft), inset 0 0 0 2px var(--accent);border-radius:5px}
         .drag-handle{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;border:1px solid oklch(100% 0 0 / .2);background:oklch(100% 0 0 / .08);color:inherit;cursor:grab;font-size:.66rem;line-height:1;vertical-align:middle;user-select:none;opacity:0;pointer-events:none;transition:opacity .14s ease-out,background .14s ease-out}
         .stg-c:hover>.drag-handle,.stg-c:focus-within>.drag-handle,
         .sub-c:hover>.drag-handle,.sub-c:focus-within>.drag-handle,
@@ -420,18 +483,34 @@
         .add-row-bar.drop-end{box-shadow:inset 0 3px 0 var(--accent);background:var(--accent-soft)}
 
         /* sub-stage header row */
-        .sub-c{background:var(--ink-sub)!important;color:var(--text-sec)!important;font-weight:600!important;font-size:var(--fs-xs)!important;text-align:center!important;vertical-align:middle!important;border:1px solid var(--border)!important}
+        .sub-c{background:transparent!important;color:var(--text-sec)!important;font-weight:600!important;font-size:var(--fs-xs)!important;text-align:center!important;vertical-align:middle!important;border:0!important;padding:10px 12px!important}
+        .step-chip{display:flex;align-items:center;justify-content:flex-start;min-height:30px;margin:0 3px;padding:5px 10px;border:1px solid oklch(86% .01 70 / .65);border-radius:8px;background:oklch(98.8% .004 70);box-shadow:0 1px 1px oklch(20% .006 70 / .025);line-height:1.2}
+        .step-chip-label{position:sticky;left:var(--stage-label-left);display:inline-block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
         /* add column / add row affordances */
-        .add-col-c{min-width:62px;width:62px;background:var(--ink-stage)!important;text-align:center!important;border:1px solid var(--border)!important;vertical-align:middle!important}
+        .add-col-c{min-width:62px;width:62px;background:transparent!important;text-align:center!important;border:0!important;vertical-align:middle!important}
         .add-btn{background:var(--surface);color:var(--text);border:1px dashed var(--border);border-radius:6px;padding:5px 11px;font-size:var(--fs-sm);font-weight:700;cursor:pointer;font-family:inherit}
         .add-btn:hover{background:var(--surface-2)}
-        .add-row-bar{padding:7px 12px;background:var(--surface-2);border:1px solid var(--border);border-top:none}
+        .add-row-bar{padding:6px 0 10px;background:var(--canvas);border:0}
         .add-row-btn{background:var(--surface);border:1px dashed var(--border);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);font-weight:600;color:var(--text-sec);cursor:pointer;font-family:inherit}
         .add-row-btn:hover{background:var(--bg);color:var(--text);border-color:var(--text-sec)}
 
-        /* selected cell highlight */
-        .dc.cell-sel{box-shadow:inset 0 0 0 2px var(--accent)}
+        /* hover-revealed insert affordances (edit mode): the transparent zone is
+           the boundary/gap target; the visible button stays compact. */
+        .insert-zone{position:absolute;z-index:14;display:flex;align-items:center;justify-content:center;pointer-events:auto}
+        .ins-stage-r-zone,.ins-sub-r-zone{top:4px;bottom:4px;right:-16px;width:32px}
+        .ins-stage-b-zone{left:14px;right:14px;bottom:5px;height:28px}
+        .stg-empty-subrow .ins-stage-b-zone{top:58px;bottom:12px;height:auto}
+        .ins-row-t-zone{top:calc(-1 * var(--lane-gap));left:0;right:0;height:var(--lane-gap)}
+        .ins-btn{position:static;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:1px solid var(--accent-line);background:var(--surface);color:var(--accent-strong);font-size:15px;font-weight:700;line-height:1;cursor:pointer;padding:0;font-family:inherit;box-shadow:0 1px 3px oklch(20% .006 70 / .2);opacity:0;pointer-events:none;transition:opacity .12s ease-out}
+        .ins-btn:hover{background:var(--accent-soft);border-color:var(--accent)}
+        .insert-zone:hover>.ins-btn,.insert-zone:focus-within>.ins-btn{opacity:1;pointer-events:auto}
+        /* edit-mode-only breathing room below the last lane (hidden in view/print) */
+        .edit-bottom-pad{height:120px}
+
+        /* Selection lives on the note surface only, never the cell rectangle,
+           so editing never reveals the underlying table grid. */
+        .dc.cell-sel .cell-note{background:var(--note);border-radius:9px;box-shadow:0 0 0 3px var(--accent-soft), inset 0 0 0 1px var(--accent-line)}
 
         /* cell locked by another collaborator (Phase 8): read-only, outlined in
            the holder's color, with an initials badge in the corner */
@@ -443,8 +522,11 @@
         .al-center{text-align:center!important}
         .al-left{text-align:left!important}
 
-        /* tags-mode cell */
-        .cell-tags{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+        /* tags-mode cell — chips get breathing room matching the note inset */
+        .cell-tags{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:34px;padding:5px 8px;border-radius:9px;transition:box-shadow .12s ease-out,background .12s ease-out}
+        .dc.cell-tags-mode.cell-sel .cell-tags{background:var(--note-fill);box-shadow:0 0 0 3px var(--accent-soft), inset 0 0 0 1px var(--accent-line)}
+        .cell-empty-hint{color:oklch(62% .006 70 / .65);font-size:var(--fs-xs);font-weight:600}
+        .dc:not(.cell-sel):not(:hover) .cell-empty-hint{opacity:.55}
         .tag-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:var(--fs-2xs);font-weight:600}
         .tag-x{cursor:pointer;font-weight:700;opacity:.55;font-size:var(--fs-xs)}
         .tag-x:hover{opacity:1}
@@ -470,12 +552,13 @@
         .tag-suggest-new .tag-suggest-hint{color:var(--accent-strong)}
 
         /* bullets-mode cell */
-        .cell-bullets>div,.cell-bullets>p{padding-left:14px;position:relative;margin-bottom:3px}
-        .cell-bullets>div::before,.cell-bullets>p::before{content:'•';position:absolute;left:2px;color:var(--accent-strong);font-weight:700}
+        .cell-bullets .cell-note>div,.cell-bullets .cell-note>p{padding-left:14px;position:relative;margin-bottom:3px}
+        .cell-bullets .cell-note>div::before,.cell-bullets .cell-note>p::before{content:'•';position:absolute;left:2px;color:var(--accent-strong);font-weight:700}
 
         /* boxes-mode cell (card-style bullet items) */
-        .cell-boxes>div,.cell-boxes>p{background:oklch(99% .002 70 / .7);border:1px solid oklch(20% .006 70 / .1);border-radius:5px;padding:5px 9px;margin-bottom:5px}
-        .cell-boxes>div:last-child,.cell-boxes>p:last-child{margin-bottom:0}
+        .cell-boxes .cell-note{background:transparent!important;border:0!important;box-shadow:none!important;padding:0}
+        .cell-boxes .cell-note>div,.cell-boxes .cell-note>p{background:var(--note-fill);border:1px solid var(--note-border);border-radius:8px;padding:7px 10px;margin-bottom:6px;box-shadow:var(--note-shadow)}
+        .cell-boxes .cell-note>div:last-child,.cell-boxes .cell-note>p:last-child{margin-bottom:0}
 
         /* per-cell save / discard mini-toolbar */
 
@@ -1127,6 +1210,46 @@ const ROW_TYPES = [
     ["row-suggest", "Suggestions"],
 ];
 
+const ROW_META = {
+    "row-operator": { icon: "user", kicker: "Journey", fallback: "Actions" },
+    "row-parties": { icon: "users", kicker: "Map", fallback: "Parties" },
+    "row-fs-human": { icon: "userRound", kicker: "Frontstage", fallback: "Human" },
+    "row-fs-system": { icon: "monitor", kicker: "Frontstage", fallback: "System" },
+    [DIVIDER_TYPE]: { icon: "eye", kicker: "", fallback: "Line of visibility" },
+    "row-bs-human": { icon: "users", kicker: "Backstage", fallback: "Human" },
+    "row-bs-system": { icon: "settings", kicker: "Backstage", fallback: "System" },
+    "row-support": { icon: "layers", kicker: "Enabler", fallback: "Support process" },
+    "row-pain": { icon: "alertTriangle", kicker: "Signal", fallback: "Pain points" },
+    "row-verbatim": { icon: "quote", kicker: "Voice", fallback: "Verbatim" },
+    "row-emotion": { icon: "smile", kicker: "Signal", fallback: "Emotion" },
+    "row-suggest": { icon: "lightbulb", kicker: "Improve", fallback: "Opportunities" },
+};
+
+function cleanLaneLabel(label = "") {
+    return String(label)
+        .replace(/^[\s👤⚙️🛠️]+/u, "")
+        .replace(/^(FS|BS)\s+(Human|System)\s*:\s*/i, "")
+        .replace(/^(Human|System)\s*:\s*/i, "")
+        .trim();
+}
+
+function LaneLabel({ rowType, label, editable, onCommit }) {
+    const meta = ROW_META[rowType] || { icon: "layers", kicker: "", fallback: "Lane" };
+    const display = cleanLaneLabel(label) || meta.fallback;
+    return (
+        <span className="lane-label">
+            <span className="lane-icon"><LucideIcon name={meta.icon} /></span>
+            <span className="lane-copy">
+                {meta.kicker && <span className="lane-kicker">{meta.kicker}</span>}
+                <span className={`lane-main${editable ? " hdr-edit" : ""}`} contentEditable={editable} suppressContentEditableWarning
+                    onBlur={editable ? (e) => onCommit(e.currentTarget.textContent) : undefined}>
+                    {display}
+                </span>
+            </span>
+        </span>
+    );
+}
+
 // ═══════════════════════════════════════
 // PERSISTENCE (Dexie / IndexedDB)
 // ═══════════════════════════════════════
@@ -1668,11 +1791,11 @@ function createBlankJourney(index = 0) {
             rows: [
                 { rowType: "row-parties", laneLabel: "Parties", cells: blankCells(total, "tags") },
                 { rowType: "row-operator", laneLabel: "User Actions", cells: blankCells(total, "bullets") },
-                { rowType: "row-fs-human", laneLabel: "👤 FS Human: Role", cells: blankCells(total, "bullets") },
-                { rowType: "row-fs-system", laneLabel: "⚙️ System: Frontstage System", cells: blankCells(total, "bullets") },
-                { rowType: DIVIDER_TYPE, laneLabel: "Line of Visibility", cells: [{ mode: "text", html: "━━━━━━━━ BELOW THIS LINE: BACKSTAGE ACTIONS NOT VISIBLE TO CUSTOMERS ━━━━━━━━", align: "center", colspan: total }] },
-                { rowType: "row-bs-human", laneLabel: "👤 BS Human: Role", cells: blankCells(total, "bullets") },
-                { rowType: "row-bs-system", laneLabel: "⚙️ System: Backstage System", cells: blankCells(total, "bullets") },
+                { rowType: "row-fs-human", laneLabel: "Human Role", cells: blankCells(total, "bullets") },
+                { rowType: "row-fs-system", laneLabel: "Visible System", cells: blankCells(total, "bullets") },
+                { rowType: DIVIDER_TYPE, laneLabel: "Line of Visibility", cells: [{ mode: "text", html: "", align: "center", colspan: total }] },
+                { rowType: "row-bs-human", laneLabel: "Backstage Role", cells: blankCells(total, "bullets") },
+                { rowType: "row-bs-system", laneLabel: "Internal System", cells: blankCells(total, "bullets") },
                 { rowType: "row-support", laneLabel: "Support Process", cells: blankCells(total, "bullets") },
                 { rowType: "row-pain", laneLabel: "Pain Points", cells: blankCells(total, "boxes") },
                 { rowType: "row-emotion", laneLabel: "Emotion", cells: blankCells(total, "text", "center") },
@@ -1881,6 +2004,11 @@ function buildExampleProject() {
 // TOP APP BAR
 // ═══════════════════════════════════════
 const LUCIDE_PATHS = {
+    alertTriangle: [
+        <path key="1" d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />,
+        <path key="2" d="M12 9v4" />,
+        <path key="3" d="M12 17h.01" />
+    ],
     alignCenter: [
         <path key="1" d="M17 12H7" />,
         <path key="2" d="M19 18H5" />,
@@ -1891,6 +2019,21 @@ const LUCIDE_PATHS = {
         <path key="2" d="M17 18H3" />,
         <path key="3" d="M21 6H3" />
     ],
+    eye: [
+        <path key="1" d="M2.06 12.35a1 1 0 0 1 0-.7C3.52 7.46 7.52 5 12 5s8.48 2.46 9.94 6.65a1 1 0 0 1 0 .7C20.48 16.54 16.48 19 12 19s-8.48-2.46-9.94-6.65" />,
+        <circle key="2" cx="12" cy="12" r="3" />
+    ],
+    layers: [
+        <path key="1" d="m12.83 2.18 8.5 4.7a.75.75 0 0 1 0 1.31l-8.5 4.7a1.75 1.75 0 0 1-1.66 0l-8.5-4.7a.75.75 0 0 1 0-1.31l8.5-4.7a1.75 1.75 0 0 1 1.66 0" />,
+        <path key="2" d="m22 12-9.17 5.07a1.75 1.75 0 0 1-1.66 0L2 12" />,
+        <path key="3" d="m22 16-9.17 5.07a1.75 1.75 0 0 1-1.66 0L2 16" />
+    ],
+    lightbulb: [
+        <path key="1" d="M15 14c.2-1 .7-1.7 1.5-2.5A4.9 4.9 0 0 0 18 8 6 6 0 0 0 6 8c0 1.3.5 2.5 1.5 3.5.8.8 1.3 1.5 1.5 2.5" />,
+        <path key="2" d="M9 18h6" />,
+        <path key="3" d="M10 22h4" />,
+        <path key="4" d="M10 14h4" />
+    ],
     list: [
         <path key="1" d="M8 6h13" />,
         <path key="2" d="M8 12h13" />,
@@ -1898,6 +2041,11 @@ const LUCIDE_PATHS = {
         <path key="4" d="M3 6h.01" />,
         <path key="5" d="M3 12h.01" />,
         <path key="6" d="M3 18h.01" />
+    ],
+    monitor: [
+        <rect key="1" width="20" height="14" x="2" y="3" rx="2" />,
+        <path key="2" d="M8 21h8" />,
+        <path key="3" d="M12 17v4" />
     ],
     moreVertical: [
         <circle key="1" cx="12" cy="12" r="1" fill="currentColor" />,
@@ -1907,6 +2055,10 @@ const LUCIDE_PATHS = {
     pencil: [
         <path key="1" d="M21.17 6.17a2.12 2.12 0 0 0-3-3L3 18.34V22h3.66z" />,
         <path key="2" d="m15 5 4 4" />
+    ],
+    quote: [
+        <path key="1" d="M3 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2H4c-1.25 0-2 .75-2 2v6c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1" />,
+        <path key="2" d="M15 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2h-4c-1.25 0-2 .75-2 2v6c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1" />
     ],
     redo2: [
         <path key="1" d="m15 14 5-5-5-5" />,
@@ -1918,6 +2070,16 @@ const LUCIDE_PATHS = {
     shieldCheck: [
         <path key="1" d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />,
         <path key="2" d="m9 12 2 2 4-4" />
+    ],
+    settings: [
+        <path key="1" d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />,
+        <circle key="2" cx="12" cy="12" r="3" />
+    ],
+    smile: [
+        <circle key="1" cx="12" cy="12" r="10" />,
+        <path key="2" d="M8 14s1.5 2 4 2 4-2 4-2" />,
+        <path key="3" d="M9 9h.01" />,
+        <path key="4" d="M15 9h.01" />
     ],
     tag: [
         <path key="1" d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />,
@@ -1933,6 +2095,20 @@ const LUCIDE_PATHS = {
     undo2: [
         <path key="1" d="M9 14 4 9l5-5" />,
         <path key="2" d="M4 9h10.5A5.5 5.5 0 0 1 20 14.5 5.5 5.5 0 0 1 14.5 20H11" />
+    ],
+    user: [
+        <path key="1" d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />,
+        <circle key="2" cx="12" cy="7" r="4" />
+    ],
+    userRound: [
+        <circle key="1" cx="12" cy="8" r="5" />,
+        <path key="2" d="M20 21a8 8 0 0 0-16 0" />
+    ],
+    users: [
+        <path key="1" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />,
+        <circle key="2" cx="9" cy="7" r="4" />,
+        <path key="3" d="M22 21v-2a4 4 0 0 0-3-3.87" />,
+        <path key="4" d="M16 3.13a4 4 0 0 1 0 7.75" />
     ]
 };
 
@@ -2979,19 +3155,27 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, cell
     if (peerLocked) {
         return (
             <td className={className} style={style} colSpan={colSpan}
-                data-cell-key={cellKey} contentEditable={false}
+                data-cell-key={cellKey}
                 title={`Editing: ${lockedBy.name || "Someone"}`}>
-                <span className="cell-locked-html" dangerouslySetInnerHTML={{ __html: html || "" }} />
+                <div className="cell-note cell-locked-html" dangerouslySetInnerHTML={{ __html: html || "" }} />
                 <LockBadge lockedBy={lockedBy} />
             </td>
         );
     }
 
     return (
-        <td ref={ref} className={className} style={style} colSpan={colSpan}
+        <td className={className} style={style} colSpan={colSpan}
             data-cell-key={cellKey}
-            contentEditable={editMode} suppressContentEditableWarning
-            onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} />
+            onMouseDown={(e) => {
+                if (!editMode || e.target !== e.currentTarget) return;
+                e.preventDefault();
+                ref.current?.focus();
+            }}>
+            <div ref={ref} className="cell-note" contentEditable={editMode} suppressContentEditableWarning
+                data-placeholder={editMode ? "Add note" : ""}
+                dangerouslySetInnerHTML={{ __html: html || "" }}
+                onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} />
+        </td>
     );
 }
 
@@ -3014,7 +3198,8 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
     const mode = cell.mode || "text";
     const alignClass = (cell.align || "left") === "center" ? "al-center" : "al-left";
     const peerLocked = !!lockedBy; // a DIFFERENT collaborator is editing this cell
-    const cls = `dc ${alignClass}${cell.colspan ? " dc-span" : ""}${selected ? " cell-sel" : ""}${peerLocked ? " cell-locked" : ""}`;
+    const hasHtml = !!String(cell.html || "").replace(/<br\s*\/?>|&nbsp;|\s|<[^>]*>/gi, "");
+    const cls = `dc ${alignClass}${cell.colspan ? " dc-span" : ""}${selected ? " cell-sel" : ""}${peerLocked ? " cell-locked" : ""}${hasHtml ? " cell-filled" : ""}`;
     const style = rowBg ? { background: rowBg } : undefined;
 
     if (mode === "tags") {
@@ -3023,7 +3208,7 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
         // add/remove affordances. Tags edit is an edit-intent → acquire on entering
         // edit (selecting in edit mode), release when deselected.
         return (
-            <td className={cls} colSpan={cell.colspan || undefined} style={style}
+            <td className={`${cls} cell-tags-mode${tags.length ? " cell-filled" : ""}`} colSpan={cell.colspan || undefined} style={style}
                 data-cell-key={cellKey}
                 onClick={peerLocked ? undefined : () => { onSelect(); if (editMode && !selected) onAcquireLock?.(cell.id); }}>
                 <div className="cell-tags" style={{ justifyContent: (cell.align || "left") === "center" ? "center" : "flex-start" }}>
@@ -3034,7 +3219,7 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
                                 onClick={(e) => { e.stopPropagation(); onTagsChange(tags.filter((_, k) => k !== i)); }}>✕</span>}
                         </span>
                     ))}
-                    {!tags.length && !editMode && <span style={{ color: "var(--text-sec)" }}>—</span>}
+                    {!tags.length && <span className="cell-empty-hint">{editMode ? "Add tags" : "No tags"}</span>}
                 </div>
                 {editMode && selected && !peerLocked && <TagAdder existing={tags} onAdd={(t) => onTagsChange([...tags, t])} />}
                 <LockBadge lockedBy={lockedBy} />
@@ -3069,6 +3254,10 @@ function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPr
                     <>
                     <span className="drag-handle row-drag" draggable title="Drag to reorder row"
                         onDragStart={(e) => onRowDragStart(e, rowIdx)} onDragEnd={onDragEnd}>⠿</span>
+                    <span className="insert-zone ins-row-t-zone">
+                        <button type="button" className="ins-btn" title="Add row here"
+                            onClick={() => onRowAction("insertAbove")}>+</button>
+                    </span>
                     <span className="row-menu">
                         <Menu align="left">
                             {(close) => (
@@ -3102,10 +3291,8 @@ function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPr
                     </span>
                     </>
                 )}
-                <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
-                    onBlur={editMode ? (e) => onRowAction("label", e.currentTarget.textContent) : undefined}>
-                    {row.laneLabel}
-                </span>
+                <LaneLabel rowType={row.rowType} label={row.laneLabel} editable={editMode}
+                    onCommit={(value) => onRowAction("label", value)} />
             </td>
             {isDivider ? (() => {
                 const dCell = row.cells[0] || {};
@@ -3398,7 +3585,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                     const lc = leafCount(s);
                                     const sHasSub = (s.subStages?.length || 0) > 0;
                                     return (
-                                        <td key={si} className={`stg-c${dropTarget?.type === "stage" && dropTarget.stageIdx === si ? ` drop-${dropTarget.side}` : ""}`} colSpan={lc}
+                                        <td key={si} className={`stg-c${hasSub && !sHasSub ? " stg-empty-subrow" : ""}${dropTarget?.type === "stage" && dropTarget.stageIdx === si ? ` drop-${dropTarget.side}` : ""}`} colSpan={lc}
                                             rowSpan={hasSub && !sHasSub ? 2 : 1}
                                             style={{ minWidth: lc * COL_W }}
                                             onDragOver={editMode ? (e) => stageDragOver(e, si) : undefined}
@@ -3418,16 +3605,30 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                         </>
                                                     )}
                                                 </Menu>
+                                                {si < stages.length - 1 && (
+                                                    <span className="insert-zone ins-stage-r-zone">
+                                                        <button type="button" className="ins-btn" title="Add stage here"
+                                                            onClick={() => onStage("addStage", { stageIdx: si })}>+</button>
+                                                    </span>
+                                                )}
+                                                {!sHasSub && (
+                                                    <span className="insert-zone ins-stage-b-zone">
+                                                        <button type="button" className="ins-btn" title="Add sub-stage"
+                                                            onClick={() => onStage("addSubStage", { stageIdx: si })}>+</button>
+                                                    </span>
+                                                )}
                                                 </>
                                             )}
-                                            <span style={{ display: "inline-flex", alignItems: "flex-start", justifyContent: "center", gap: "6px", textAlign: "left" }}>
+                                            <span className="stage-card">
+                                                <span className="stage-card-label">
                                                 {(s.num != null || editMode) && <span className="stage-num" style={{ flexShrink: 0 }}
                                                     contentEditable={editMode} suppressContentEditableWarning
                                                     title={editMode ? "Edit number" : undefined}
                                                     onBlur={editMode ? (e) => onStage("renumberStage", { stageIdx: si, value: e.currentTarget.textContent }) : undefined}>{s.num}</span>}
-                                                <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
+                                                <span className={`stage-title${editMode ? " hdr-edit" : ""}`} contentEditable={editMode} suppressContentEditableWarning
                                                     onBlur={editMode ? (e) => onStage("renameStage", { stageIdx: si, value: e.currentTarget.textContent }) : undefined}>
                                                     {s.title}
+                                                </span>
                                                 </span>
                                             </span>
                                         </td>
@@ -3464,11 +3665,17 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                             </>
                                                         )}
                                                     </Menu>
+                                                    <span className="insert-zone ins-sub-r-zone">
+                                                        <button type="button" className="ins-btn" title="Add sub-stage here"
+                                                            onClick={() => onStage("addSubStage", { stageIdx: si, subIdx: ssi })}>+</button>
+                                                    </span>
                                                     </>
                                                 )}
-                                                <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
+                                                <span className="step-chip">
+                                                <span className={`step-chip-label${editMode ? " hdr-edit" : ""}`} contentEditable={editMode} suppressContentEditableWarning
                                                     onBlur={editMode ? (e) => onStage("renameSubStage", { stageIdx: si, subIdx: ssi, value: e.currentTarget.textContent }) : undefined}>
                                                     {ss.title}
+                                                </span>
                                                 </span>
                                             </td>
                                         ));
@@ -3482,7 +3689,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
 
             {/* Sub-journeys (rows only; section breaks use divider rows) */}
             {journey.subJourneys.map((sj, si) => (
-                <div key={si}>
+                <div key={si} className="bp-lane-wrap">
                     <div className="bpw" data-ss="">
                         <table className="bp" style={{ minWidth: hdrW }}>
                             <BlueprintColGroup total={total} includeAddColumn={editMode} />
@@ -3523,6 +3730,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                     )}
                 </div>
             ))}
+            {editMode && <div className="edit-bottom-pad" aria-hidden="true" />}
         </div>
     );
 }
@@ -4289,16 +4497,19 @@ function App() {
             return commitOp({ t: "stage.move", journeyId: j.id, stageId: stage.id, afterStageId });
         }
         if (action === "addSubStage") {
-            const { stageIdx } = payload;
+            const { stageIdx, subIdx } = payload;
             const stage = stages[stageIdx];
             if (!stage) return;
             const subs = stage.subStages || [];
             const subStage = { id: newId(), title: "New" };
+            const afterSubStageId = subIdx != null
+                ? (subs[subIdx]?.id ?? null)
+                : (subs.length ? subs[subs.length - 1].id : null);
             return commitOp({
                 t: "substage.insert",
                 journeyId: j.id,
                 stageId: stage.id,
-                afterSubStageId: subs.length ? subs[subs.length - 1].id : null,
+                afterSubStageId,
                 subStage,
                 cellIds: cellIdsByRow(j, 1),
             });
