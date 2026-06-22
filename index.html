@@ -433,6 +433,12 @@
         /* selected cell highlight */
         .dc.cell-sel{box-shadow:inset 0 0 0 2px var(--accent)}
 
+        /* cell locked by another collaborator (Phase 8): read-only, outlined in
+           the holder's color, with an initials badge in the corner */
+        .dc.cell-locked{position:relative;cursor:not-allowed;box-shadow:inset 0 0 0 2px oklch(60% .14 280 / .55)}
+        .cell-lock-badge{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 3px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;line-height:1;color:#fff;border:1.5px solid var(--surface);box-shadow:0 1px 2px oklch(20% .006 70 / .25);user-select:none;pointer-events:none;text-shadow:0 1px 1px oklch(20% .006 70 / .35)}
+        .cell-locked-html{display:block}
+
         /* alignment */
         .al-center{text-align:center!important}
         .al-left{text-align:left!important}
@@ -2549,20 +2555,30 @@ function TagAdder({ onAdd, existing = [] }) {
 // element is NOT focused. This avoids React resetting the caret to the start
 // while typing. The edit commits when the cell loses focus (click away, or
 // Escape to finish via the keyboard).
-function EditableCell({ html, editMode, className, style, colSpan, cellKey, onCommit, onFocusCell, onDone }) {
+function EditableCell({ html, editMode, className, style, colSpan, cellKey, cellId, lockedBy,
+        onCommit, onFocusCell, onDone, onAcquireLock, onReleaseLock }) {
     const ref = useRef(null);
+    // A peer is editing this cell: render it read-only and do not let it focus.
+    const peerLocked = !!lockedBy;
 
     useEffect(() => {
         const el = ref.current;
-        if (!el || document.activeElement === el) return;
+        // When a peer holds the lock React controls this td (badge + html via
+        // dangerouslySetInnerHTML), so don't imperatively touch innerHTML here.
+        if (!el || peerLocked || document.activeElement === el) return;
         const next = html || "";
         if (el.innerHTML !== next) el.innerHTML = next;
-    }, [html]);
+    }, [html, peerLocked]);
 
-    const handleFocus = () => { onFocusCell?.(); };
+    const handleFocus = () => {
+        onFocusCell?.();
+        // Edit-intent: acquire the lock on focus (NOT on selection/click).
+        onAcquireLock?.(cellId);
+    };
     const handleBlur = () => {
         onCommit(ref.current?.innerHTML ?? "");
         onDone?.();
+        onReleaseLock?.(); // clean release on blur (also covers Escape, which blurs)
     };
     const handleKeyDown = (e) => {
         // Escape just finishes editing (blur commits); it does not discard.
@@ -2576,6 +2592,18 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, onCo
         }
     };
 
+    // Peer-locked: React fully owns the td (read-only, no focus, badge + html).
+    if (peerLocked) {
+        return (
+            <td className={className} style={style} colSpan={colSpan}
+                data-cell-key={cellKey} contentEditable={false}
+                title={`Editing: ${lockedBy.name || "Someone"}`}>
+                <span className="cell-locked-html" dangerouslySetInnerHTML={{ __html: html || "" }} />
+                <LockBadge lockedBy={lockedBy} />
+            </td>
+        );
+    }
+
     return (
         <td ref={ref} className={className} style={style} colSpan={colSpan}
             data-cell-key={cellKey}
@@ -2587,28 +2615,46 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, onCo
 // ═══════════════════════════════════════
 // CELL
 // ═══════════════════════════════════════
-function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, onTagsChange, onDeselect }) {
+// Small badge shown on a cell another collaborator is currently editing (Phase 8).
+function LockBadge({ lockedBy }) {
+    if (!lockedBy) return null;
+    return (
+        <span className="cell-lock-badge" style={{ background: lockedBy.color || "var(--accent)" }}
+            title={`Editing: ${lockedBy.name || "Someone"}`} aria-label={`Editing: ${lockedBy.name || "Someone"}`}>
+            {presenceInitials(lockedBy.name)}
+        </span>
+    );
+}
+
+function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, onTagsChange, onDeselect,
+        lockedBy, onAcquireLock, onReleaseLock }) {
     const mode = cell.mode || "text";
     const alignClass = (cell.align || "left") === "center" ? "al-center" : "al-left";
-    const cls = `dc ${alignClass}${cell.colspan ? " dc-span" : ""}${selected ? " cell-sel" : ""}`;
+    const peerLocked = !!lockedBy; // a DIFFERENT collaborator is editing this cell
+    const cls = `dc ${alignClass}${cell.colspan ? " dc-span" : ""}${selected ? " cell-sel" : ""}${peerLocked ? " cell-locked" : ""}`;
     const style = rowBg ? { background: rowBg } : undefined;
 
     if (mode === "tags") {
         const tags = cell.tags || [];
+        // While a peer holds the lock, the tags cell is read-only: no select, no
+        // add/remove affordances. Tags edit is an edit-intent → acquire on entering
+        // edit (selecting in edit mode), release when deselected.
         return (
             <td className={cls} colSpan={cell.colspan || undefined} style={style}
-                data-cell-key={cellKey} onClick={onSelect}>
+                data-cell-key={cellKey}
+                onClick={peerLocked ? undefined : () => { onSelect(); if (editMode && !selected) onAcquireLock?.(cell.id); }}>
                 <div className="cell-tags" style={{ justifyContent: (cell.align || "left") === "center" ? "center" : "flex-start" }}>
                     {tags.map((t, i) => (
                         <span key={i} className="tag-chip" style={{ background: t.bg, color: t.fg }}>
                             {t.text}
-                            {editMode && selected && <span className="tag-x" title="remove"
+                            {editMode && selected && !peerLocked && <span className="tag-x" title="remove"
                                 onClick={(e) => { e.stopPropagation(); onTagsChange(tags.filter((_, k) => k !== i)); }}>✕</span>}
                         </span>
                     ))}
                     {!tags.length && !editMode && <span style={{ color: "var(--text-sec)" }}>—</span>}
                 </div>
-                {editMode && selected && <TagAdder existing={tags} onAdd={(t) => onTagsChange([...tags, t])} />}
+                {editMode && selected && !peerLocked && <TagAdder existing={tags} onAdd={(t) => onTagsChange([...tags, t])} />}
+                <LockBadge lockedBy={lockedBy} />
             </td>
         );
     }
@@ -2617,7 +2663,9 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
     return (
         <EditableCell html={cell.html} editMode={editMode}
             className={`${cls}${modeClass}`} colSpan={cell.colspan || undefined} style={style}
-            cellKey={cellKey} onCommit={onEditHtml} onFocusCell={onSelect} onDone={onDeselect} />
+            cellKey={cellKey} cellId={cell.id} lockedBy={lockedBy}
+            onCommit={onEditHtml} onFocusCell={onSelect} onDone={onDeselect}
+            onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock} />
     );
 }
 
@@ -2625,7 +2673,8 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
 // BLUEPRINT ROW
 // ═══════════════════════════════════════
 function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPrefix, dragState, dropRowIdx,
-        onSelect, onCellEdit, onCellTags, onRowAction, onRowDragStart, onRowDragOver, onRowDrop, onDragEnd, onDeselect }) {
+        onSelect, onCellEdit, onCellTags, onRowAction, onRowDragStart, onRowDragOver, onRowDrop, onDragEnd, onDeselect,
+        lockedByPeer, onAcquireLock, onReleaseLock }) {
     const rowBg = row.customColor || null;
     const isDivider = row.rowType === DIVIDER_TYPE;
     return (
@@ -2675,17 +2724,24 @@ function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPr
                     {row.laneLabel}
                 </span>
             </td>
-            {isDivider ? (
-                <EditableCell html={(row.cells[0] || {}).html || ""} editMode={editMode}
-                    className={`dc dc-span al-center${selectedCellIdx === 0 ? " cell-sel" : ""}`}
+            {isDivider ? (() => {
+                const dCell = row.cells[0] || {};
+                const dLock = lockedByPeer?.get(dCell.id) || null;
+                return (
+                <EditableCell html={dCell.html || ""} editMode={editMode}
+                    className={`dc dc-span al-center${selectedCellIdx === 0 ? " cell-sel" : ""}${dLock ? " cell-locked" : ""}`}
                     colSpan={total} style={rowBg ? { background: rowBg } : undefined}
-                    cellKey={`${cellKeyPrefix}-0`}
-                    onCommit={(html) => onCellEdit(0, html)} onFocusCell={() => onSelect(0)} onDone={onDeselect} />
-            ) : (
+                    cellKey={`${cellKeyPrefix}-0`} cellId={dCell.id} lockedBy={dLock}
+                    onCommit={(html) => onCellEdit(0, html)} onFocusCell={() => onSelect(0)} onDone={onDeselect}
+                    onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock} />
+                );
+            })() : (
                 row.cells.map((cell, ci) => (
                     <Cell key={ci} cell={cell} editMode={editMode} rowBg={rowBg}
                         selected={ci === selectedCellIdx}
                         cellKey={`${cellKeyPrefix}-${ci}`}
+                        lockedBy={lockedByPeer?.get(cell.id) || null}
+                        onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock}
                         onSelect={() => onSelect(ci)}
                         onEditHtml={(html) => onCellEdit(ci, html)}
                         onTagsChange={(tags) => onCellTags(ci, tags)}
@@ -2843,7 +2899,8 @@ function BlueprintColGroup({ total, includeAddColumn = false }) {
 // JOURNEY VIEW
 // ═══════════════════════════════════════
 function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
-        onTitleEdit, onCellEdit, onCellTags, onRowAction, onStageAction, onAddRow }) {
+        onTitleEdit, onCellEdit, onCellTags, onRowAction, onStageAction, onAddRow,
+        lockedByPeer, onAcquireLock, onReleaseLock }) {
     const ref = useRef(null);
     const [dragState, setDragState] = useState(null);
     const [dropTarget, setDropTarget] = useState(null);
@@ -3062,7 +3119,9 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                         onRowDragOver={(e, targetRowIdx) => rowDragOver(e, si, targetRowIdx)}
                                         onRowDrop={(e, targetRowIdx) => rowDrop(e, si, targetRowIdx)}
                                         onDragEnd={clearDrag}
-                                        onDeselect={onDeselect} />
+                                        onDeselect={onDeselect}
+                                        lockedByPeer={lockedByPeer}
+                                        onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock} />
                                 ))}
                             </tbody>
                         </table>
@@ -3111,6 +3170,14 @@ function App() {
     // Presence (Phase 3): other people currently in this map. Ephemeral roster
     // pushed by the DO; excludes our own clientId. [{clientId, name, color}].
     const [peers, setPeers] = useState([]);
+    // Cell locking (Phase 8): the DO's lock roster. Each entry is
+    // {cellId, clientId, name, color, lockedAt}. A separate presence-like channel
+    // layered on top of doc.* sync — does NOT touch the whole-doc push/version.
+    const [locks, setLocks] = useState([]);
+    // The cell we are currently editing (its stable cell.id), tracked in a ref so
+    // the heartbeat interval and release-on-hide handlers can read it without
+    // re-subscribing. null when not editing.
+    const editingCellIdRef = useRef(null);
     // Password gate (Phase 5): when opening a password-protected share link, this
     // holds {mapId, token} and surfaces the password modal. Cleared once a valid
     // session is obtained (or the gate is dismissed). Owners never see it.
@@ -3458,6 +3525,72 @@ function App() {
         }
     }, [applyRemoteDoc]);
 
+    // ── Cell locking (Phase 8): soft advisory locks ──
+    // True only when locking should be active at all. When not synced (or not an
+    // editor in edit mode) locking is fully inert — zero behavior change vs today.
+    const lockingActive = sync.status === "synced" && editMode && sync.role !== "viewer";
+
+    // Map cellId -> {clientId,name,color} of the PEER holding it, EXCLUDING our
+    // own clientId (our own lock must never lock us out of our own cell).
+    const lockedByPeer = useMemo(() => {
+        const myId = getPresenceIdentity().clientId;
+        const m = new Map();
+        for (const l of locks) {
+            if (!l || !l.cellId || l.clientId === myId) continue;
+            m.set(l.cellId, { clientId: l.clientId, name: l.name, color: l.color });
+        }
+        return m;
+    }, [locks]);
+
+    // Send a lock.* frame if the socket is OPEN and locking is active.
+    const sendLock = useCallback((type, cellId) => {
+        if (!lockingActive || !cellId) return;
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        try { ws.send(JSON.stringify({ t: type, cellId })); } catch { /* socket going away */ }
+    }, [lockingActive]);
+
+    // Acquire on edit-intent (cell editable focus / tags-cell entering edit).
+    // Release any lock we still hold on a different cell first (e.g. moving from a
+    // tags cell, which has no blur, straight to another cell).
+    const acquireLock = useCallback((cellId) => {
+        if (!lockingActive || !cellId) return;
+        const prev = editingCellIdRef.current;
+        if (prev && prev !== cellId) sendLock("lock.release", prev);
+        editingCellIdRef.current = cellId;
+        sendLock("lock.acquire", cellId);
+    }, [lockingActive, sendLock]);
+
+    // Release on blur / Escape / tab hide / leaving the map.
+    const releaseLock = useCallback(() => {
+        const cellId = editingCellIdRef.current;
+        editingCellIdRef.current = null;
+        if (cellId) sendLock("lock.release", cellId);
+    }, [sendLock]);
+
+    // Heartbeat while editing so peers / the server keep the lock fresh (~5s).
+    useEffect(() => {
+        if (!lockingActive) return;
+        const id = setInterval(() => {
+            const cellId = editingCellIdRef.current;
+            if (cellId) sendLock("lock.heartbeat", cellId);
+        }, 5000);
+        return () => clearInterval(id);
+    }, [lockingActive, sendLock]);
+
+    // Release the lock (and blur the cell) when the tab is hidden, so a lock is
+    // not held while the editor is away. Also covers Cmd-Tab / minimise.
+    useEffect(() => {
+        const onHide = () => {
+            if (document.visibilityState !== "hidden") return;
+            const el = document.activeElement;
+            if (el && el.isContentEditable) { try { el.blur(); } catch { /* ignore */ } }
+            releaseLock();
+        };
+        document.addEventListener("visibilitychange", onHide);
+        return () => document.removeEventListener("visibilitychange", onHide);
+    }, [releaseLock]);
+
     // Open/maintain the socket while synced; reconnect with capped backoff.
     useEffect(() => {
         if (sync.status !== "synced" || !sync.mapId) return;
@@ -3493,9 +3626,19 @@ function App() {
                 } else if (parsed.t === "presence" && Array.isArray(parsed.peers)) {
                     const myId = getPresenceIdentity().clientId;
                     setPeers(parsed.peers.filter((p) => p && p.clientId && p.clientId !== myId));
+                } else if (parsed.t === "locks" && Array.isArray(parsed.locks)) {
+                    setLocks(parsed.locks);
+                } else if (parsed.t === "lock.denied") {
+                    // A peer already holds the cell we just tried to edit: abandon
+                    // (blur the active cell). The incoming `locks` frame marks it locked.
+                    if (editingCellIdRef.current === parsed.cellId) {
+                        editingCellIdRef.current = null;
+                        const el = document.activeElement;
+                        if (el && el.isContentEditable) { try { el.blur(); } catch { /* ignore */ } }
+                    }
                 }
             };
-            ws.onclose = () => { if (wsRef.current === ws) { wsRef.current = null; setPeers([]); } scheduleReconnect(); };
+            ws.onclose = () => { if (wsRef.current === ws) { wsRef.current = null; setPeers([]); setLocks([]); } scheduleReconnect(); };
             ws.onerror = () => { try { ws.close(); } catch { /* ignore */ } };
         };
 
@@ -3514,6 +3657,8 @@ function App() {
             const ws = wsRef.current;
             wsRef.current = null;
             setPeers([]); // leaving this map; drop the roster
+            setLocks([]); // and the lock roster
+            editingCellIdRef.current = null;
             if (ws) { ws.onclose = null; ws.onerror = null; try { ws.close(); } catch { /* ignore */ } }
         };
     }, [sync.status, sync.mapId, applyOrDeferRemote]);
@@ -4105,11 +4250,12 @@ function App() {
                     journeys.map((j, i) => (
                         <div key={j.id + "-" + i} style={{ display: i === tab ? "block" : "none" }}>
                             <JourneyView journey={j} jIdx={i} editMode={!viewOnly && editMode}
-                                selected={selected} onSelect={setSelected} onDeselect={() => setSelected(null)}
+                                selected={selected} onSelect={setSelected} onDeselect={() => { setSelected(null); releaseLock(); }}
                                 onTitleEdit={renameJourneyTitle}
                                 onCellEdit={handleCellEdit} onCellTags={handleCellTags}
                                 onRowAction={handleRowAction} onStageAction={handleStageAction}
-                                onAddRow={handleAddRow} />
+                                onAddRow={handleAddRow}
+                                lockedByPeer={lockedByPeer} onAcquireLock={acquireLock} onReleaseLock={releaseLock} />
                         </div>
                     ))
                 )}

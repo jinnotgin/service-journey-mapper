@@ -13,10 +13,140 @@ See `collab-sync.md` for the design.
 - [x] **Phase 5** — (optional) password-gated links — verified locally (Worker curl + WS + browser)
 - [x] **Phase 6** — Stop sharing / delete cloud map (owner)
 - [x] **Phase 7** — Stable entity IDs (journey/stage/column/sub-journey/row/cell), backfilled on hydrate — prerequisite for 8 & 9
-- [ ] **Phase 8** — Cell locking (soft, presence-driven advisory locks; acquire on edit-intent, heartbeat/TTL anti-hoard, release on blur/disconnect)
+- [x] **Phase 8** — Cell locking (soft, presence-driven advisory locks; acquire on edit-intent, heartbeat/TTL anti-hoard, release on blur/disconnect) — verified locally (Worker + browser + Node peer)
 - [ ] **Phase 9** — Atomic op-based sync: `cell.set` content patches (per-cell LWW) + structural ops (row add/delete/move, column add/delete/move, stage/sub-journey/journey ops), version-gated with whole-doc resync fallback
 
 ## Log
+
+### 2026-06-22 — Phase 8 done (cell locking)
+
+Soft, advisory per-cell locks so only one person edits a given cell at a time.
+The lock is **presence, not persistence**: it rides in each socket's attachment
+and is broadcast as a roster (a separate channel from `doc.*`), so it
+auto-releases on disconnect for free. **No Phase 9 op-sync** — today's
+whole-document `doc.push`/`doc.update`/`version` LWW path is completely untouched;
+locks are a new presence-like channel layered on top, keyed by the stable
+`cell.id` shipped in Phase 7. When a map is not synced, locking is fully inert
+(zero behavior change vs before).
+
+Wire format added (separate frames from presence/doc):
+
+```
+client -> server  { t:"lock.acquire",   cellId }
+                  { t:"lock.heartbeat", cellId }
+                  { t:"lock.release",   cellId }
+server -> client  { t:"locks",       locks:[{cellId,clientId,name,color,lockedAt}, ...] }
+                  { t:"lock.denied", cellId }     // someone fresh already holds it
+```
+
+Worker (`worker/src/MapRoom.ts`):
+
+- `SocketAttachment` extended with `editingCellId?:string; lockedAt?:number`. A
+  socket holds **at most one** lock; merges preserve `role`/`clientId`/`name`/`color`.
+  Constants `LOCK_TTL_MS = 15000` (a lock is "fresh" if `now - lockedAt < TTL`) and
+  `LOCK_SWEEP_MS = 5000` (alarm cadence).
+- `webSocketMessage` gained a `lock.*` branch **after** presence/before `doc.push`.
+  Requires a role and ignores **viewers** (they cannot edit):
+  - `lock.acquire`: if a DIFFERENT live socket holds `cellId` with a fresh
+    `lockedAt` → reply `lock.denied` to the requester only, do nothing else.
+    Otherwise set this socket's `editingCellId`/`lockedAt=now` (merge) and
+    `broadcastLocks()` + schedule the sweep alarm.
+  - `lock.heartbeat`: if this socket holds `cellId`, refresh `lockedAt=now` (no
+    broadcast per heartbeat).
+  - `lock.release`: if this socket holds `cellId`, clear the lock and `broadcastLocks()`.
+- `broadcastLocks(except?)` mirrors `broadcastPresence`: iterates
+  `getWebSockets()`, includes only attachments with a fresh `lockedAt`, an
+  `editingCellId`, and a `clientId`, and sends `{t:"locks",locks}` to **every**
+  socket (holder included — clients filter their own `clientId`). `except` skips
+  the departing socket on close/error.
+- **Idle-hoarder expiry via a DO alarm.** `broadcastLocks` filters stale locks,
+  but with no events nothing re-broadcasts, so a holder who keeps the socket open
+  but stops heartbeating would linger forever. `scheduleLockSweep()` calls
+  `state.storage.setAlarm(now+LOCK_SWEEP_MS)` whenever a lock is acquired; the new
+  `alarm()` handler clears any stale (`now-lockedAt >= TTL`) lock on its socket,
+  `broadcastLocks()`, and **reschedules while any fresh lock remains**. This makes
+  a hoarded lock demonstrably expire within ~TTL with zero other activity.
+- `webSocketClose` / `webSocketError` now also call `broadcastLocks(ws)` (the
+  departing socket's lock dies with its attachment).
+- Presence and locks stay SEPARATE frames/channels. `cd worker && npx tsc --noEmit` passes.
+
+Client (`index.html`, no grid/cell/stage data-model or `cellKey`/`data-cell-key`
+positional scheme touched):
+
+- New `locks` state (the DO roster) + `editingCellIdRef` (the cell we are editing,
+  in a ref so the heartbeat/visibility handlers read it without re-subscribing).
+  A `lockedByPeer` `useMemo` derives `Map cellId -> {clientId,name,color}`
+  EXCLUDING our own `clientId`, so our own lock never locks us out.
+- `lockingActive = sync.status==="synced" && editMode && sync.role!=="viewer"`
+  gates ALL lock activity. `sendLock(type,cellId)` guards `wsRef.current` OPEN.
+- `acquireLock(cellId)` releases any previously-held lock first (covers a tags cell
+  → another cell, which has no blur) then sends `lock.acquire`; `releaseLock()`
+  sends `lock.release` and is idempotent (guards on `editingCellIdRef`).
+- **Acquire on EDIT-INTENT, not selection.** `cell.id` is threaded into
+  `EditableCell` (which previously got only `html`) and the tags path. The editable
+  `handleFocus` calls `onAcquireLock(cellId)`; `handleBlur` calls `onReleaseLock()`
+  (so Escape, which blurs, also releases). The first-column / divider `EditableCell`
+  in `BlueprintRow` uses `row.cells[0].id`. The tags cell acquires on entering edit
+  (selecting in edit mode), and the App's `onDeselect` also releases. Merely
+  CLICKING/selecting a cell sends NO `lock.acquire` (verified).
+- **Heartbeat**: a single app-level 5s interval (active only while `lockingActive`)
+  reads `editingCellIdRef` and sends `lock.heartbeat`.
+- **Release** on blur, Escape (blurs), `document` `visibilitychange → hidden`
+  (blurs the active cell + releases), and effect cleanup / leaving the map
+  (clears `locks`/`editingCellIdRef` like `peers`). `onmessage` routes
+  `{t:"locks"}` → `setLocks`; `{t:"lock.denied"}` → if it's the cell we just tried,
+  blur the active element (abandon) and let the incoming `locks` frame mark it locked.
+- **Peer-locked render**: a cell locked by another client renders read-only —
+  `EditableCell` takes a fully React-controlled branch (`contentEditable={false}`,
+  `dangerouslySetInnerHTML` for the html, no focus/blur handlers, and the innerHTML
+  effect skips so it doesn't fight React); tags cells drop the add/remove
+  affordances and `onClick`. Both show a `LockBadge` (holder color + `presenceInitials`,
+  `title="Editing: <name>"`) and a `.cell-locked` outline. New CSS `.dc.cell-locked`
+  / `.cell-lock-badge` reuses existing tokens.
+- `applyOrDeferRemote` blur-defer logic is untouched and remains complementary.
+
+**Verification (local: `wrangler dev --local` :8787 + managed static server :8755 +
+browser preview + a throwaway Node `ws` peer; all servers/maps/scripts cleaned up):**
+
+- Server-side (Node peer suite, 10/10 PASS): A reads a real `cell.id` from
+  `doc.sync` → `lock.acquire` broadcasts a `locks` roster with A holding it; a 2nd
+  peer B acquiring the same cell gets `lock.denied` and the roster still shows only
+  A; `lock.heartbeat` keeps it; `lock.release` empties the roster for B; B then
+  acquires; B disconnect → A sees the lock removed; and **idle-hoarder**: A acquires
+  then stops heartbeating (socket open) → within ~TTL the server alarm sweep drops
+  it and broadcasts an empty roster.
+- Browser (real app via preview), no console errors:
+  1. **Peer lock shows up:** Node peer holding a real cell id → the browser renders
+     that cell `.cell-locked`, `contentEditable` removed, with an "AO" badge in the
+     holder's color and `title="Editing: Anonymous Otter"`. Screenshot captured.
+  2. **Edit-intent only:** a pure click on a cell sent `[]` (no `lock.acquire`);
+     focusing it to edit sent exactly one `lock.acquire` (real cell UUID) plus
+     periodic `lock.heartbeat`s. WS frames captured via a `WebSocket.send` patch.
+  3. **Denied:** while the Node peer held cell X, the browser's `lock.acquire` for X
+     received `lock.denied` (matching cellId) and did not steal it.
+  4. **Idle-hoarder expiry (key anti-hoard):** Node peer acquired then stopped
+     heartbeating (socket kept open) → within ~TTL the browser cleared `.cell-locked`
+     and the cell became editable; the peer's log showed the server-broadcast
+     `locks` frame with its own lock dropped (while the browser's concurrently-held
+     lock kept refreshing), proving the alarm swept it with zero holder activity.
+  5. **Disconnect release:** killing the holding peer → the browser cleared the lock
+     promptly.
+  6. **Clean release:** browser focusing a cell then blurring sent exactly one
+     `lock.release`.
+
+Limitations / follow-ups:
+- Advisory + UI-level only (Phase 8 by design): a peer-locked cell is rendered
+  read-only, but the server does not yet hard-reject a write to a locked cell —
+  hard enforcement becomes possible once writes are per-cell in Phase 9. With LWW
+  whole-doc sync, two people could still clobber via cells they each lock at
+  different times; the lock prevents the *same-cell* collision, which is the felt case.
+- The DO alarm is shared with no other current use; if a later phase needs alarms
+  for something else, the handler must multiplex (today it only sweeps locks).
+- Heartbeat is a fixed 5s app-level interval; a lock can therefore appear stale to
+  peers for up to ~TTL after an unclean drop that didn't fire close/error, which is
+  exactly what the sweep covers.
+- Name is still the anonymous presence identity (no editable-name UI yet, same as
+  Phase 3), so the badge shows "Anonymous <animal>" initials.
 
 ### 2026-06-22 — Phase 7 done (stable entity IDs)
 

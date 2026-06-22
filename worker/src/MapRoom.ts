@@ -48,15 +48,21 @@ interface AccessBody {
 // Per-socket data persisted across hibernation via serializeAttachment.
 // Presence fields (clientId/name/color) are ephemeral identity for the avatar
 // stack — they live only here in the attachment, never in SQLite (Phase 3).
+// Cell-lock fields (editingCellId/lockedAt) are the soft advisory lock a socket
+// holds while editing one cell (Phase 8). A socket holds at most one lock.
 interface SocketAttachment {
   role: Role;
   clientId?: string;
   name?: string;
   color?: string;
+  editingCellId?: string;
+  lockedAt?: number;
 }
 
 const MAX_DOC_BYTES = 2 * 1024 * 1024; // 2 MB ceiling per document
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // password sessions live 12 hours
+const LOCK_TTL_MS = 15000; // a lock with no heartbeat for this long is stale (Phase 8)
+const LOCK_SWEEP_MS = 5000; // alarm cadence while any lock is held (idle-hoarder sweep)
 
 export class MapRoom {
   private state: DurableObjectState;
@@ -151,6 +157,7 @@ export class MapRoom {
       clientId?: unknown;
       name?: unknown;
       color?: unknown;
+      cellId?: unknown;
     };
     try {
       msg = JSON.parse(typeof message === "string" ? message : new TextDecoder().decode(message));
@@ -179,7 +186,49 @@ export class MapRoom {
       return;
     }
 
-    if (msg.t !== "doc.push") return; // only doc.push / presence.update handled
+    // Cell locking (Phase 8): soft advisory locks, a separate presence-like
+    // channel layered on top of doc.* sync. Only owner/editor may lock — viewers
+    // cannot edit, so their lock frames are ignored.
+    if (msg.t === "lock.acquire" || msg.t === "lock.heartbeat" || msg.t === "lock.release") {
+      if (role === "viewer") return;
+      const cellId = typeof msg.cellId === "string" ? msg.cellId : undefined;
+      if (!cellId) return;
+
+      if (msg.t === "lock.acquire") {
+        // Deny if a DIFFERENT live socket holds this cell with a fresh lock.
+        const now = Date.now();
+        for (const s of this.state.getWebSockets()) {
+          if (s === ws) continue;
+          const a = s.deserializeAttachment() as SocketAttachment | null;
+          if (a?.editingCellId === cellId && a.lockedAt && now - a.lockedAt < LOCK_TTL_MS) {
+            ws.send(JSON.stringify({ t: "lock.denied", cellId }));
+            return;
+          }
+        }
+        // Grant: take the lock (merge, preserving identity); a socket holds one lock.
+        ws.serializeAttachment({ ...attachment, role, editingCellId: cellId, lockedAt: now });
+        this.broadcastLocks();
+        this.scheduleLockSweep();
+        return;
+      }
+
+      if (msg.t === "lock.heartbeat") {
+        // Refresh our own lock's freshness; no broadcast needed per heartbeat.
+        if (attachment?.editingCellId === cellId) {
+          ws.serializeAttachment({ ...attachment, role, editingCellId: cellId, lockedAt: Date.now() });
+        }
+        return;
+      }
+
+      // lock.release
+      if (attachment?.editingCellId === cellId) {
+        ws.serializeAttachment({ ...attachment, role, editingCellId: undefined, lockedAt: undefined });
+        this.broadcastLocks();
+      }
+      return;
+    }
+
+    if (msg.t !== "doc.push") return; // only doc.push / presence.update / lock.* handled
     if (role === "viewer") return; // viewers cannot mutate
 
     const journeys = Array.isArray(msg.journeys) ? msg.journeys : [];
@@ -222,13 +271,16 @@ export class MapRoom {
       /* already closed */
     }
     // Tell remaining peers this socket has left (exclude the departing one).
+    // Its lock dies with its attachment, so refresh the lock roster too (Phase 8).
     this.broadcastPresence(ws);
+    this.broadcastLocks(ws);
   }
 
   async webSocketError(ws: WebSocket, _err: unknown): Promise<void> {
-    // Presence lives in the attachment; just refresh the roster for the peers
+    // Presence + locks live in the attachment; refresh both rosters for the peers
     // (excluding the failing socket, which may still appear in getWebSockets()).
     this.broadcastPresence(ws);
+    this.broadcastLocks(ws);
   }
 
   /**
@@ -256,6 +308,82 @@ export class MapRoom {
         /* peer going away; ignore */
       }
     }
+  }
+
+  /**
+   * Build and broadcast the current cell-lock roster (Phase 8). Mirrors
+   * broadcastPresence: reads each socket's attachment, includes only locks that
+   * are fresh (lockedAt within LOCK_TTL_MS) and have a clientId, and sends the
+   * full list to EVERY socket (holder included — clients filter their own
+   * clientId so their own lock never locks them out). `except` skips one socket,
+   * used on close/error so a departing socket's lock is not counted.
+   */
+  private broadcastLocks(except?: WebSocket): void {
+    const sockets = this.state.getWebSockets();
+    const now = Date.now();
+    const locks: Array<{
+      cellId: string;
+      clientId: string;
+      name?: string;
+      color?: string;
+      lockedAt: number;
+    }> = [];
+    for (const s of sockets) {
+      if (s === except) continue;
+      const a = s.deserializeAttachment() as SocketAttachment | null;
+      if (!a || !a.editingCellId || !a.clientId || !a.lockedAt) continue;
+      if (now - a.lockedAt >= LOCK_TTL_MS) continue; // stale; ignore
+      locks.push({
+        cellId: a.editingCellId,
+        clientId: a.clientId,
+        name: a.name,
+        color: a.color,
+        lockedAt: a.lockedAt,
+      });
+    }
+    const frame = JSON.stringify({ t: "locks", locks });
+    for (const s of sockets) {
+      if (s === except) continue;
+      try {
+        s.send(frame);
+      } catch {
+        /* peer going away; ignore */
+      }
+    }
+  }
+
+  /**
+   * Schedule the idle-hoarder sweep (Phase 8). With no socket events nothing
+   * re-broadcasts, so a lock whose holder keeps the socket open but stops
+   * heartbeating would linger visually forever. A DO alarm sweeps stale locks
+   * within ~TTL even with zero other activity.
+   */
+  private scheduleLockSweep(): void {
+    // Only schedule if not already pending (cheap; setAlarm overwrites anyway).
+    this.state.storage.setAlarm(Date.now() + LOCK_SWEEP_MS);
+  }
+
+  /**
+   * Alarm handler (Phase 8): drop any stale locks (clear editingCellId/lockedAt
+   * on those sockets), re-broadcast the roster, and reschedule while any FRESH
+   * lock remains so an idle-hoarder lock demonstrably expires.
+   */
+  async alarm(): Promise<void> {
+    const now = Date.now();
+    let changed = false;
+    let freshRemains = false;
+    for (const s of this.state.getWebSockets()) {
+      const a = s.deserializeAttachment() as SocketAttachment | null;
+      if (!a || !a.editingCellId || !a.lockedAt) continue;
+      if (now - a.lockedAt >= LOCK_TTL_MS) {
+        s.serializeAttachment({ ...a, editingCellId: undefined, lockedAt: undefined });
+        changed = true;
+      } else {
+        freshRemains = true;
+      }
+    }
+    if (changed) this.broadcastLocks();
+    if (freshRemains) this.scheduleLockSweep();
   }
 
   /** Build a doc.sync / doc.update / doc.reject envelope from current state. */
