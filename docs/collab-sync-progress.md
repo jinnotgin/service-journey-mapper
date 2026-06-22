@@ -14,9 +14,130 @@ See `collab-sync.md` for the design.
 - [x] **Phase 6** — Stop sharing / delete cloud map (owner)
 - [x] **Phase 7** — Stable entity IDs (journey/stage/column/sub-journey/row/cell), backfilled on hydrate — prerequisite for 8 & 9
 - [x] **Phase 8** — Cell locking (soft, presence-driven advisory locks; acquire on edit-intent, heartbeat/TTL anti-hoard, release on blur/disconnect) — verified locally (Worker + browser + Node peer)
-- [ ] **Phase 9** — Atomic op-based sync: `cell.set` content patches (per-cell LWW) + structural ops (row add/delete/move, column add/delete/move, stage/sub-journey/journey ops), version-gated with whole-doc resync fallback
+- [x] **Phase 9** — Atomic op-based sync: `cell.set` content patches (per-cell LWW) + structural ops (row add/delete/move, column add/delete/move, stage/sub-journey/journey ops), version-gated with whole-doc resync fallback
 
 ## Log
+
+### 2026-06-22 — Phase 9 done (atomic op-based sync)
+
+Phase 9 replaces the synced client's ordinary whole-document write path with
+atomic operations keyed by Phase-7 stable ids. The Worker still stores one
+whole-document snapshot per map and still hydrates with `doc.sync`; the wire
+format is now granular for edits, with `doc.reject` kept as the universal
+resync backstop.
+
+Wire protocol added:
+
+```
+content:
+  { t:"cell.set", cellId, fields:{html?,tags?,mode?,align?}, ts }
+
+structural:
+  row.insert/delete/move/setType/setLabel/setColor
+  column.insert/delete/move
+  stage.insert/delete/move/setLabel/setNum
+  substage.insert/delete/move/setLabel
+  subjourney.insert/delete/move/setLabel
+  journey.insert/delete/move/rename/setStageLabel
+```
+
+Concurrency model:
+
+- `cell.set` is **not** globally version-gated. The Worker applies it by
+  `cell.id` anywhere in the snapshot and uses a per-cell timestamp map in DO
+  metadata as the LWW backstop (`ts < lastTs` is ignored). It persists the same
+  snapshot version and broadcasts only `{t:"cell.set",cellId,fields,ts}` to other
+  sockets. Different cells commute and no longer clobber each other.
+- Structural ops carry `baseVersion` and are serialized through the global
+  document version. The Worker accepts only when `baseVersion === currentVersion`,
+  applies the op to its snapshot, bumps `version`, and broadcasts the single op
+  plus `version` to other clients. Stale version, unknown id, malformed op, size
+  cap overflow, or unhandled op path all reply to the sender with
+  `doc.reject {version, journeys}`.
+
+Worker changes:
+
+- Added `worker/src/ops.ts`, the id-keyed op applier. It returns a cloned next
+  `journeys` array or `null` to signal "cannot apply; resync". It covers content,
+  row, column, stage, sub-stage, sub-journey, and journey ops, including the
+  local row color / stage number / stage-label mutations the UI exposes.
+- `worker/src/MapRoom.ts` now routes `cell.set` and structural prefixes before
+  legacy `doc.push`. `doc.push` remains for old-client migration; accepted old
+  pushes still version-gate and broadcast `doc.update`.
+- Added snapshot helpers (`currentJourneys`, `persistSnapshot`) and `cellTs`
+  metadata for per-cell LWW. Snapshot size cap remains enforced for both content
+  and structural writes. Hydrate / single-snapshot-row storage are unchanged.
+
+Client changes:
+
+- Ported the same `applyOp` logic into `index.html` so inbound ops and local
+  optimistic ops converge with the Worker.
+- Added `emitOp` / `commitOp` wiring. Local cell edits now emit `cell.set` with
+  only changed fields; row, stage, sub-stage, sub-journey, and journey actions
+  emit structural ops with `baseVersion` added at send time. Structural sends
+  optimistically advance `syncVersionRef`; server rejection still resyncs via
+  `doc.reject`.
+- Inbound op handling now applies `cell.set` immediately unless it targets the
+  currently edited `cell.id`; only that case is deferred until blur. Whole-doc
+  `doc.sync` / `doc.update` / `doc.reject` still use the existing defer path.
+- The old "push whole journeys on every state change" effect is now intentionally
+  inert for this client. Undo/redo remain local snapshot stacks; a future phase
+  should add snapshot-diff op emission or explicit synced undo semantics.
+
+Column reconciliation:
+
+- Column ops are journey-wide. `column.insert` inserts a header leaf (as a
+  top-level stage when called directly) and adds one client-minted cell id per
+  row. `column.delete` removes the header leaf and drops the corresponding leaf
+  from every row. `column.move` reorders the header leaf and moves the matching
+  leaf-cell range in every row. Divider rows collapse back to one full-width
+  cell after each operation, and non-divider row widths continue to match
+  `totalLeaves(stages)`.
+- Stage and sub-stage insert/delete/move use the same leaf-range reconciliation
+  so multi-leaf stage moves carry their row cell ranges with them.
+
+Verification:
+
+- `cd worker && npx tsc --noEmit` passes.
+- Local Worker: `npx wrangler dev --local --port 8787`; static app:
+  `python3 -m http.server 8788 --bind 127.0.0.1`.
+- Two-peer protocol verification used a disposable Node WebSocket harness
+  against the local Worker. It created a throwaway map, connected owner/editor
+  sockets, and deleted the map at the end.
+- Concurrent different-cell content edits: peer A sent
+  `cell.set c11 {html:"A edit"}` while peer B sent
+  `cell.set c22 {html:"B edit"}` in the same version era. Both edits survived
+  in the Worker snapshot, and each peer received a granular `cell.set` frame
+  containing only `cellId`, `fields`, and `ts` (no `journeys` blob).
+- Structural round-trip coverage: row insert/move/setType/delete; column
+  insert/move/delete with every row width checked against the stage leaf count;
+  stage insert/move/setLabel/delete; substage insert/move/setLabel/delete;
+  subjourney insert/move/setLabel/delete; journey insert/move/rename/
+  setStageLabel/delete. After each accepted op, the peer saw the op with the
+  incremented `version`, and hydrate matched expected ids/structure.
+- Stale structural op: sending `row.insert` with old `baseVersion:1` after the
+  document had advanced returned `doc.reject` with the current snapshot.
+- Fallback: sending `row.delete` for an unknown row id returned `doc.reject`
+  without corrupting the snapshot.
+- Phase 8 regression check: `lock.acquire` / `lock.release` still broadcast the
+  expected `locks` roster. Browser load smoke test on `http://localhost:8788`
+  had no console errors; browser automation did not reliably trigger the
+  uncontrolled `contentEditable` blur commit, so the hard concurrency evidence
+  is the two-WebSocket harness.
+
+Limitations / follow-ups:
+
+- Undo/redo are still local whole-snapshot stacks. Synced undo should either
+  emit a calculated op sequence or introduce an explicit collaborative undo
+  model; it is intentionally not solved in Phase 9.
+- Old/new migration: new clients still hydrate with `doc.sync` and handle
+  `doc.update` / `doc.reject`; the Worker still accepts legacy `doc.push`.
+  A legacy client can still send whole-document writes and may overwrite content
+  through the old version-gated path, so mixed-client sessions are compatible but
+  only fully atomic once all active editors speak ops.
+- `column.move` supports top-level stage leaves and same-parent sub-stage leaves.
+  Moving a sub-stage leaf across parent stages should be modeled as delete+insert
+  or promoted to a future explicit cross-parent operation if the UI adds it.
 
 ### 2026-06-22 — Phase 8 done (cell locking)
 

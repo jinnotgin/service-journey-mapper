@@ -11,6 +11,7 @@ import {
   hashPassword,
   verifyPassword,
 } from "./util";
+import { applyOp, isContentOp, Op } from "./ops";
 
 interface InitBody {
   mapId: string;
@@ -153,11 +154,15 @@ export class MapRoom {
     let msg: {
       t?: string;
       version?: number;
+      baseVersion?: number;
       journeys?: unknown;
       clientId?: unknown;
       name?: unknown;
       color?: unknown;
       cellId?: unknown;
+      ts?: unknown;
+      // Phase 9 op fields are read generically via the parsed object.
+      [k: string]: unknown;
     };
     try {
       msg = JSON.parse(typeof message === "string" ? message : new TextDecoder().decode(message));
@@ -228,8 +233,21 @@ export class MapRoom {
       return;
     }
 
-    if (msg.t !== "doc.push") return; // only doc.push / presence.update / lock.* handled
-    if (role === "viewer") return; // viewers cannot mutate
+    if (role === "viewer") return; // viewers cannot mutate (doc.push / ops alike)
+
+    // ── Phase 9: atomic op-based sync ─────────────────────────────────────
+    // The server keeps the whole-document snapshot as source of truth, applies
+    // each op to it, and re-broadcasts the single op (not the whole blob).
+    if (msg.t === "cell.set" || this.isStructuralOp(msg.t)) {
+      this.handleOp(ws, msg as unknown as Op & { baseVersion?: number; ts?: number });
+      return;
+    }
+
+    // ── Legacy whole-document push (Phase 2) ──────────────────────────────
+    // Kept for protocol migration: a client still on the old whole-doc path can
+    // share a map with new op-speaking clients and vice versa. Accept/reject by
+    // the same LWW version gate, then broadcast as a structural full snapshot.
+    if (msg.t !== "doc.push") return;
 
     const journeys = Array.isArray(msg.journeys) ? msg.journeys : [];
     const docJson = JSON.stringify(journeys);
@@ -246,18 +264,138 @@ export class MapRoom {
 
     const newVersion = currentVersion + 1;
     const now = Date.now();
-    this.sql.exec("INSERT INTO snapshot (version, json) VALUES (?, ?)", newVersion, docJson);
-    // Keep only the latest snapshot to bound storage.
-    this.sql.exec("DELETE FROM snapshot WHERE version <> ?", newVersion);
-    this.setMeta("version", String(newVersion));
-    this.setMeta("updatedAt", String(now));
+    this.persistSnapshot(journeys, newVersion, now);
 
     // Broadcast the accepted doc to every OTHER connected client.
     const update = JSON.stringify({ t: "doc.update", version: newVersion, journeys });
+    this.broadcastExcept(ws, update);
+  }
+
+  // ── Phase 9 op handling ─────────────────────────────────────────────────
+
+  /** True for every structural op (those serialized through the global version). */
+  private isStructuralOp(t: string | undefined): boolean {
+    if (!t) return false;
+    return (
+      t.startsWith("row.") ||
+      t.startsWith("column.") ||
+      t.startsWith("stage.") ||
+      t.startsWith("substage.") ||
+      t.startsWith("subjourney.") ||
+      t.startsWith("journey.")
+    );
+  }
+
+  /**
+   * Apply a single op to the snapshot and broadcast it. Two concurrency classes:
+   *
+   *  A. cell.set — content, NOT version-gated. Per-cell last-write-wins by `ts`:
+   *     an incoming write older than the cell's last recorded `ts` is ignored.
+   *     Different cells never conflict; the same cell is also protected by the
+   *     Phase-8 lock, with `ts` as the backstop. Broadcast to OTHER clients.
+   *
+   *  B. structural — serialized through the global `version`. Carries
+   *     `baseVersion`; accepted iff `baseVersion === currentVersion`, then the
+   *     version bumps, the snapshot mutates, and the op (+ new version) is
+   *     broadcast to OTHER clients. A stale base, an unknown id, or any op that
+   *     `applyOp` cannot apply cleanly → reply `doc.reject` (full snapshot) to
+   *     the sender so the stale client resyncs. This whole-doc resync is the
+   *     universal convergence backstop.
+   */
+  private handleOp(ws: WebSocket, op: Op & { baseVersion?: number; ts?: number }): void {
+    const currentVersion = Number(this.getMeta("version") || "1");
+    const journeys = this.currentJourneys();
+    const now = Date.now();
+
+    if (isContentOp(op.t)) {
+      // Per-cell LWW: ignore an out-of-order (older) write to the same cell.
+      const cellId = typeof op.cellId === "string" ? op.cellId : null;
+      const ts = typeof op.ts === "number" ? op.ts : now;
+      if (!cellId) return;
+      const tsMap = this.cellTsMap();
+      const lastTs = tsMap[cellId] || 0;
+      if (ts < lastTs) return; // stale write, drop silently
+      const next = applyOp(journeys, op);
+      if (!next) {
+        // Unknown cell id (e.g. raced a structural delete) → resync.
+        ws.send(JSON.stringify(this.docMessage("doc.reject")));
+        return;
+      }
+      if (JSON.stringify(next).length > MAX_DOC_BYTES) {
+        ws.send(JSON.stringify(this.docMessage("doc.reject")));
+        return;
+      }
+      tsMap[cellId] = ts;
+      this.setMeta("cellTs", JSON.stringify(tsMap));
+      // cell.set does NOT bump the global version (content is commutative).
+      this.persistSnapshot(next, currentVersion, now);
+      const frame = JSON.stringify({ t: "cell.set", cellId, fields: op.fields, ts });
+      this.broadcastExcept(ws, frame);
+      return;
+    }
+
+    // Structural op: version-gated.
+    if (Number(op.baseVersion) !== currentVersion) {
+      ws.send(JSON.stringify(this.docMessage("doc.reject")));
+      return;
+    }
+    const next = applyOp(journeys, op);
+    if (!next) {
+      // Unknown id / malformed / un-special-cased → full resync (the backstop).
+      ws.send(JSON.stringify(this.docMessage("doc.reject")));
+      return;
+    }
+    const docJson = JSON.stringify(next);
+    if (docJson.length > MAX_DOC_BYTES) {
+      ws.send(JSON.stringify(this.docMessage("doc.reject")));
+      return;
+    }
+    const newVersion = currentVersion + 1;
+    this.persistSnapshot(next, newVersion, now);
+    // Re-broadcast the op (+ the new version) to OTHER clients. They apply it by
+    // id to their local journeys and adopt `version`.
+    const frame = JSON.stringify({ ...op, version: newVersion });
+    this.broadcastExcept(ws, frame);
+  }
+
+  /** The current whole-document snapshot as a parsed journeys array. */
+  private currentJourneys(): unknown[] {
+    const version = Number(this.getMeta("version") || "1");
+    const row = this.sql.exec("SELECT json FROM snapshot WHERE version = ?", version).toArray()[0];
+    return row ? (JSON.parse(row.json as string) as unknown[]) : [];
+  }
+
+  /** Persist a snapshot at `version` (prune older rows) and bump updatedAt. */
+  private persistSnapshot(journeys: unknown, version: number, now: number): void {
+    const docJson = JSON.stringify(journeys);
+    this.sql.exec(
+      "INSERT INTO snapshot (version, json) VALUES (?, ?) ON CONFLICT(version) DO UPDATE SET json = excluded.json",
+      version,
+      docJson,
+    );
+    this.sql.exec("DELETE FROM snapshot WHERE version <> ?", version);
+    this.setMeta("version", String(version));
+    this.setMeta("updatedAt", String(now));
+  }
+
+  /** Per-cell last-write timestamps for cell.set LWW (stored as one meta blob). */
+  private cellTsMap(): Record<string, number> {
+    const raw = this.getMeta("cellTs");
+    if (!raw) return {};
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? (parsed as Record<string, number>) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  /** Send a frame to every connected socket except `ws`. */
+  private broadcastExcept(ws: WebSocket, frame: string): void {
     for (const peer of this.state.getWebSockets()) {
       if (peer === ws) continue;
       try {
-        peer.send(update);
+        peer.send(frame);
       } catch {
         /* peer going away; ignore */
       }

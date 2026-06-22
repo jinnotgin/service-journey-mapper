@@ -688,6 +688,389 @@ function hydrate(journeys) {
     });
 }
 
+// ═══════════════════════════════════════
+// PHASE 9 — atomic op-based sync: applyOp
+// ═══════════════════════════════════════
+// Mirror of worker/src/ops.ts. Applies a single op to a journeys array BY ID
+// (never by array index) so the client and the Worker (and every peer) converge
+// on a byte-identical tree. Returns the next journeys array, or null when the op
+// cannot be applied cleanly (unknown id) — the inbound handler then waits for the
+// server's doc.reject full-snapshot resync (the universal convergence backstop).
+//
+// Used for INBOUND remote ops only. Locally, the existing immutable updaters do
+// the optimistic mutation and emit the matching op; we never re-apply our own.
+
+// Id-aware leaf insert: like insertLeafIntoRow but uses a supplied cell id so
+// every peer mints the SAME id for a new column cell.
+function insertLeafWithId(cells, at, cellId) {
+    let pos = 0;
+    for (let i = 0; i < cells.length; i++) {
+        const w = cells[i].colspan || 1;
+        if (at < pos + w) {
+            const nc = cells.slice();
+            if (at === pos) nc.splice(i, 0, { id: cellId || newId(), mode: "text", html: "", align: "left" });
+            else nc[i] = { ...nc[i], colspan: w + 1 };
+            return nc;
+        }
+        pos += w;
+    }
+    return [...cells, { id: cellId || newId(), mode: "text", html: "", align: "left" }];
+}
+
+const opFindJourney = (J, id) => { const i = J.findIndex((j) => j.id === id); return i < 0 ? null : { idx: i, j: J[i] }; };
+const opColumnLeafIndex = (stages, columnId) => {
+    let leaf = 0;
+    for (const s of stages || []) {
+        const subs = s.subStages || [];
+        if (s.id === columnId) return leaf;
+        if (subs.length) { for (const ss of subs) { if (ss.id === columnId) return leaf; leaf++; } }
+        else leaf++;
+    }
+    return -1;
+};
+const opLocateColumn = (stages, columnId) => {
+    let leafIdx = 0;
+    for (let stageIdx = 0; stageIdx < (stages || []).length; stageIdx++) {
+        const s = stages[stageIdx];
+        const subs = s.subStages || [];
+        if (s.id === columnId && !subs.length) return { stageIdx, subIdx: null, leafIdx };
+        if (subs.length) {
+            for (let subIdx = 0; subIdx < subs.length; subIdx++) {
+                if (subs[subIdx].id === columnId) return { stageIdx, subIdx, leafIdx };
+                leafIdx++;
+            }
+        } else leafIdx++;
+    }
+    return null;
+};
+const opLocateRow = (J, rowId) => {
+    for (let jIdx = 0; jIdx < J.length; jIdx++) {
+        const sjs = J[jIdx].subJourneys || [];
+        for (let sjIdx = 0; sjIdx < sjs.length; sjIdx++) {
+            const r = (sjs[sjIdx].rows || []).findIndex((x) => x.id === rowId);
+            if (r >= 0) return { jIdx, sjIdx, rowIdx: r };
+        }
+    }
+    return null;
+};
+const opInsertAfter = (arr, afterId, item) => {
+    if (afterId == null) return [item, ...arr];
+    const at = arr.findIndex((x) => x.id === afterId);
+    if (at < 0) return null;
+    const next = arr.slice(); next.splice(at + 1, 0, item); return next;
+};
+const opMoveAfter = (arr, id, afterId) => {
+    const from = arr.findIndex((x) => x.id === id);
+    if (from < 0) return null;
+    const without = arr.slice(); const [moved] = without.splice(from, 1);
+    if (afterId == null) return [moved, ...without];
+    const at = without.findIndex((x) => x.id === afterId);
+    if (at < 0) return null;
+    without.splice(at + 1, 0, moved); return without;
+};
+const opMapRows = (j, fn) => ({
+    ...j,
+    subJourneys: (j.subJourneys || []).map((sj) => ({
+        ...sj, rows: (sj.rows || []).map((r) => ({ ...r, cells: fn(r.cells || [], r) })),
+    })),
+});
+const opReplaceJourney = (J, idx, nj) => { const n = J.slice(); n[idx] = nj; return n; };
+
+function applyOp(journeys, op) {
+    if (!op || typeof op.t !== "string") return null;
+    const J = Array.isArray(journeys) ? journeys : [];
+    switch (op.t) {
+        case "cell.set": {
+            if (!op.cellId) return null;
+            const f = op.fields || {};
+            let found = false;
+            const next = J.map((j) => ({ ...j, subJourneys: (j.subJourneys || []).map((sj) => ({
+                ...sj, rows: (sj.rows || []).map((r) => ({ ...r, cells: (r.cells || []).map((c) => {
+                    if (c.id !== op.cellId) return c;
+                    found = true;
+                    const nc = { ...c };
+                    if ("html" in f) nc.html = f.html;
+                    if ("tags" in f) nc.tags = f.tags;
+                    if ("mode" in f) nc.mode = f.mode;
+                    if ("align" in f) nc.align = f.align;
+                    return nc;
+                }) })),
+            })) }));
+            return found ? next : null;
+        }
+        case "row.insert": {
+            for (let jIdx = 0; jIdx < J.length; jIdx++) {
+                const sjs = J[jIdx].subJourneys || [];
+                const sjIdx = sjs.findIndex((sj) => sj.id === op.subJourneyId);
+                if (sjIdx < 0) continue;
+                const total = totalLeaves(J[jIdx].stages || []);
+                let cells = normalizeRowCells(op.row.cells || [], total);
+                if (op.row.rowType === DIVIDER_TYPE) cells = collapseDivider(cells, total);
+                const rows = opInsertAfter(sjs[sjIdx].rows || [], op.afterRowId ?? null, { ...op.row, cells });
+                if (!rows) return null;
+                const nsjs = sjs.slice(); nsjs[sjIdx] = { ...sjs[sjIdx], rows };
+                return opReplaceJourney(J, jIdx, { ...J[jIdx], subJourneys: nsjs });
+            }
+            return null;
+        }
+        case "row.delete": {
+            const loc = opLocateRow(J, op.rowId); if (!loc) return null;
+            const j = J[loc.jIdx]; const nsjs = (j.subJourneys || []).slice();
+            nsjs[loc.sjIdx] = { ...nsjs[loc.sjIdx], rows: (nsjs[loc.sjIdx].rows || []).filter((r) => r.id !== op.rowId) };
+            return opReplaceJourney(J, loc.jIdx, { ...j, subJourneys: nsjs });
+        }
+        case "row.move": {
+            const loc = opLocateRow(J, op.rowId); if (!loc) return null;
+            const j = J[loc.jIdx]; const nsjs = (j.subJourneys || []).slice();
+            const rows = opMoveAfter(nsjs[loc.sjIdx].rows || [], op.rowId, op.afterRowId ?? null);
+            if (!rows) return null;
+            nsjs[loc.sjIdx] = { ...nsjs[loc.sjIdx], rows };
+            return opReplaceJourney(J, loc.jIdx, { ...j, subJourneys: nsjs });
+        }
+        case "row.setType": {
+            const loc = opLocateRow(J, op.rowId); if (!loc) return null;
+            const j = J[loc.jIdx]; const total = totalLeaves(j.stages || []);
+            const nsjs = (j.subJourneys || []).slice(); const rows = (nsjs[loc.sjIdx].rows || []).slice();
+            const cur = rows[loc.rowIdx];
+            const wasDivider = cur.rowType === DIVIDER_TYPE, willDivider = op.rowType === DIVIDER_TYPE;
+            let cells = cur.cells || [];
+            if (willDivider && !wasDivider) cells = collapseDivider(cells, total);
+            else if (!willDivider && wasDivider) cells = expandDivider(cells, total);
+            rows[loc.rowIdx] = { ...cur, rowType: op.rowType, cells };
+            nsjs[loc.sjIdx] = { ...nsjs[loc.sjIdx], rows };
+            return opReplaceJourney(J, loc.jIdx, { ...j, subJourneys: nsjs });
+        }
+        case "row.setLabel": case "row.setColor": {
+            const loc = opLocateRow(J, op.rowId); if (!loc) return null;
+            const j = J[loc.jIdx]; const nsjs = (j.subJourneys || []).slice();
+            const rows = (nsjs[loc.sjIdx].rows || []).slice();
+            rows[loc.rowIdx] = op.t === "row.setLabel"
+                ? { ...rows[loc.rowIdx], laneLabel: op.label }
+                : { ...rows[loc.rowIdx], customColor: op.color || undefined };
+            nsjs[loc.sjIdx] = { ...nsjs[loc.sjIdx], rows };
+            return opReplaceJourney(J, loc.jIdx, { ...j, subJourneys: nsjs });
+        }
+        case "column.insert": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).slice();
+            const newColumnId = op.columnId || op.stageId; if (!newColumnId) return null;
+            let leafIdx, insertStageIdx;
+            if ((op.afterColumnId ?? null) == null) { leafIdx = 0; insertStageIdx = 0; }
+            else {
+                const loc = opLocateColumn(stages, op.afterColumnId); if (!loc) return null;
+                leafIdx = loc.leafIdx + 1; insertStageIdx = loc.stageIdx + 1;
+            }
+            stages.splice(insertStageIdx, 0, op.stage || { id: newColumnId, title: "New Stage", subStages: [] });
+            const cellIds = op.cellIds || {};
+            const nj = opMapRows({ ...f.j, stages }, (cells, row) => row.rowType === DIVIDER_TYPE
+                ? collapseDivider(cells, totalLeaves(stages))
+                : insertLeafWithId(cells, leafIdx, row.id ? cellIds[row.id] : undefined));
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "column.delete": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
+            const loc = opLocateColumn(stages, op.columnId); if (!loc) return null;
+            const leafIdx = loc.leafIdx;
+            if (loc.subIdx == null) stages.splice(loc.stageIdx, 1);
+            else stages[loc.stageIdx].subStages.splice(loc.subIdx, 1);
+            const newTotal = Math.max(totalLeaves(stages), 1);
+            const nj = opMapRows({ ...f.j, stages }, (cells, row) => row.rowType === DIVIDER_TYPE
+                ? collapseDivider(cells, newTotal) : removeLeafFromRow(cells, leafIdx));
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "column.move": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
+            const loc = opLocateColumn(stages, op.columnId); if (!loc) return null;
+            const from = loc.leafIdx;
+            let to;
+            if ((op.afterColumnId ?? null) == null) to = 0;
+            else { const al = opLocateColumn(stages, op.afterColumnId); if (!al) return null; to = al.leafIdx + 1; }
+            if (loc.subIdx == null) {
+                const afterLoc = (op.afterColumnId ?? null) == null ? null : opLocateColumn(stages, op.afterColumnId);
+                const afterStageId = afterLoc ? stages[afterLoc.stageIdx].id : null;
+                const movedStages = opMoveAfter(stages, op.columnId, afterStageId);
+                if (!movedStages) return null;
+                stages.splice(0, stages.length, ...movedStages);
+            } else if ((op.afterColumnId ?? null) == null || opLocateColumn(stages, op.afterColumnId)?.stageIdx === loc.stageIdx) {
+                const subs = stages[loc.stageIdx].subStages;
+                const movedSubs = opMoveAfter(subs, op.columnId, op.afterColumnId ?? null);
+                if (!movedSubs) return null;
+                stages[loc.stageIdx] = { ...stages[loc.stageIdx], subStages: movedSubs };
+            }
+            const nj = { ...f.j, stages, subJourneys: (f.j.subJourneys || []).map((sj) => ({
+                ...sj, rows: (sj.rows || []).map((r) => moveLeafRangeInRow(r, from, 1, to)),
+            })) };
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "stage.insert": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).slice();
+            const inserted = opInsertAfter(stages, op.afterStageId ?? null, op.stage); if (!inserted) return null;
+            const insertIdx = (op.afterStageId ?? null) == null ? 0 : inserted.findIndex((s) => s.id === op.stage.id);
+            const leafIdx = leafStart(inserted, insertIdx);
+            const addLeaves = leafCount(op.stage);
+            const cellIds = op.cellIds || {};
+            const nj = opMapRows({ ...f.j, stages: inserted }, (cells, row) => {
+                if (row.rowType === DIVIDER_TYPE) return collapseDivider(cells, totalLeaves(inserted));
+                let c = cells; const ids = row.id ? cellIds[row.id] : undefined;
+                for (let k = 0; k < addLeaves; k++) c = insertLeafWithId(c, leafIdx + k, ids ? ids[k] : undefined);
+                return c;
+            });
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "stage.delete": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).slice();
+            const sIdx = stages.findIndex((s) => s.id === op.stageId); if (sIdx < 0) return null;
+            const start = leafStart(stages, sIdx), cnt = leafCount(stages[sIdx]);
+            stages.splice(sIdx, 1);
+            const newTotal = Math.max(totalLeaves(stages), 1);
+            const nj = opMapRows({ ...f.j, stages }, (cells, row) => {
+                if (row.rowType === DIVIDER_TYPE) return collapseDivider(cells, newTotal);
+                let c = cells; for (let k = 0; k < cnt; k++) c = removeLeafFromRow(c, start); return c;
+            });
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "stage.move": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).slice();
+            const fromIdx = stages.findIndex((s) => s.id === op.stageId); if (fromIdx < 0) return null;
+            let toIdx;
+            if ((op.afterStageId ?? null) == null) toIdx = 0;
+            else { const ai = stages.findIndex((s) => s.id === op.afterStageId); if (ai < 0) return null; toIdx = ai + 1; }
+            const start = leafStart(stages, fromIdx), cnt = leafCount(stages[fromIdx]), target = leafStart(stages, toIdx);
+            const movedStages = moveArrayRange(stages, fromIdx, 1, toIdx);
+            if (movedStages === stages) return opReplaceJourney(J, f.idx, { ...f.j });
+            const nj = { ...f.j, stages: movedStages, subJourneys: (f.j.subJourneys || []).map((sj) => ({
+                ...sj, rows: (sj.rows || []).map((r) => moveLeafRangeInRow(r, start, cnt, target)),
+            })) };
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "stage.setLabel": case "stage.setNum": {
+            for (let jIdx = 0; jIdx < J.length; jIdx++) {
+                const stages = (J[jIdx].stages || []).slice();
+                const sIdx = stages.findIndex((s) => s.id === op.stageId); if (sIdx < 0) continue;
+                stages[sIdx] = op.t === "stage.setLabel" ? { ...stages[sIdx], title: op.label } : { ...stages[sIdx], num: op.num };
+                return opReplaceJourney(J, jIdx, { ...J[jIdx], stages });
+            }
+            return null;
+        }
+        case "substage.insert": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
+            const sIdx = stages.findIndex((s) => s.id === op.stageId); if (sIdx < 0) return null;
+            const before = stages[sIdx].subStages.length;
+            const subs = opInsertAfter(stages[sIdx].subStages, op.afterSubStageId ?? null, op.subStage); if (!subs) return null;
+            stages[sIdx] = { ...stages[sIdx], subStages: subs };
+            const oldL = Math.max(before, 1), newL = Math.max(before + 1, 1);
+            if (newL <= oldL) return opReplaceJourney(J, f.idx, { ...f.j, stages });
+            const localIdx = subs.findIndex((s) => s.id === op.subStage.id);
+            const gi = leafStart(stages, sIdx) + localIdx;
+            const cellIds = op.cellIds || {};
+            const nj = opMapRows({ ...f.j, stages }, (cells, row) => row.rowType === DIVIDER_TYPE
+                ? collapseDivider(cells, totalLeaves(stages))
+                : insertLeafWithId(cells, gi, row.id ? cellIds[row.id] : undefined));
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "substage.delete": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
+            const sIdx = stages.findIndex((s) => s.id === op.stageId); if (sIdx < 0) return null;
+            const subs = stages[sIdx].subStages;
+            const subIdx = subs.findIndex((s) => s.id === op.subStageId); if (subIdx < 0) return null;
+            const before = subs.length; subs.splice(subIdx, 1);
+            const oldL = Math.max(before, 1), newL = Math.max(before - 1, 1);
+            if (newL >= oldL) return opReplaceJourney(J, f.idx, { ...f.j, stages });
+            const gi = leafStart(stages, sIdx) + Math.min(subIdx, oldL - 1);
+            const nj = opMapRows({ ...f.j, stages }, (cells, row) => row.rowType === DIVIDER_TYPE
+                ? collapseDivider(cells, Math.max(totalLeaves(stages), 1))
+                : removeLeafFromRow(cells, gi));
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "substage.move": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
+            const sIdx = stages.findIndex((s) => s.id === op.stageId); if (sIdx < 0) return null;
+            const subs = stages[sIdx].subStages;
+            const fromIdx = subs.findIndex((s) => s.id === op.subStageId);
+            if (fromIdx < 0 || subs.length <= 1) return null;
+            let toIdx;
+            if ((op.afterSubStageId ?? null) == null) toIdx = 0;
+            else { const ai = subs.findIndex((s) => s.id === op.afterSubStageId); if (ai < 0) return null; toIdx = ai + 1; }
+            const start = leafStart(stages, sIdx), fromLeaf = start + fromIdx, toLeaf = start + toIdx;
+            const movedSubs = moveArrayRange(subs, fromIdx, 1, toIdx);
+            if (movedSubs === subs) return opReplaceJourney(J, f.idx, { ...f.j });
+            stages[sIdx] = { ...stages[sIdx], subStages: movedSubs };
+            const nj = { ...f.j, stages, subJourneys: (f.j.subJourneys || []).map((sj) => ({
+                ...sj, rows: (sj.rows || []).map((r) => moveLeafRangeInRow(r, fromLeaf, 1, toLeaf)),
+            })) };
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "substage.setLabel": {
+            for (let jIdx = 0; jIdx < J.length; jIdx++) {
+                const stages = (J[jIdx].stages || []).map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
+                const sIdx = stages.findIndex((s) => s.id === op.stageId); if (sIdx < 0) continue;
+                const subIdx = stages[sIdx].subStages.findIndex((s) => s.id === op.subStageId); if (subIdx < 0) return null;
+                stages[sIdx].subStages[subIdx] = { ...stages[sIdx].subStages[subIdx], title: op.label };
+                return opReplaceJourney(J, jIdx, { ...J[jIdx], stages });
+            }
+            return null;
+        }
+        case "subjourney.insert": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const sjs = opInsertAfter(f.j.subJourneys || [], op.afterSubJourneyId ?? null, op.subJourney); if (!sjs) return null;
+            return opReplaceJourney(J, f.idx, { ...f.j, subJourneys: sjs });
+        }
+        case "subjourney.delete": {
+            for (let jIdx = 0; jIdx < J.length; jIdx++) {
+                const sjs = J[jIdx].subJourneys || [];
+                if (!sjs.some((sj) => sj.id === op.subJourneyId)) continue;
+                return opReplaceJourney(J, jIdx, { ...J[jIdx], subJourneys: sjs.filter((sj) => sj.id !== op.subJourneyId) });
+            }
+            return null;
+        }
+        case "subjourney.move": {
+            for (let jIdx = 0; jIdx < J.length; jIdx++) {
+                const sjs = J[jIdx].subJourneys || [];
+                if (!sjs.some((sj) => sj.id === op.subJourneyId)) continue;
+                const moved = opMoveAfter(sjs, op.subJourneyId, op.afterSubJourneyId ?? null); if (!moved) return null;
+                return opReplaceJourney(J, jIdx, { ...J[jIdx], subJourneys: moved });
+            }
+            return null;
+        }
+        case "subjourney.setLabel": {
+            for (let jIdx = 0; jIdx < J.length; jIdx++) {
+                const sjs = (J[jIdx].subJourneys || []).slice();
+                const sjIdx = sjs.findIndex((sj) => sj.id === op.subJourneyId); if (sjIdx < 0) continue;
+                sjs[sjIdx] = { ...sjs[sjIdx], label: op.label };
+                return opReplaceJourney(J, jIdx, { ...J[jIdx], subJourneys: sjs });
+            }
+            return null;
+        }
+        case "journey.insert": {
+            return opInsertAfter(J, op.afterJourneyId ?? null, op.journey);
+        }
+        case "journey.delete": {
+            if (!J.some((j) => j.id === op.journeyId)) return null;
+            return J.filter((j) => j.id !== op.journeyId);
+        }
+        case "journey.move": {
+            return opMoveAfter(J, op.journeyId, op.afterJourneyId ?? null);
+        }
+        case "journey.rename": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            return opReplaceJourney(J, f.idx, { ...f.j, title: op.name });
+        }
+        case "journey.setStageLabel": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            return opReplaceJourney(J, f.idx, { ...f.j, stageLabel: op.label });
+        }
+        default: return null;
+    }
+}
+
 // Palettes
 const TAG_COLORS = [
     { name: "blue",   bg: "#dbeafe", fg: "#1e40af" },
@@ -3506,6 +3889,88 @@ function App() {
         replaceJourneys(hydrate(parsed.journeys || []), { skipSave: true });
     }, [replaceJourneys]);
 
+    // ── Phase 9: emit an op over the socket for a local optimistic change ──
+    // The local immutable updater has already mutated `journeys`; this only sends
+    // the matching op. Structural ops carry the baseVersion the local state was
+    // built on (the server accepts iff it still matches). cell.set is not
+    // version-gated. We never apply our own op inbound (the server broadcasts it
+    // only to OTHER clients), so no echo guard is needed for ops — the
+    // skipNextPushRef guard is only for the legacy whole-doc push effect.
+    const STRUCTURAL_PREFIXES = ["row.", "column.", "stage.", "substage.", "subjourney.", "journey."];
+    const emitOp = useCallback((op) => {
+        if (sync.status !== "synced" || sync.role === "viewer") return;
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const structural = STRUCTURAL_PREFIXES.some((p) => op.t.startsWith(p));
+        // Bump our local version optimistically for a structural op so a rapid
+        // burst of structural ops carries increasing baseVersions (the server
+        // serializes them; a stale one just triggers a doc.reject resync).
+        const frame = structural
+            ? { ...op, baseVersion: syncVersionRef.current }
+            : { ...op, ts: op.ts ?? Date.now() };
+        try { ws.send(JSON.stringify(frame)); } catch { /* socket going away; reconnect resyncs */ }
+        if (structural) syncVersionRef.current += 1;
+    }, [sync.status, sync.role]);
+    const emitOpRef = useRef(emitOp);
+    useEffect(() => { emitOpRef.current = emitOp; }, [emitOp]);
+
+    const commitOp = useCallback((op, afterCommit) => {
+        const next = applyOp(journeysRef.current, op);
+        if (!next) return false;
+        commitJourneys(next);
+        afterCommit?.(next);
+        emitOpRef.current(op);
+        return true;
+    }, [commitJourneys]);
+
+    const cellIdsByRow = useCallback((journey, leavesPerRow = 1) => {
+        const ids = {};
+        for (const sj of journey?.subJourneys || []) {
+            for (const row of sj.rows || []) {
+                if (!row.id) continue;
+                ids[row.id] = leavesPerRow === 1
+                    ? newId()
+                    : Array.from({ length: leavesPerRow }, newId);
+            }
+        }
+        return ids;
+    }, []);
+
+    const afterIdFromMovedOrder = useCallback((items, fromIdx, toIdx) => {
+        const moved = moveArrayRange(items || [], fromIdx, 1, toIdx);
+        if (moved === items) return undefined;
+        const id = items?.[fromIdx]?.id;
+        const at = moved.findIndex((x) => x.id === id);
+        return at <= 0 ? null : moved[at - 1]?.id;
+    }, []);
+
+    // Apply an INBOUND remote op (cell.set or a structural op) by id to the local
+    // journeys. Structural ops also adopt the new server `version`. If applyOp
+    // can't apply it (unknown id), do nothing — the server's doc.reject backstop
+    // will follow. Sets skipNextPushRef so the legacy push effect stays quiet.
+    const applyRemoteOp = useCallback((op) => {
+        const structural = STRUCTURAL_PREFIXES.some((p) => op.t.startsWith(p));
+        const next = applyOp(journeysRef.current, op);
+        if (!next) return; // unknown id; wait for doc.reject resync
+        if (structural && typeof op.version === "number") syncVersionRef.current = op.version;
+        skipNextPushRef.current = true;
+        replaceJourneys(next, { skipSave: true });
+    }, [replaceJourneys]);
+
+    // Defer a remote cell.set only when it targets the cell we are actively
+    // editing; a different cell can apply immediately (the Phase 9 headline win).
+    const applyOrDeferRemoteOp = useCallback((op) => {
+        if (op.t === "cell.set" && op.cellId && op.cellId === editingCellIdRef.current) {
+            const el = document.activeElement;
+            if (el && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
+                const onBlur = () => { el.removeEventListener("blur", onBlur); applyRemoteOp(op); };
+                el.addEventListener("blur", onBlur, { once: true });
+                return;
+            }
+        }
+        applyRemoteOp(op);
+    }, [applyRemoteOp]);
+
     // If a remote payload arrives while the user is actively editing a grid
     // cell, stash it and apply on the next blur (mirrors the popstate dance).
     const applyOrDeferRemote = useCallback((parsed) => {
@@ -3636,6 +4101,8 @@ function App() {
                         const el = document.activeElement;
                         if (el && el.isContentEditable) { try { el.blur(); } catch { /* ignore */ } }
                     }
+                } else if (parsed.t === "cell.set" || STRUCTURAL_PREFIXES.some((p) => String(parsed.t || "").startsWith(p))) {
+                    applyOrDeferRemoteOp(parsed);
                 }
             };
             ws.onclose = () => { if (wsRef.current === ws) { wsRef.current = null; setPeers([]); setLocks([]); } scheduleReconnect(); };
@@ -3661,24 +4128,16 @@ function App() {
             editingCellIdRef.current = null;
             if (ws) { ws.onclose = null; ws.onerror = null; try { ws.close(); } catch { /* ignore */ } }
         };
-    }, [sync.status, sync.mapId, applyOrDeferRemote]);
+    }, [sync.status, sync.mapId, applyOrDeferRemote, applyOrDeferRemoteOp]);
 
-    // Push local edits over the socket (owner/editor only). Runs on every
-    // journeys change while synced, except when the change came from a remote
-    // apply (skipNextPushRef) — that would echo back to the server.
+    // Phase 9 replaces the old "push the entire journeys array on every change"
+    // behavior with explicit op emits from the edit handlers. The Worker still
+    // accepts doc.push from older clients, but this client no longer sends it for
+    // ordinary edits; undo/redo remain local until a future snapshot-diff pass.
     useEffect(() => {
         if (!ready) return;
         if (skipNextPushRef.current) { skipNextPushRef.current = false; return; }
-        if (sync.status !== "synced" || sync.role === "viewer") return;
-        const ws = wsRef.current;
-        if (!ws || ws.readyState !== WebSocket.OPEN) return;
-        try {
-            ws.send(JSON.stringify({
-                t: "doc.push",
-                version: syncVersionRef.current,
-                journeys: journeysRef.current,
-            }));
-        } catch { /* socket going away; reconnect will resync */ }
+        // no-op by design; local mutation handlers call emitOpRef.current(op).
     }, [journeys, ready, sync.status, sync.role]);
 
     // ── Load data (JSON array / exported project) ──
@@ -3744,185 +4203,148 @@ function App() {
     }, [commitJourneys]);
 
     // Mutate a single cell via `fn(cellCopy) -> cell`.
-    const editCell = useCallback((jIdx, sjIdx, rowIdx, cellIdx, fn) => {
-        editJourney(jIdx, (j) => {
-            const cur = j.subJourneys?.[sjIdx]?.rows?.[rowIdx]?.cells?.[cellIdx];
-            if (!cur) return j;
-            const nc = fn({ ...cur });
-            if (nc === cur || JSON.stringify(nc) === JSON.stringify(cur)) return j;
-            const sjs = j.subJourneys.slice();
-            const sj = { ...sjs[sjIdx], rows: sjs[sjIdx].rows.slice() };
-            const row = { ...sj.rows[rowIdx], cells: sj.rows[rowIdx].cells.slice() };
-            row.cells[cellIdx] = nc;
-            sj.rows[rowIdx] = row;
-            sjs[sjIdx] = sj;
-            return { ...j, subJourneys: sjs };
-        });
-    }, [editJourney]);
+    const editCell = useCallback((jIdx, sjIdx, rowIdx, cellIdx, fields) => {
+        const cell = journeysRef.current[jIdx]?.subJourneys?.[sjIdx]?.rows?.[rowIdx]?.cells?.[cellIdx];
+        if (!cell?.id) return;
+        const changed = Object.keys(fields || {}).some((k) => JSON.stringify(cell[k]) !== JSON.stringify(fields[k]));
+        if (!changed) return;
+        commitOp({ t: "cell.set", cellId: cell.id, fields, ts: Date.now() });
+    }, [commitOp]);
 
     // ── Cell handlers ──
     const handleCellEdit = useCallback((jIdx, sjIdx, rowIdx, cellIdx, html) =>
-        editCell(jIdx, sjIdx, rowIdx, cellIdx, (c) => (c.html === html ? c : { ...c, html })), [editCell]);
+        editCell(jIdx, sjIdx, rowIdx, cellIdx, { html }), [editCell]);
     const handleCellTags = useCallback((jIdx, sjIdx, rowIdx, cellIdx, tags) =>
-        editCell(jIdx, sjIdx, rowIdx, cellIdx, (c) => ({ ...c, tags })), [editCell]);
+        editCell(jIdx, sjIdx, rowIdx, cellIdx, { tags }), [editCell]);
     const handleCellMode = useCallback((jIdx, sjIdx, rowIdx, cellIdx, mode) =>
-        editCell(jIdx, sjIdx, rowIdx, cellIdx, (c) => ({ ...c, mode, ...(mode === "tags" && !c.tags ? { tags: [] } : {}) })), [editCell]);
+        editCell(jIdx, sjIdx, rowIdx, cellIdx, { mode, ...(mode === "tags" ? { tags: journeysRef.current[jIdx]?.subJourneys?.[sjIdx]?.rows?.[rowIdx]?.cells?.[cellIdx]?.tags || [] } : {}) }), [editCell]);
     const handleCellAlign = useCallback((jIdx, sjIdx, rowIdx, cellIdx, align) =>
-        editCell(jIdx, sjIdx, rowIdx, cellIdx, (c) => ({ ...c, align })), [editCell]);
+        editCell(jIdx, sjIdx, rowIdx, cellIdx, { align }), [editCell]);
 
     // ── Row handlers ──
     const handleRowAction = useCallback((jIdx, sjIdx, rowIdx, action, value) => {
-        editJourney(jIdx, (j) => {
-            const total = totalLeaves(j.stages);
-            const sjs = j.subJourneys.slice();
-            const sj = { ...sjs[sjIdx], rows: sjs[sjIdx].rows.slice() };
-            const rows = sj.rows;
-            if (action === "delete") rows.splice(rowIdx, 1);
-            else if (action === "moveTo") {
-                const toRowIdx = Math.max(0, Math.min(value?.toRowIdx ?? rowIdx, rows.length));
-                const moved = moveArrayRange(rows, rowIdx, 1, toRowIdx);
-                if (moved === rows) return j;
-                sj.rows = moved;
-                sjs[sjIdx] = sj;
-                return { ...j, subJourneys: sjs };
-            }
-            else if (action === "insertAbove") rows.splice(rowIdx, 0, newRow(total));
-            else if (action === "insertBelow") rows.splice(rowIdx + 1, 0, newRow(total));
-            else if (action === "type") {
-                const cur = rows[rowIdx];
-                const wasDivider = cur.rowType === DIVIDER_TYPE;
-                const willDivider = value === DIVIDER_TYPE;
-                let cells = cur.cells;
-                if (willDivider && !wasDivider) cells = collapseDivider(cells, total);
-                else if (!willDivider && wasDivider) cells = expandDivider(cells, total);
-                rows[rowIdx] = { ...cur, rowType: value, cells };
-            }
-            else if (action === "color") rows[rowIdx] = { ...rows[rowIdx], customColor: value || undefined };
-            else if (action === "label") {
-                if (rows[rowIdx].laneLabel === value) return j;
-                rows[rowIdx] = { ...rows[rowIdx], laneLabel: value };
-            } else return j;
-            sj.rows = rows;
-            sjs[sjIdx] = sj;
-            return { ...j, subJourneys: sjs };
-        });
-    }, [editJourney]);
+        const j = journeysRef.current[jIdx];
+        const sj = j?.subJourneys?.[sjIdx];
+        const row = sj?.rows?.[rowIdx];
+        if (!j || !sj || !row) return;
+        if (action === "delete") return commitOp({ t: "row.delete", rowId: row.id });
+        if (action === "moveTo") {
+            const toRowIdx = Math.max(0, Math.min(value?.toRowIdx ?? rowIdx, sj.rows.length));
+            const afterRowId = afterIdFromMovedOrder(sj.rows, rowIdx, toRowIdx);
+            if (afterRowId === undefined) return;
+            return commitOp({ t: "row.move", rowId: row.id, afterRowId });
+        }
+        if (action === "insertAbove" || action === "insertBelow") {
+            const afterRowId = action === "insertAbove"
+                ? (rowIdx > 0 ? sj.rows[rowIdx - 1]?.id : null)
+                : row.id;
+            return commitOp({ t: "row.insert", subJourneyId: sj.id, afterRowId, row: newRow(totalLeaves(j.stages)) });
+        }
+        if (action === "type") {
+            if (row.rowType === value) return;
+            return commitOp({ t: "row.setType", rowId: row.id, rowType: value });
+        }
+        if (action === "color") {
+            if ((row.customColor || undefined) === (value || undefined)) return;
+            return commitOp({ t: "row.setColor", rowId: row.id, color: value || undefined });
+        }
+        if (action === "label") {
+            if (row.laneLabel === value) return;
+            return commitOp({ t: "row.setLabel", rowId: row.id, label: value });
+        }
+    }, [afterIdFromMovedOrder, commitOp]);
 
     const handleAddRow = useCallback((jIdx, sjIdx) => {
-        editJourney(jIdx, (j) => {
-            const sjs = j.subJourneys.slice();
-            sjs[sjIdx] = { ...sjs[sjIdx], rows: [...sjs[sjIdx].rows, newRow(totalLeaves(j.stages))] };
-            return { ...j, subJourneys: sjs };
-        });
-    }, [editJourney]);
+        const j = journeysRef.current[jIdx];
+        const sj = j?.subJourneys?.[sjIdx];
+        if (!j || !sj) return;
+        const rows = sj.rows || [];
+        commitOp({ t: "row.insert", subJourneyId: sj.id, afterRowId: rows.length ? rows[rows.length - 1].id : null, row: newRow(totalLeaves(j.stages)) });
+    }, [commitOp]);
 
     // ── Stage / sub-stage (column) handlers ──
     const handleStageAction = useCallback((jIdx, action, payload) => {
-        editJourney(jIdx, (j) => {
-            const stages = j.stages.map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
-            const mapRows = (fn) => j.subJourneys.map((sj) => ({
-                ...sj, rows: sj.rows.map((r) => ({ ...r, cells: fn(r.cells) })),
-            }));
-
-            if (action === "addStage") {
-                const insertAt = payload.stageIdx != null ? payload.stageIdx + 1 : stages.length;
-                const leafIdx = leafStart(j.stages, payload.stageIdx != null ? payload.stageIdx : j.stages.length - 1) + leafCount(j.stages[payload.stageIdx != null ? payload.stageIdx : j.stages.length - 1]);
-                stages.splice(insertAt, 0, { id: newId(), num: nextStageNum(stages), title: "New Stage", subStages: [] });
-                return { ...j, stages, subJourneys: mapRows((cells) => {
-                    const c = cells.slice();
-                    c.splice(leafIdx, 0, newCell());
-                    return c;
-                }) };
-            }
-            if (action === "deleteStage") {
-                const { stageIdx } = payload;
-                if (stages.length <= 1) { alert("A journey needs at least one stage."); return j; }
-                const start = leafStart(j.stages, stageIdx);
-                const cnt = leafCount(j.stages[stageIdx]);
-                stages.splice(stageIdx, 1);
-                return { ...j, stages, subJourneys: mapRows((cells) => {
-                    let c = cells;
-                    for (let k = 0; k < cnt; k++) c = removeLeafFromRow(c, start);
-                    return c;
-                }) };
-            }
-            if (action === "moveStage") {
-                const { fromIdx } = payload;
-                const toIdx = Math.max(0, Math.min(payload.toIdx, stages.length));
-                if (fromIdx < 0 || fromIdx >= stages.length) return j;
-                const movedStages = moveArrayRange(stages, fromIdx, 1, toIdx);
-                if (movedStages === stages) return j;
-                const start = leafStart(j.stages, fromIdx);
-                const cnt = leafCount(j.stages[fromIdx]);
-                const target = toIdx >= j.stages.length ? totalLeaves(j.stages) : leafStart(j.stages, toIdx);
-                return {
-                    ...j,
-                    stages: movedStages,
-                    subJourneys: j.subJourneys.map((sj) => ({
-                        ...sj,
-                        rows: sj.rows.map((r) => moveLeafRangeInRow(r, start, cnt, target)),
-                    })),
-                };
-            }
-            if (action === "addSubStage") {
-                const { stageIdx } = payload;
-                const before = stages[stageIdx].subStages.length;
-                stages[stageIdx].subStages.push({ id: newId(), title: "New" });
-                const oldL = Math.max(before, 1), newL = Math.max(before + 1, 1);
-                if (newL > oldL) {
-                    const gi = leafStart(j.stages, stageIdx) + oldL;
-                    return { ...j, stages, subJourneys: mapRows((cells) => insertLeafIntoRow(cells, gi)) };
-                }
-                return { ...j, stages };
-            }
-            if (action === "deleteSubStage") {
-                const { stageIdx, subIdx } = payload;
-                const before = stages[stageIdx].subStages.length;
-                stages[stageIdx].subStages.splice(subIdx, 1);
-                const oldL = Math.max(before, 1), newL = Math.max(before - 1, 1);
-                if (newL < oldL) {
-                    const gi = leafStart(j.stages, stageIdx) + Math.min(subIdx, oldL - 1);
-                    return { ...j, stages, subJourneys: mapRows((cells) => removeLeafFromRow(cells, gi)) };
-                }
-                return { ...j, stages };
-            }
-            if (action === "moveSubStage") {
-                const { stageIdx, fromIdx } = payload;
-                const subs = stages[stageIdx]?.subStages || [];
-                const toIdx = Math.max(0, Math.min(payload.toIdx, subs.length));
-                if (subs.length <= 1 || fromIdx < 0 || fromIdx >= subs.length) return j;
-                const movedSubs = moveArrayRange(subs, fromIdx, 1, toIdx);
-                if (movedSubs === subs) return j;
-                stages[stageIdx] = { ...stages[stageIdx], subStages: movedSubs };
-                const start = leafStart(j.stages, stageIdx);
-                const fromLeaf = start + fromIdx;
-                const toLeaf = start + toIdx;
-                return {
-                    ...j,
-                    stages,
-                    subJourneys: j.subJourneys.map((sj) => ({
-                        ...sj,
-                        rows: sj.rows.map((r) => moveLeafRangeInRow(r, fromLeaf, 1, toLeaf)),
-                    })),
-                };
-            }
-            if (action === "renameStage") { stages[payload.stageIdx] = { ...stages[payload.stageIdx], title: payload.value }; return { ...j, stages }; }
-            if (action === "renumberStage") {
-                const raw = (payload.value ?? "").trim();
-                stages[payload.stageIdx] = { ...stages[payload.stageIdx], num: raw === "" ? null : (Number.isFinite(Number(raw)) ? Number(raw) : raw) };
-                return { ...j, stages };
-            }
-            if (action === "renameSubStage") {
-                stages[payload.stageIdx].subStages[payload.subIdx] = { ...stages[payload.stageIdx].subStages[payload.subIdx], title: payload.value };
-                return { ...j, stages };
-            }
-            if (action === "setStageLabel") {
-                if (j.stageLabel === payload.value) return j;
-                return { ...j, stageLabel: payload.value };
-            }
-            return j;
-        });
-    }, [editJourney]);
+        const j = journeysRef.current[jIdx];
+        if (!j) return;
+        const stages = j.stages || [];
+        if (action === "addStage") {
+            const afterStageId = payload.stageIdx != null ? stages[payload.stageIdx]?.id : (stages.length ? stages[stages.length - 1].id : null);
+            const stage = { id: newId(), num: nextStageNum(stages), title: "New Stage", subStages: [] };
+            return commitOp({ t: "stage.insert", journeyId: j.id, afterStageId, stage, cellIds: cellIdsByRow(j, leafCount(stage)) });
+        }
+        if (action === "deleteStage") {
+            const { stageIdx } = payload;
+            if (stages.length <= 1) { alert("A journey needs at least one stage."); return; }
+            const stage = stages[stageIdx];
+            if (!stage) return;
+            return commitOp({ t: "stage.delete", journeyId: j.id, stageId: stage.id });
+        }
+        if (action === "moveStage") {
+            const { fromIdx } = payload;
+            const toIdx = Math.max(0, Math.min(payload.toIdx, stages.length));
+            const stage = stages[fromIdx];
+            if (!stage) return;
+            const afterStageId = afterIdFromMovedOrder(stages, fromIdx, toIdx);
+            if (afterStageId === undefined) return;
+            return commitOp({ t: "stage.move", journeyId: j.id, stageId: stage.id, afterStageId });
+        }
+        if (action === "addSubStage") {
+            const { stageIdx } = payload;
+            const stage = stages[stageIdx];
+            if (!stage) return;
+            const subs = stage.subStages || [];
+            const subStage = { id: newId(), title: "New" };
+            return commitOp({
+                t: "substage.insert",
+                journeyId: j.id,
+                stageId: stage.id,
+                afterSubStageId: subs.length ? subs[subs.length - 1].id : null,
+                subStage,
+                cellIds: cellIdsByRow(j, 1),
+            });
+        }
+        if (action === "deleteSubStage") {
+            const { stageIdx, subIdx } = payload;
+            const stage = stages[stageIdx];
+            const subStage = stage?.subStages?.[subIdx];
+            if (!stage || !subStage) return;
+            return commitOp({ t: "substage.delete", journeyId: j.id, stageId: stage.id, subStageId: subStage.id });
+        }
+        if (action === "moveSubStage") {
+            const { stageIdx, fromIdx } = payload;
+            const stage = stages[stageIdx];
+            const subs = stage?.subStages || [];
+            const subStage = subs[fromIdx];
+            if (!stage || !subStage || subs.length <= 1) return;
+            const toIdx = Math.max(0, Math.min(payload.toIdx, subs.length));
+            const afterSubStageId = afterIdFromMovedOrder(subs, fromIdx, toIdx);
+            if (afterSubStageId === undefined) return;
+            return commitOp({ t: "substage.move", journeyId: j.id, stageId: stage.id, subStageId: subStage.id, afterSubStageId });
+        }
+        if (action === "renameStage") {
+            const stage = stages[payload.stageIdx];
+            if (!stage || stage.title === payload.value) return;
+            return commitOp({ t: "stage.setLabel", stageId: stage.id, label: payload.value });
+        }
+        if (action === "renumberStage") {
+            const stage = stages[payload.stageIdx];
+            if (!stage) return;
+            const raw = (payload.value ?? "").trim();
+            const num = raw === "" ? null : (Number.isFinite(Number(raw)) ? Number(raw) : raw);
+            if (stage.num === num) return;
+            return commitOp({ t: "stage.setNum", stageId: stage.id, num });
+        }
+        if (action === "renameSubStage") {
+            const stage = stages[payload.stageIdx];
+            const subStage = stage?.subStages?.[payload.subIdx];
+            if (!stage || !subStage || subStage.title === payload.value) return;
+            return commitOp({ t: "substage.setLabel", stageId: stage.id, subStageId: subStage.id, label: payload.value });
+        }
+        if (action === "setStageLabel") {
+            if (j.stageLabel === payload.value) return;
+            return commitOp({ t: "journey.setStageLabel", journeyId: j.id, label: payload.value });
+        }
+    }, [afterIdFromMovedOrder, cellIdsByRow, commitOp]);
 
     // ── Project actions ──
     const openProject = useCallback(async (id) => {
@@ -3983,12 +4405,11 @@ function App() {
     }, [currentId, refreshProjects]);
 
     const renameJourneyTitle = useCallback((jIdx, title) => {
-        editJourney(jIdx, (j) => {
-            const nextTitle = title.trim();
-            if (!nextTitle || j.title === nextTitle) return j;
-            return { ...j, title: nextTitle };
-        });
-    }, [editJourney]);
+        const journey = journeysRef.current[jIdx];
+        const nextTitle = title.trim();
+        if (!journey || !nextTitle || journey.title === nextTitle) return;
+        commitOp({ t: "journey.rename", journeyId: journey.id, name: nextTitle });
+    }, [commitOp]);
 
     const newProject = useCallback(async () => {
         const id = await dbCreateProject(defaultName(projects), []);
@@ -4006,7 +4427,7 @@ function App() {
     const newBlankJourney = useCallback(async () => {
         const journey = createBlankJourney(journeysRef.current.length);
         let id = currentId;
-        if (id == null) {
+        if (id == null && sync.status !== "synced") {
             id = await dbCreateProject("Blank Service Journey", [journey]);
             setCurrentId(id);
             localStorage.setItem(LAST_KEY, String(id));
@@ -4018,12 +4439,11 @@ function App() {
             await refreshProjects();
             return;
         }
-        commitJourneys((prev) => {
-            const next = [...prev, journey];
-            setTab(next.length - 1);
-            return next;
-        });
-    }, [clearHistory, commitJourneys, currentId, refreshProjects, replaceJourneys]);
+        const afterJourneyId = journeysRef.current.length
+            ? journeysRef.current[journeysRef.current.length - 1]?.id
+            : null;
+        commitOp({ t: "journey.insert", afterJourneyId, journey }, (next) => setTab(next.length - 1));
+    }, [clearHistory, commitOp, currentId, refreshProjects, replaceJourneys, sync.status]);
 
     const deleteJourney = useCallback((jIdx) => {
         const journey = journeysRef.current[jIdx];
@@ -4033,8 +4453,7 @@ function App() {
             message: `Delete the journey “${journey.title}”? You can undo this right after.`,
             confirmLabel: "Delete journey",
             danger: true,
-            onConfirm: () => commitJourneys((prev) => {
-                const next = prev.filter((_, i) => i !== jIdx);
+            onConfirm: () => commitOp({ t: "journey.delete", journeyId: journey.id }, (next) => {
                 setTab((cur) => {
                     if (!next.length) return 0;
                     if (cur > jIdx) return cur - 1;
@@ -4042,10 +4461,9 @@ function App() {
                     return cur;
                 });
                 setSelected(null);
-                return next;
             }),
         });
-    }, [commitJourneys]);
+    }, [commitOp]);
 
     const currentExportPayload = useCallback((scope = "project") => {
         const data = journeysRef.current;
