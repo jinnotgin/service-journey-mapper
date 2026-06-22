@@ -130,6 +130,160 @@ pushed version; it can revert a peer's concurrent change — accepted LWW tradeo
 3. Presence (anonymous names + avatar stack).
 4. View vs edit links + rotate / disable (owner UI).
 5. (optional, later) password-gated links.
+6. Stop sharing / delete cloud map (owner).
+7. **Stable entity IDs** — prerequisite for everything below.
+8. **Cell locking** — soft, presence-driven advisory locks (no data-model rewrite).
+9. **Atomic operation-based sync** — per-cell content patches + structural ops
+   (row add/delete/move, column add/delete, stage/sub-journey/journey ops).
+
+See "Evolution: cell locking + atomic sync (Phases 7–9)" below for the design.
+
+## Evolution: cell locking + atomic sync (Phases 7–9)
+
+The whole-document LWW model above is the MVP. It clobbers concurrent edits and
+re-sends the entire `journeys` array on every change. Phases 7–9 fix both
+**without** adopting a CRDT, by combining two ideas that reinforce each other:
+
+- A **per-cell lock** guarantees only one person edits a given cell at a time —
+  which means we never need character-level text merge. Per-cell last-write-wins
+  is sufficient *because the lock makes same-cell collisions impossible.*
+- **Atomic ops** let the server reason about individual cells / rows / columns,
+  so edits to *different* parts of the map stop conflicting and the wire payload
+  shrinks from the whole doc to a single op.
+
+### Phase 7 — Stable entity IDs (prerequisite)
+
+Today cells/rows/sub-journeys/journeys are addressed **positionally**
+(`jIdx/sjIdx/rowIdx/cellIdx`) and `hydrate()` assigns no IDs. You cannot lock or
+patch "the cell at row 3" when a peer just deleted row 1. So first:
+
+- Assign an immutable `id` (e.g. `crypto.randomUUID()`) to every **journey**,
+  **stage** (and sub-stage / column leaf), **sub-journey**, **row**, and **cell**.
+- **Backfill on load**: `hydrate()` mints IDs for any entity missing one, so old
+  local/cloud docs upgrade transparently. IDs are persisted (Dexie + snapshot).
+- All creation helpers (`newRow`, new cell, add stage/column, etc.) mint an `id`.
+- IDs are opaque and stable for the entity's lifetime; reordering never changes
+  an `id`. This is the only change in Phase 7 — no protocol change yet.
+
+### Phase 8 — Cell locking (soft, advisory)
+
+A lock is **presence**, not persistence: it rides in the socket attachment and is
+broadcast like the roster, so it auto-releases on disconnect for free
+(`webSocketClose` already re-broadcasts presence).
+
+Nuances this must respect:
+
+- **Lock on edit-intent, not on clicking around.** Acquire the lock on `focus` of
+  a cell's editable surface (or first keystroke), *not* on mere `onSelect`. The
+  client already separates selection from editing, so clicking around stays free.
+- **No hoarding.** A lock carries a `lockedAt`; the editing client sends a
+  **heartbeat** (~every 5 s) while active. A lock with no heartbeat for ~10–15 s
+  is considered stale and ignored by peers / swept by the server.
+- **Clean release** on `blur`, `Escape`, tab `visibilitychange → hidden`, and
+  disconnect.
+- **Enforcement.** Peers render a cell locked by someone else as read-only with
+  the holder's color/initials. Hard enforcement (server rejecting a write to a
+  cell locked by another socket) becomes possible once writes are per-cell in
+  Phase 9; in Phase 8 the lock is advisory + UI-level.
+
+Wire format additions:
+
+```
+client -> server
+  { t: "lock.acquire",   cellId }
+  { t: "lock.heartbeat", cellId }
+  { t: "lock.release",   cellId }
+
+server -> client
+  { t: "locks", locks: [{ cellId, clientId, name, color, lockedAt }, ...] }
+  { t: "lock.denied", cellId }     // someone already holds it
+```
+
+Phase 8 can ship on top of today's whole-doc sync and already removes the felt
+clobbering, because the lock — not the data model — is what prevents two people
+editing one cell.
+
+### Phase 9 — Atomic operation-based sync
+
+Replace the whole-`journeys` `doc.push` with granular ops applied **by id**. The
+server still keeps a whole-document snapshot as its source of truth (hydrate and
+storage stay simple, size still bounded); it just **applies ops to that snapshot
+server-side** and broadcasts the single op instead of the whole blob.
+
+Two op classes with different concurrency rules:
+
+**A. Content ops — commutative, per-cell LWW, NOT globally version-gated.**
+Different cells never conflict; the same cell is protected by the Phase 8 lock,
+with a per-cell `rev`/timestamp as the LWW tiebreaker if a lock was missed.
+
+```
+{ t: "cell.set", cellId, fields: { html?, tags?, mode?, align? }, ts }
+```
+
+**B. Structural ops — serialized through the global `version`.** These reshape
+the tree, so they are applied in order; a client that is behind gets a full
+snapshot resync (`doc.reject`) rather than a risky positional rebase. Structural
+edits are comparatively rare, so the occasional resync is acceptable.
+
+Each structural op carries `baseVersion`; the server accepts iff
+`baseVersion === currentVersion`, bumps the version, mutates the snapshot,
+broadcasts the op (+ new version) to other clients, else replies `doc.reject`
+with the current snapshot. Op set (keyed by **parent id**, never index):
+
+```
+Rows (within a sub-journey)
+  { t: "row.insert", subJourneyId, afterRowId|null, row }   // row has a fresh id + cells
+  { t: "row.delete", rowId }
+  { t: "row.move",   rowId, afterRowId|null }
+  { t: "row.setType", rowId, rowType }                      // normal / divider / section
+
+Columns (stage leaves — span the whole journey, every row gains/loses a cell)
+  { t: "column.insert", journeyId, stageId, afterColumnId|null }   // new cell id minted per row
+  { t: "column.delete", journeyId, columnId }                      // drops that cell from every row
+  { t: "column.move",   journeyId, columnId, afterColumnId|null }
+
+Stages / sub-stages (the column header tree)
+  { t: "stage.insert", journeyId, afterStageId|null, stage }
+  { t: "stage.delete", journeyId, stageId }
+  { t: "stage.move",   journeyId, stageId, afterStageId|null }
+  { t: "stage.setLabel", stageId, label }
+  ( sub-stage variants: substage.insert/delete/move/setLabel under a stageId )
+
+Sub-journeys (row groups / lanes)
+  { t: "subjourney.insert", journeyId, afterSubJourneyId|null, subJourney }
+  { t: "subjourney.delete", subJourneyId }
+  { t: "subjourney.move",   subJourneyId, afterSubJourneyId|null }
+  { t: "subjourney.setLabel", subJourneyId, label }
+
+Journeys (tabs)
+  { t: "journey.insert", afterJourneyId|null, journey }
+  { t: "journey.delete", journeyId }
+  { t: "journey.move",   journeyId, afterJourneyId|null }
+  { t: "journey.rename", journeyId, name }
+```
+
+**Column ops are journey-wide:** because columns are the leaves of the stage
+tree and each row is normalized to `totalLeaves(stages)` cells,
+`column.insert/delete` must add/remove the corresponding cell **in every row of
+every sub-journey** of that journey (server reuses the existing
+`normalizeRowCells` / `collapseDivider` logic, ported or mirrored). The op names
+the affected `columnId` so the mutation is positional-free.
+
+**Client mapping.** The existing immutable updaters are the natural emit points:
+`editCell` → `cell.set`; `handleRowAction` (delete / insert / move / type) → the
+`row.*` ops; the stage/column handlers → `stage.*` / `column.*`; tab add/delete/
+rename → `journey.*`. Each updater applies locally (optimistic) **and** emits the
+op; the inbound handler applies remote ops by id and skips the local-echo. The
+`skipNextPushRef` echo-guard generalizes to an op-id/source guard.
+
+**Undo/redo** stays a local whole-snapshot stack for now; an undo emits whatever
+ops reconcile the snapshots (or, simplest first cut, a structural resync). This
+can be refined later and is not a Phase 9 blocker.
+
+**Fallback / safety.** Any op the server cannot apply cleanly (unknown id, failed
+version gate, malformed) → it replies `doc.reject` with the full current
+snapshot, so the client always converges. This guarantees correctness even if a
+specific op path has a bug — the whole-doc resync is the backstop.
 
 ## Open decisions
 

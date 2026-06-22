@@ -502,14 +502,19 @@ const nextStageNum = (stages) => {
     return nums.length ? Math.max(...nums) + 1 : (stages?.length || 0) + 1;
 };
 
-const newCell = () => ({ mode: "text", html: "", align: "left" });
+// Opaque, immutable entity id (Phase 7). Stable for the entity's lifetime;
+// reordering never changes it. Same fallback shape as the presence clientId.
+const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `e_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`);
+
+const newCell = () => ({ id: newId(), mode: "text", html: "", align: "left" });
 const newRow  = (total) => ({
+    id: newId(),
     rowType: "row-operator",
     laneLabel: "New row",
     cells: Array.from({ length: Math.max(total, 1) }, newCell),
 });
 const blankCells = (total, mode = "text", align = "left") =>
-    Array.from({ length: Math.max(total, 1) }, () => ({ mode, html: "", align }));
+    Array.from({ length: Math.max(total, 1) }, () => ({ id: newId(), mode, html: "", align }));
 
 const rowWidth = (cells) => (cells || []).reduce((a, c) => a + (c.colspan || 1), 0);
 function moveArrayRange(items, from, count, to) {
@@ -537,12 +542,17 @@ function cellsToLeafCells(cells) {
 
 function leafCellsToCells(leaves) {
     const out = [];
+    const usedIds = new Set();
     (leaves || []).forEach((leaf) => {
         const { __spanKey, ...cell } = leaf;
         const last = out[out.length - 1];
         if (last && last.__spanKey === __spanKey) {
             last.colspan = (last.colspan || 1) + 1;
         } else {
+            // A split span can re-emit the same id on two separate cells; keep
+            // ids unique by minting a fresh one for the duplicate.
+            if (cell.id && usedIds.has(cell.id)) cell.id = newId();
+            if (cell.id) usedIds.add(cell.id);
             out.push({ ...cell, __spanKey, colspan: 1 });
         }
     });
@@ -616,30 +626,47 @@ function normalizeRowCells(cells, total) {
     return nc;
 }
 
-// A divider row is always a single cell merged across every column.
+// A divider row is always a single cell merged across every column. Carry the
+// first cell's id forward so collapsing/expanding keeps a stable id.
 function collapseDivider(cells, total) {
     const first = cells[0] || newCell();
-    const c = { mode: "text", html: first.html ?? "", align: first.align || "center" };
+    const c = { id: first.id || newId(), mode: "text", html: first.html ?? "", align: first.align || "center" };
     if (total > 1) c.colspan = total;
     return [c];
 }
 // Expand a (former) divider back into one cell per column.
 function expandDivider(cells, total) {
     const first = { ...(cells[0] || newCell()) };
+    if (!first.id) first.id = newId();
     delete first.colspan;
     return normalizeRowCells([first], total);
 }
 
-// Normalize loaded data: ensure stages/cells carry the fields the editor needs.
+// Backfill an `id` on a stage and, recursively, every nested sub-stage / column
+// leaf (Phase 7). Existing ids are preserved; only missing ones are minted.
+function hydrateStage(s) {
+    return {
+        ...s,
+        id: s.id || newId(),
+        subStages: (s.subStages || []).map(hydrateStage),
+    };
+}
+
+// Normalize loaded data: ensure stages/cells carry the fields the editor needs,
+// and backfill stable opaque ids on every entity (journey, stage + nested
+// sub-stage, sub-journey, row, cell) so old local/cloud docs upgrade
+// transparently. Existing ids are never overwritten.
 function hydrate(journeys) {
     return (journeys || []).map((j) => {
-        const stages = (j.stages || []).map((s) => ({ ...s, subStages: s.subStages || [] }));
+        const stages = (j.stages || []).map(hydrateStage);
         const total = totalLeaves(stages);
         const subJourneys = (j.subJourneys || []).map((sj) => ({
             ...sj,
+            id: sj.id || newId(),
             rows: (sj.rows || []).map((r) => {
                 const rowType = r.rowType;
                 let cells = (r.cells || []).map((c) => ({
+                    id: c.id || newId(),
                     mode: c.mode || "text",
                     html: c.html ?? "",
                     align: c.align || "left",
@@ -648,10 +675,10 @@ function hydrate(journeys) {
                 }));
                 cells = normalizeRowCells(cells, total);
                 if (rowType === DIVIDER_TYPE) cells = collapseDivider(cells, total);
-                return { ...r, rowType, cells };
+                return { ...r, id: r.id || newId(), rowType, cells };
             }),
         }));
-        return { ...j, stages, subJourneys };
+        return { ...j, id: j.id || newId(), stages, subJourneys };
     });
 }
 
@@ -3655,7 +3682,7 @@ function App() {
             if (action === "addStage") {
                 const insertAt = payload.stageIdx != null ? payload.stageIdx + 1 : stages.length;
                 const leafIdx = leafStart(j.stages, payload.stageIdx != null ? payload.stageIdx : j.stages.length - 1) + leafCount(j.stages[payload.stageIdx != null ? payload.stageIdx : j.stages.length - 1]);
-                stages.splice(insertAt, 0, { num: nextStageNum(stages), title: "New Stage", subStages: [] });
+                stages.splice(insertAt, 0, { id: newId(), num: nextStageNum(stages), title: "New Stage", subStages: [] });
                 return { ...j, stages, subJourneys: mapRows((cells) => {
                     const c = cells.slice();
                     c.splice(leafIdx, 0, newCell());
@@ -3695,7 +3722,7 @@ function App() {
             if (action === "addSubStage") {
                 const { stageIdx } = payload;
                 const before = stages[stageIdx].subStages.length;
-                stages[stageIdx].subStages.push({ title: "New" });
+                stages[stageIdx].subStages.push({ id: newId(), title: "New" });
                 const oldL = Math.max(before, 1), newL = Math.max(before + 1, 1);
                 if (newL > oldL) {
                     const gi = leafStart(j.stages, stageIdx) + oldL;

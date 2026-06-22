@@ -11,10 +11,85 @@ See `collab-sync.md` for the design.
 - [x] **Phase 3** — Presence (anonymous names + avatar stack) — verified locally (Worker + browser)
 - [x] **Phase 4** — View vs edit links + rotate/disable — verified locally (Worker curl + browser)
 - [x] **Phase 5** — (optional) password-gated links — verified locally (Worker curl + WS + browser)
+- [x] **Phase 6** — Stop sharing / delete cloud map (owner)
+- [x] **Phase 7** — Stable entity IDs (journey/stage/column/sub-journey/row/cell), backfilled on hydrate — prerequisite for 8 & 9
+- [ ] **Phase 8** — Cell locking (soft, presence-driven advisory locks; acquire on edit-intent, heartbeat/TTL anti-hoard, release on blur/disconnect)
+- [ ] **Phase 9** — Atomic op-based sync: `cell.set` content patches (per-cell LWW) + structural ops (row add/delete/move, column add/delete/move, stage/sub-journey/journey ops), version-gated with whole-doc resync fallback
 
 ## Log
 
-### 2026-06-22 — Phase 5 done (optional password-gated share links)
+### 2026-06-22 — Phase 7 done (stable entity IDs)
+
+Gave every entity an immutable, opaque `id` (journey, stage + every nested
+sub-stage / column leaf, sub-journey, row, cell). This is the **only** change in
+Phase 7 — no protocol / WebSocket / Worker change, no `cellKey` /
+`data-cell-key` change (those stay positional), no rendering / selection change.
+IDs become part of the `journeys` blob already persisted to Dexie and pushed in
+the Worker snapshot, so no schema/Worker migration is needed.
+
+Client (`index.html`):
+
+- New `newId()` helper (next to the structure helpers): `crypto.randomUUID()`
+  with the same fallback shape as the presence clientId (`e_<rand><time>`).
+- **Mint at birth in the base constructors:** `newCell()`, `newRow()`, and
+  `blankCells()` now stamp an `id`. Because the divider/colspan transforms reuse
+  these (and spread existing cells), most creation paths inherit ids for free.
+- **Deep backfill in `hydrate()`** (the single funnel every load/import/remote-
+  apply passes through): mints an `id` for ANY entity missing one and **never
+  overwrites an existing id**, so old local (Dexie) and cloud docs upgrade
+  transparently. A recursive `hydrateStage()` walks the stage tree to the leaves
+  so nested sub-stages are covered.
+- **Transform helpers carry ids forward (mint only for genuinely new cells):**
+  `collapseDivider` keeps the first cell's id on the merged cell; `expandDivider`
+  keeps it on the first re-expanded cell (the rest are padded by
+  `normalizeRowCells` → `newCell()`); `normalizeRowCells` / `insertLeafIntoRow` /
+  `removeLeafFromRow` spread existing cells (id preserved) and use `newCell()` for
+  new leaves. `leafCellsToCells` now tracks emitted ids and re-mints if a **split
+  span** would otherwise duplicate an id across two cells.
+- **Structural creation sites updated:** `handleStageAction` `addStage` (the new
+  stage literal) and `addSubStage` (the pushed `{title:"New"}` sub-stage) now get
+  an `id`; the new column cell came from `newCell()` already. `newRow`-based
+  inserts (`insertAbove`/`insertBelow`/`handleAddRow`) and new-journey creation
+  (`createBlankJourney`, which wraps its template in `hydrate([...])`) are covered
+  by the above.
+- **Untouched (correctly):** `editCell`'s `JSON.stringify` equality dedup —
+  since ids are stable across an edit, a no-op edit still early-returns;
+  undo/redo stays whole-snapshot (ids are part of the snapshot). Both confirmed
+  in verification. `editCell`/`editJourney` carry ids forward unchanged.
+  `buildExampleProject` mutates post-hydrate but is only used to render the AI
+  prompt JSON (line ~904), never loaded directly; on import it re-hydrates.
+
+**Verification (static server :8755 + browser preview; live state read via the
+React fiber `journeys` mirror; an `__auditIds` walker counted entities missing an
+`id`). No console errors at any point:**
+
+- **Deep ids on load:** opened a project → audit reported **0 missing ids** of
+  31 cells / 11 rows / 3 stages / 1 sub-journey / 1 journey; sample cell id was a
+  UUID.
+- **Backfill of a genuinely id-less doc:** inspected Dexie directly — Project 2's
+  persisted journeys had **no** stage/cell ids (only an old `journey-…` id).
+  Opening it (runs `hydrate()`) produced a live state with UUIDs on every
+  stage/cell and **0 missing ids**, while the original journey id was
+  **preserved** (not overwritten) — proving deep backfill + id-preservation.
+- **Mutations keep/ mint ids, no errors** (driven through the real App handlers):
+  cell text edit → id unchanged, html updated; **no-op** edit (same html) →
+  cell id + html stable (early-return holds); insert row → new row + all its
+  cells have unique ids; delete row; add stage (new column leaf cells get ids);
+  add sub-stage → nested sub-stage leaf gets a real id; toggle to divider →
+  merged cell **carried the first cell's id forward**; toggle back → 4 cells, id
+  preserved on the first, all unique; delete stage (drops a cell from every row)
+  → 0 missing; add new tab/journey → journey + stages + sub-journey + rows +
+  cells all id'd; **undo/redo** restored/re-applied the row delete with ids
+  intact. Every step re-audited to **0 missing ids**.
+- Screenshot of the working editor captured.
+
+Limitations / follow-ups:
+- IDs are not yet used by anything (still addressed positionally everywhere) —
+  that is intentional; Phases 8 (locking) and 9 (op-based sync) consume them.
+- The Load-JSON modal's two-step "Add sheets" confirm flow didn't apply a pasted
+  id-less array in the automated run (an import-UI quirk, not a Phase 7 issue);
+  the backfill was instead proven conclusively via the Dexie id-less → hydrate
+  path above, which exercises the same `hydrate()` funnel.
 
 A single optional password for the whole map (not per-link). The owner can set,
 change, or remove it. When set, anyone opening a share link (editor or viewer)
