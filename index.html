@@ -90,6 +90,8 @@
         .ab-back:hover{background:var(--surface-2);border-color:var(--text-sec);box-shadow:0 1px 2px oklch(20% .006 70 / .08)}
         .ab-brand{display:flex;align-items:center;min-width:0;max-width:min(760px,52vw);line-height:1.15}
         .ab-title{font-size:var(--fs-lg);font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+        .cloud-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;margin-left:8px;color:var(--blue);background:oklch(96% .018 245);border:1px solid oklch(86% .035 245);flex:0 0 auto}
+        .cloud-badge svg{width:15px;height:15px;stroke:currentColor}
         .ab-spacer{flex:1 1 auto;min-width:8px}
         .inline-title{cursor:default}
         .inline-title.editable{cursor:text;border-radius:5px;transition:background .12s,box-shadow .12s}
@@ -126,6 +128,7 @@
         .save-dot{width:7px;height:7px;border-radius:999px;display:inline-block;background:var(--green)}
         .save-saving{color:oklch(82% .05 80)}
         .save-saved{color:var(--text-sec)}
+        .save-by{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
         /* ===== MAIN ===== */
         .main-content{padding-bottom:50px;min-height:60vh}
@@ -346,12 +349,24 @@
         /* ===== LIBRARY (home screen) ===== */
         .lib{max-width:1120px;margin:0 auto;padding:48px 24px 86px}
         .lib-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:28px;margin-bottom:26px}
+        .profile-wrap{display:flex;justify-content:flex-end;margin-bottom:14px}
+        .profile-wrap .menu-trigger{width:auto;height:auto;padding:0;border:0;background:transparent;box-shadow:none}
+        .profile-wrap .menu-trigger:hover{background:transparent}
+        .profile-trigger{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font:inherit;font-size:var(--fs-xs);font-weight:700;cursor:pointer;box-shadow:0 1px 1px oklch(20% .006 70 / .05)}
+        .profile-trigger:hover{background:var(--surface-2)}
+        .profile-trigger .presence-av{margin-left:0;width:22px;height:22px;border-width:0;font-size:9px}
+        .profile-form{display:grid;gap:8px;padding:8px;min-width:230px}
+        .profile-form label{font-size:var(--fs-2xs);font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-sec)}
+        .profile-form-actions{display:flex;gap:6px}
         .lib-eyebrow{font-size:var(--fs-xs);font-weight:700;color:oklch(42% .08 220);margin-bottom:8px}
         .lib-head h1{font-size:34px;font-weight:800;letter-spacing:0;color:var(--text);line-height:1.08}
         .lib-head p{font-size:var(--fs-sm);color:var(--text-sec);margin-top:10px;max-width:56ch;line-height:1.6}
         .lib-actions{display:flex;gap:8px;flex-shrink:0}
         .lib-actions .btn-s,.lib-actions .btn-p{min-height:40px}
         .project-list{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:0 12px 30px oklch(30% .012 70 / .08)}
+        .library-section{margin-top:22px}
+        .library-section:first-of-type{margin-top:0}
+        .library-section-title{font-size:var(--fs-xs);font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-sec);margin:0 0 8px 2px}
         .project-row{width:100%;display:grid;grid-template-columns:minmax(0,1fr) 118px 168px 38px;align-items:center;gap:18px;text-align:left;background:var(--surface);border:0;border-bottom:1px solid var(--border-light);padding:17px 18px 17px 20px;cursor:pointer;font-family:inherit;color:var(--text);transition:background .15s,box-shadow .15s}
         .project-row:last-child{border-bottom:0}
         .project-row:hover{background:oklch(97% .006 70)}
@@ -362,6 +377,7 @@
         .pc-main{min-width:0}
         .pc-name{font-weight:760;font-size:var(--fs-md);color:var(--text);letter-spacing:0;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
         .pc-badge{display:inline-flex;align-items:center;background:oklch(92.5% .04 220);color:oklch(34% .1 220);font-size:var(--fs-2xs);font-weight:800;padding:3px 7px;border-radius:6px;text-transform:none;letter-spacing:0;margin-bottom:6px}
+        .pc-badge.cloud{background:oklch(95% .025 245);color:oklch(38% .1 245);margin-left:6px}
         .pc-count,.pc-updated{font-size:var(--fs-xs);color:var(--text-sec);white-space:nowrap}
         .pc-updated{font-variant-numeric:tabular-nums}
         .pc-menu{display:flex;justify-content:flex-end}
@@ -1255,10 +1271,15 @@ function LaneLabel({ rowType, label, editable, onCommit }) {
 // ═══════════════════════════════════════
 const db = new Dexie("ServiceJourneyMapperDB");
 db.version(1).stores({ projects: "++id, name, updatedAt" });
+db.version(2).stores({
+    projects: "++id, name, updatedAt, cloudMapId",
+    sharedMaps: "mapId, name, lastOpenedAt",
+});
 
 const LAST_KEY = "sjm:lastProjectId";
 
 const dbListProjects   = () => db.projects.orderBy("updatedAt").reverse().toArray();
+const dbListSharedMaps = () => db.sharedMaps.orderBy("lastOpenedAt").reverse().toArray();
 const dbGetProject     = (id) => db.projects.get(id);
 const dbDeleteProject  = (id) => db.projects.delete(id);
 const dbSaveJourneys   = (id, journeys) => db.projects.update(id, { journeys, updatedAt: Date.now() });
@@ -1266,6 +1287,45 @@ const dbRenameProject  = (id, name) => db.projects.update(id, { name, updatedAt:
 const dbCreateProject  = (name, journeys = []) => {
     const now = Date.now();
     return db.projects.add({ name, journeys, createdAt: now, updatedAt: now });
+};
+const dbFindProjectByCloudMap = async (mapId) => {
+    if (!mapId) return null;
+    return db.projects.where("cloudMapId").equals(mapId).first();
+};
+const cloudMetaFromData = (mapId, role, data) => {
+    const meta = {
+        cloudMapId: mapId,
+        cloudRole: role || data?.role || null,
+        cloudUpdatedAt: data?.updatedAt || Date.now(),
+        cloudUpdatedByName: data?.updatedByName || null,
+        cloudUpdatedByClientId: data?.updatedByClientId || null,
+    };
+    // Only write cloudVersion when the source actually carries one. Versionless
+    // frames (e.g. cell.set) must not clobber the stored version to 0.
+    if (typeof data?.version === "number") meta.cloudVersion = data.version;
+    return meta;
+};
+const dbMarkProjectCloud = (id, mapId, role, data = {}) => db.projects.update(id, cloudMetaFromData(mapId, role, data));
+const dbSaveCloudMirror = (id, journeys, mapId, role, data = {}) => {
+    const now = Date.now();
+    return db.projects.update(id, {
+        journeys,
+        updatedAt: now,
+        ...cloudMetaFromData(mapId, role, { ...data, updatedAt: data.updatedAt || now }),
+    });
+};
+const dbUpsertSharedMap = (mapId, patch) => {
+    if (!mapId) return Promise.resolve();
+    const now = Date.now();
+    return db.sharedMaps.put({
+        mapId,
+        name: patch?.name || "Shared map",
+        role: patch?.role || null,
+        lastOpenedAt: now,
+        updatedAt: patch?.updatedAt || now,
+        updatedByName: patch?.updatedByName || null,
+        updatedByClientId: patch?.updatedByClientId || null,
+    });
 };
 
 // ═══════════════════════════════════════
@@ -1591,6 +1651,14 @@ function getPresenceIdentity() {
     const hue = hashHue(clientId);
     const color = `hsl(${hue} 62% 48%)`;
     _presenceIdentity = { clientId, name, color };
+    return _presenceIdentity;
+}
+
+function setPresenceName(name) {
+    const current = getPresenceIdentity();
+    const nextName = (name || "").trim().slice(0, 80) || current.name;
+    try { localStorage.setItem(presenceNameKey, nextName); } catch { /* ignore */ }
+    _presenceIdentity = { ...current, name: nextName };
     return _presenceIdentity;
 }
 
@@ -2019,6 +2087,9 @@ const LUCIDE_PATHS = {
         <path key="2" d="M17 18H3" />,
         <path key="3" d="M21 6H3" />
     ],
+    cloud: [
+        <path key="1" d="M17.5 19H8a5 5 0 1 1 1.1-9.88A6 6 0 0 1 20 12.5 3.5 3.5 0 0 1 17.5 19Z" />
+    ],
     eye: [
         <path key="1" d="M2.06 12.35a1 1 0 0 1 0-.7C3.52 7.46 7.52 5 12 5s8.48 2.46 9.94 6.65a1 1 0 0 1 0 .7C20.48 16.54 16.48 19 12 19s-8.48-2.46-9.94-6.65" />,
         <circle key="2" cx="12" cy="12" r="3" />
@@ -2409,11 +2480,25 @@ function PresenceStack({ peers }) {
     );
 }
 
+function saveStatusLabel(saveState, lastSaved) {
+    if (saveState === "saving") return "Saving...";
+    if (!lastSaved) return "";
+    return `Saved ${fmtDate(lastSaved)}`;
+}
+
+function saveStatusTooltip(lastSaved, lastSavedBy) {
+    if (!lastSaved) return "";
+    const who = lastSavedBy || "you";
+    return `Saved by ${who} ${fmtDate(lastSaved)}`;
+}
+
 function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadSheet, onDownloadProject, onStandaloneExport, onPromptSheet, onPromptProject, canExport, hasMultipleSheets, saveState, lastSaved,
-        viewOnly,
+        lastSavedBy, viewOnly,
         editMode, onSetEdit, canUndo, canRedo, onUndo, onRedo,
         sync, onEnableSync, onStopSharing, peers }) {
     const [promptCopied, setPromptCopied] = useState(false);
+    const savedLabel = saveStatusLabel(saveState, lastSaved);
+    const savedTooltip = saveStatusTooltip(lastSaved, lastSavedBy);
     const copyPrompt = async (close, scope) => {
         await (scope === "project" ? onPromptProject() : onPromptSheet());
         setPromptCopied(true);
@@ -2424,12 +2509,17 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
         <header className="app-bar" ref={innerRef}>
             <div className="app-bar-main">
                 <div className="ab-left">
-                    {!viewOnly && (
+                    {(!viewOnly || sync.status === "synced") && (
                         <button className="ab-back" onClick={onLibrary} title="Back to your projects">← Library</button>
                     )}
                     <div className="ab-brand">
                         <InlineTitleEdit className="ab-title" value={currentName} fallback="Untitled project"
                             disabled={!currentName || viewOnly} onCommit={onRenameCurrent} />
+                        {sync.status === "synced" && (
+                            <span className="cloud-badge" title={`Cloud copy (${sync.role || "shared"})`} aria-label="Cloud copy">
+                                <LucideIcon name="cloud" />
+                            </span>
+                        )}
                     </div>
                 </div>
                 <div className="ab-spacer" />
@@ -2448,15 +2538,15 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                         </div>
                     )}
                     {!viewOnly && <ShareControl sync={sync} onEnableSync={onEnableSync} onStopSharing={onStopSharing} />}
-                    {!viewOnly && <div className="ab-status" aria-live="polite">
+                    <div className="ab-status" aria-live="polite">
                         {saveState === "saving" ? (
                             <span className="save-state save-saving">Saving...</span>
                         ) : lastSaved ? (
-                            <span className="save-state save-saved" title={`Last saved ${fmtDate(lastSaved)}`}>
-                                <span className="save-dot" />Saved
+                            <span className="save-state save-saved" title={savedTooltip}>
+                                <span className="save-dot" /><span className="save-by">{savedLabel}</span>
                             </span>
                         ) : null}
-                    </div>}
+                    </div>
                     {!viewOnly && (
                         <div className="ab-seg" role="group" aria-label="Editing mode">
                             <button className={editMode ? "on" : ""} aria-pressed={editMode}
@@ -2754,12 +2844,20 @@ function ProjectCard({ p, current, onOpen, onRename, onDelete }) {
         if (n && n !== p.name) onRename(p.id, n); else setDraft(p.name);
     };
     const count = p.journeys?.length || 0;
+    // Cloud-linked projects show the collaborative edit (who/when), not the local
+    // mirror's write time. fall back to the local Modified timestamp otherwise.
+    const cloudWhen = p.cloudMapId ? (p.cloudUpdatedAt || p.updatedAt) : null;
+    const cloudWho = p.cloudUpdatedByName;
+    const updatedLabel = p.cloudMapId
+        ? (cloudWho ? `Updated by ${cloudWho} ${fmtDate(cloudWhen)}` : `Updated ${fmtDate(cloudWhen)}`)
+        : `Modified ${fmtDate(p.updatedAt)}`;
     return (
         <div className={`project-row${current ? " current" : ""}`} role="button" tabIndex={0}
             onClick={() => !editing && onOpen(p.id)}
             onKeyDown={(e) => { if (!editing && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onOpen(p.id); } }}>
             <div className="pc-main">
                 {current && <span className="pc-badge">Last opened</span>}
+                {p.cloudMapId && <span className="pc-badge cloud">Cloud</span>}
                 {editing ? (
                     <input ref={inputRef} className="m-input pc-rename" value={draft}
                         onClick={(e) => e.stopPropagation()} onChange={(e) => setDraft(e.target.value)} onBlur={commit}
@@ -2772,7 +2870,7 @@ function ProjectCard({ p, current, onOpen, onRename, onDelete }) {
                 )}
             </div>
             <div className="pc-count">{count} journey{count === 1 ? "" : "s"}</div>
-            <div className="pc-updated">Modified {fmtDate(p.updatedAt)}</div>
+            <div className="pc-updated" title={updatedLabel}>{updatedLabel}</div>
             <div className="pc-menu" onClick={(e) => e.stopPropagation()}>
                 <Menu align="right">
                     {(close) => (
@@ -2787,9 +2885,59 @@ function ProjectCard({ p, current, onOpen, onRename, onDelete }) {
     );
 }
 
-function LibraryScreen({ projects, currentId, onOpen, onNew, onRename, onDelete, onLoad }) {
+function SharedMapCard({ map, onOpen }) {
+    const when = map.updatedAt || map.lastOpenedAt;
+    const updatedLabel = map.updatedByName
+        ? `Updated by ${map.updatedByName} ${fmtDate(when)}`
+        : `Updated ${fmtDate(when)}`;
+    return (
+        <button className="project-row" onClick={() => onOpen(map.mapId)}>
+            <div className="pc-main">
+                <span className="pc-badge cloud">{map.role || "shared"}</span>
+                <div className="pc-name" title={map.name}>{map.name || "Shared map"}</div>
+            </div>
+            <div className="pc-count">Cloud</div>
+            <div className="pc-updated" title={updatedLabel}>{updatedLabel}</div>
+            <div className="pc-menu" aria-hidden="true" />
+        </button>
+    );
+}
+
+function ProfileMenu({ identity, onRename }) {
+    const [draft, setDraft] = useState(identity.name || "");
+    useEffect(() => setDraft(identity.name || ""), [identity.name]);
+    return (
+        <Menu trigger={
+            <span className="profile-trigger">
+                <span className="presence-av" style={{ background: identity.color || "var(--text-sec)" }}>{presenceInitials(identity.name)}</span>
+                <span>{identity.name}</span>
+            </span>
+        } align="right">
+            {(close) => (
+                <div className="profile-form">
+                    <label htmlFor="presence-name">Display name</label>
+                    <input id="presence-name" className="m-input" value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") { e.preventDefault(); onRename(draft); close(); }
+                            if (e.key === "Escape") { e.preventDefault(); setDraft(identity.name || ""); close(); }
+                        }} />
+                    <div className="profile-form-actions">
+                        <button className="btn-p" onClick={() => { onRename(draft); close(); }}>Save</button>
+                        <button className="btn-s" onClick={close}>Cancel</button>
+                    </div>
+                </div>
+            )}
+        </Menu>
+    );
+}
+
+function LibraryScreen({ projects, sharedMaps, currentId, profile, onProfileRename, onOpen, onOpenShared, onNew, onRename, onDelete, onLoad }) {
     return (
         <div className="lib">
+            <div className="profile-wrap">
+                <ProfileMenu identity={profile} onRename={onProfileRename} />
+            </div>
             <div className="lib-head">
                 <div>
                     <div className="lib-eyebrow">Local AI-assisted mapping workspace</div>
@@ -2801,18 +2949,31 @@ function LibraryScreen({ projects, currentId, onOpen, onNew, onRename, onDelete,
                     <button className="btn-p" onClick={onNew}>＋ New project</button>
                 </div>
             </div>
-            {projects.length === 0 ? (
-                <div className="lib-empty">No projects yet. Create your first one to get started.</div>
-            ) : (
+            <section className="library-section">
+                <h2 className="library-section-title">Your projects</h2>
+                {projects.length === 0 ? (
+                    <div className="lib-empty">No projects yet. Create your first one to get started.</div>
+                ) : (
+                    <div className="project-list">
+                        {projects.map((p) => (
+                            <ProjectCard key={p.id} p={p} current={p.id === currentId}
+                                onOpen={onOpen} onRename={onRename} onDelete={onDelete} />
+                        ))}
+                        <button className="project-row add" onClick={onNew}>
+                            <span className="pc-add-label">＋ New project</span>
+                        </button>
+                    </div>
+                )}
+            </section>
+            {sharedMaps.length > 0 && (
+                <section className="library-section">
+                    <h2 className="library-section-title">Shared with me</h2>
                 <div className="project-list">
-                    {projects.map((p) => (
-                        <ProjectCard key={p.id} p={p} current={p.id === currentId}
-                            onOpen={onOpen} onRename={onRename} onDelete={onDelete} />
+                    {sharedMaps.map((m) => (
+                        <SharedMapCard key={m.mapId} map={m} onOpen={onOpenShared} />
                     ))}
-                    <button className="project-row add" onClick={onNew}>
-                        <span className="pc-add-label">＋ New project</span>
-                    </button>
                 </div>
+                </section>
             )}
             <footer className="lib-footer">
                 <div className="lib-footer-left">
@@ -2928,7 +3089,7 @@ function Menu({ trigger, align, children, onOpen }) {
 // ═══════════════════════════════════════
 // TAG ADDER (inline, for tags-mode cells)
 // ═══════════════════════════════════════
-function TagAdder({ onAdd, existing = [] }) {
+function TagAdder({ onAdd, onCancel, existing = [] }) {
     const [text, setText] = useState("");
     const [ci, setCi] = useState(0);
     const [pickerOpen, setPickerOpen] = useState(false);
@@ -3057,7 +3218,9 @@ function TagAdder({ onAdd, existing = [] }) {
             if (open && options.length) commitOption(options[hi]);
             else addNew();
         } else if (e.key === "Escape") {
+            e.preventDefault();
             setOpen(false); setPickerOpen(false);
+            onCancel?.();
         }
     };
 
@@ -3157,7 +3320,7 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, cell
             <td className={className} style={style} colSpan={colSpan}
                 data-cell-key={cellKey}
                 title={`Editing: ${lockedBy.name || "Someone"}`}>
-                <div className="cell-note cell-locked-html" dangerouslySetInnerHTML={{ __html: html || "" }} />
+                <div key="locked" className="cell-note cell-locked-html" dangerouslySetInnerHTML={{ __html: html || "" }} />
                 <LockBadge lockedBy={lockedBy} />
             </td>
         );
@@ -3171,7 +3334,7 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, cell
                 e.preventDefault();
                 ref.current?.focus();
             }}>
-            <div ref={ref} className="cell-note" contentEditable={editMode} suppressContentEditableWarning
+            <div key="editable" ref={ref} className="cell-note" contentEditable={editMode} suppressContentEditableWarning
                 data-placeholder={editMode ? "Add note" : ""}
                 dangerouslySetInnerHTML={{ __html: html || "" }}
                 onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} />
@@ -3221,7 +3384,9 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
                     ))}
                     {!tags.length && <span className="cell-empty-hint">{editMode ? "Add tags" : "No tags"}</span>}
                 </div>
-                {editMode && selected && !peerLocked && <TagAdder existing={tags} onAdd={(t) => onTagsChange([...tags, t])} />}
+                {editMode && selected && !peerLocked && <TagAdder existing={tags}
+                    onAdd={(t) => onTagsChange([...tags, t])}
+                    onCancel={onDeselect} />}
                 <LockBadge lockedBy={lockedBy} />
             </td>
         );
@@ -3746,6 +3911,7 @@ function App() {
     const [view, setView] = useState("library");
     const [confirmState, setConfirmState] = useState(null);
     const [projects, setProjects] = useState([]);
+    const [sharedMaps, setSharedMaps] = useState([]);
     const [currentId, setCurrentId] = useState(null);
     const [standaloneName, setStandaloneName] = useState(null);
     const [viewOnly, setViewOnly] = useState(false);
@@ -3755,6 +3921,8 @@ function App() {
     const [editMode, setEditMode] = useState(true);
     const [selected, setSelected] = useState(null);
     const [lastSaved, setLastSaved] = useState(null);
+    const [lastSavedBy, setLastSavedBy] = useState(null);
+    const [profile, setProfile] = useState(() => getPresenceIdentity());
     const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
     // Collaborative sync. status: "off" | "enabling" | "synced" | "error".
     const [sync, setSync] = useState({ mapId: null, role: null, status: "off", error: null });
@@ -3851,9 +4019,67 @@ function App() {
 
     const refreshProjects = useCallback(async () => {
         setProjects(await dbListProjects());
+        setSharedMaps(await dbListSharedMaps());
     }, []);
 
     const currentName = projects.find((p) => p.id === currentId)?.name || standaloneName || null;
+
+    const markCloudSaved = useCallback((meta = {}) => {
+        const at = meta.updatedAt || Date.now();
+        setLastSaved(at);
+        // An ack the server echoes back to us carries OUR own name/clientId; show
+        // "you" for our own edits, the editor's name for everyone else's.
+        const myId = getPresenceIdentity().clientId;
+        const mine = meta.updatedByClientId && meta.updatedByClientId === myId;
+        setLastSavedBy(mine ? "you" : (meta.updatedByName || "you"));
+        setSaveState("saved");
+    }, []);
+
+    const mirrorCloudState = useCallback(async (mapId, role, name, journeysData, meta = {}, localId = null) => {
+        const at = meta.updatedAt || Date.now();
+        if (localId != null) {
+            await dbSaveCloudMirror(localId, journeysData, mapId, role, { ...meta, updatedAt: at });
+        } else if (role !== "owner") {
+            await dbUpsertSharedMap(mapId, { name, role, ...meta, updatedAt: at });
+        }
+        await refreshProjects();
+    }, [refreshProjects]);
+
+    // Live mirror context for the socket/op handlers. Keeping these in a ref
+    // (instead of as effect deps) prevents the WebSocket from tearing down and
+    // reconnecting on every project rename / standalone-name change.
+    const cloudCtxRef = useRef({ mapId: null, role: null, name: null, localId: null });
+    useEffect(() => {
+        cloudCtxRef.current = {
+            mapId: sync.mapId,
+            role: sync.role,
+            name: currentName || standaloneName || "Shared map",
+            localId: currentId,
+        };
+    }, [sync.mapId, sync.role, currentName, standaloneName, currentId]);
+
+    // Mirror a server-driven update using the current context ref. Stable across
+    // renames so the socket effect needn't depend on name/id state.
+    const mirrorFromSocket = useCallback((journeysData, meta) => {
+        const ctx = cloudCtxRef.current;
+        mirrorCloudState(ctx.mapId, ctx.role, ctx.name, journeysData, meta, ctx.localId)
+            .catch((err) => console.warn("Cloud mirror update failed.", err));
+    }, [mirrorCloudState]);
+
+    const announcePresence = useCallback(() => {
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const me = getPresenceIdentity();
+        try {
+            ws.send(JSON.stringify({ t: "presence.update", clientId: me.clientId, name: me.name, color: me.color }));
+        } catch { /* socket going away; reconnect will retry */ }
+    }, []);
+
+    const renameProfile = useCallback((name) => {
+        const next = setPresenceName(name);
+        setProfile(next);
+        announcePresence();
+    }, [announcePresence]);
 
     // Enable sync: mint a cloud map from the current journeys, keep the local
     // (Dexie) project as a mirror, and switch the URL to ?map=<id>. Returns the
@@ -3869,13 +4095,18 @@ function App() {
             setMapToken(mapId, tokens.owner);
             syncVersionRef.current = version;
             setSync({ mapId, role: "owner", status: "synced", error: null });
+            if (currentId != null) {
+                await dbMarkProjectCloud(currentId, mapId, "owner", { version, updatedAt: Date.now(), updatedByName: getPresenceIdentity().name });
+                await refreshProjects();
+            }
+            markCloudSaved({ updatedAt: Date.now(), updatedByName: getPresenceIdentity().name });
             writeMapRoute(mapId, { replace: true });
             return { mapId, tokens };
         } catch (err) {
             setSync((s) => ({ ...s, status: "error", error: err.message }));
             return null;
         }
-    }, [sync.status, currentName]);
+    }, [sync.status, currentName, currentId, refreshProjects, markCloudSaved]);
 
     // Stop sharing: called after the server-side delete succeeds and the token
     // has already been removed from localStorage. Closes the WS, resets sync
@@ -3903,20 +4134,31 @@ function App() {
     // Shared by the init path and the post-password-prompt path (Phase 5).
     const mountCloudMap = useCallback(async (mapId, token, session) => {
         const data = await apiGetMap(mapId, token, session);
-        setCurrentId(null);
+        const hydrated = hydrate(data.journeys || []);
+        const linkedProject = await dbFindProjectByCloudMap(mapId);
+        let localId = linkedProject?.id ?? null;
+        // Owners always get a local "Your projects" mirror — e.g. when opening
+        // their own map on a second device that has no local copy yet. Non-owners
+        // stay in the lighter "Shared with me" list (no local project created).
+        if (localId == null && data.role === "owner") {
+            localId = await dbCreateProject(data.name || "Untitled project", hydrated);
+            await dbMarkProjectCloud(localId, mapId, "owner", data);
+        }
+        setCurrentId(localId);
         setStandaloneName(data.name || "Shared map");
         syncVersionRef.current = data.version || 0;
         setSync({ mapId, role: data.role, status: "synced", error: null });
         const isViewer = data.role === "viewer";
         setViewOnly(isViewer);
         setEditMode(!isViewer);
-        replaceJourneys(hydrate(data.journeys || []), { skipSave: true });
+        replaceJourneys(hydrated, { skipSave: true });
         clearHistory();
         setView("project");
-        setSaveState("idle");
+        markCloudSaved(data);
+        await mirrorCloudState(mapId, data.role, data.name || "Shared map", hydrated, data, localId);
         writeMapRoute(mapId, { replace: true });
         setReady(true);
-    }, []);
+    }, [clearHistory, markCloudSaved, mirrorCloudState, replaceJourneys]);
 
     // Submit a password for a gated map (Phase 5). On success store the session
     // and mount the map; on failure return an error string for the modal to show.
@@ -3958,6 +4200,7 @@ function App() {
                 replaceJourneys(hydrate(embedded.journeys || []), { skipSave: true });
                 clearHistory();
                 setLastSaved(embedded.lastSavedAt ? new Date(embedded.lastSavedAt).getTime() : null);
+                setLastSavedBy(null);
                 setSaveState("idle");
                 setReady(true);
                 return;
@@ -4007,37 +4250,50 @@ function App() {
             // Land on the library; the user picks (or creates) a project to enter.
             const list = await dbListProjects();
             setProjects(list);
+            setSharedMaps(await dbListSharedMaps());
             const routedId = routeProjectId();
             if (routedId != null) {
                 const p = await dbGetProject(routedId);
                 if (p) {
-                    setCurrentId(routedId);
-                    replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
-                    clearHistory();
-                    setLastSaved(p.updatedAt || null);
-                    setTab(0);
-                    setEditMode(true);
-                    setView("project");
-                    localStorage.setItem(LAST_KEY, String(routedId));
-                    writeRoute(routedId, { replace: true });
-                    setReady(true);
-                    return;
+                    if (p.cloudMapId && getMapToken(p.cloudMapId)) {
+                        await mountCloudMap(p.cloudMapId, getMapToken(p.cloudMapId), getMapSession(p.cloudMapId));
+                        return;
+                    } else {
+                        setCurrentId(routedId);
+                        replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
+                        clearHistory();
+                        setLastSaved(p.updatedAt || null);
+                        setLastSavedBy(null);
+                        setTab(0);
+                        setEditMode(true);
+                        setViewOnly(false);
+                        setView("project");
+                        localStorage.setItem(LAST_KEY, String(routedId));
+                        writeRoute(routedId, { replace: true });
+                        setReady(true);
+                        return;
+                    }
                 }
                 writeRoute(null, { replace: true });
             }
             setView("library");
             setReady(true);
         })();
-    }, [clearHistory, replaceJourneys]);
+    }, [clearHistory, mountCloudMap, replaceJourneys]);
 
     // Keep native browser Back/Forward in sync with the in-app project view.
     useEffect(() => {
-        if (viewOnly) return;
         const onPopState = () => {
             // Browser back doesn't blur the focused cell (popstate is same-document),
             // so flush any in-flight cell draft into state before we swap views.
             document.activeElement?.blur?.();
             (async () => {
+                const routedMapId = routeMapId();
+                if (routedMapId) {
+                    const token = getMapToken(routedMapId);
+                    if (token) await mountCloudMap(routedMapId, token, getMapSession(routedMapId));
+                    return;
+                }
                 const routedId = routeProjectId();
                 if (routedId == null) {
                     setSelected(null);
@@ -4053,12 +4309,18 @@ function App() {
                     await refreshProjects();
                     return;
                 }
+                if (p.cloudMapId && getMapToken(p.cloudMapId)) {
+                    await mountCloudMap(p.cloudMapId, getMapToken(p.cloudMapId), getMapSession(p.cloudMapId));
+                    return;
+                }
                 setCurrentId(routedId);
                 replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
                 clearHistory();
                 setLastSaved(p.updatedAt || null);
+                setLastSavedBy(null);
                 setTab(0);
                 setEditMode(true);
+                setViewOnly(false);
                 setSelected(null);
                 setView("project");
                 localStorage.setItem(LAST_KEY, String(routedId));
@@ -4067,7 +4329,7 @@ function App() {
         };
         window.addEventListener("popstate", onPopState);
         return () => window.removeEventListener("popstate", onPopState);
-    }, [clearHistory, refreshProjects, replaceJourneys, viewOnly]);
+    }, [clearHistory, mountCloudMap, refreshProjects, replaceJourneys]);
 
     // ── Autosave current project (debounced) ──
     useEffect(() => {
@@ -4082,7 +4344,7 @@ function App() {
         saveTimer.current = setTimeout(() => {
             dbSaveJourneys(currentId, journeysRef.current)
                 .then(refreshProjects)
-                .then(() => { setSaveState("saved"); setLastSaved(Date.now()); });
+                .then(() => { setSaveState("saved"); setLastSaved(Date.now()); setLastSavedBy("you"); });
         }, 600);
         return () => clearTimeout(saveTimer.current);
     }, [journeys, currentId, ready, refreshProjects]);
@@ -4094,8 +4356,11 @@ function App() {
         if (!parsed || typeof parsed.version !== "number") return;
         syncVersionRef.current = parsed.version;
         skipNextPushRef.current = true;
-        replaceJourneys(hydrate(parsed.journeys || []), { skipSave: true });
-    }, [replaceJourneys]);
+        const hydrated = hydrate(parsed.journeys || []);
+        replaceJourneys(hydrated, { skipSave: true });
+        markCloudSaved(parsed);
+        mirrorFromSocket(hydrated, parsed);
+    }, [markCloudSaved, mirrorFromSocket, replaceJourneys]);
 
     // ── Phase 9: emit an op over the socket for a local optimistic change ──
     // The local immutable updater has already mutated `journeys`; this only sends
@@ -4110,6 +4375,7 @@ function App() {
         const ws = wsRef.current;
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
         const structural = STRUCTURAL_PREFIXES.some((p) => op.t.startsWith(p));
+        setSaveState("saving");
         // Bump our local version optimistically for a structural op so a rapid
         // burst of structural ops carries increasing baseVersions (the server
         // serializes them; a stale one just triggers a doc.reject resync).
@@ -4163,7 +4429,12 @@ function App() {
         if (structural && typeof op.version === "number") syncVersionRef.current = op.version;
         skipNextPushRef.current = true;
         replaceJourneys(next, { skipSave: true });
-    }, [replaceJourneys]);
+        markCloudSaved(op);
+        // cell.set frames carry no version (content is commutative); fall back to
+        // the live version so the stored cloudVersion isn't clobbered to 0.
+        const meta = typeof op.version === "number" ? op : { ...op, version: syncVersionRef.current };
+        mirrorFromSocket(next, meta);
+    }, [markCloudSaved, mirrorFromSocket, replaceJourneys]);
 
     // Defer a remote cell.set only when it targets the cell we are actively
     // editing; a different cell can apply immediately (the Phase 9 headline win).
@@ -4284,10 +4555,7 @@ function App() {
             ws.onopen = () => {
                 retries = 0;
                 // Announce our presence so peers see us (and we get the roster).
-                const me = getPresenceIdentity();
-                try {
-                    ws.send(JSON.stringify({ t: "presence.update", clientId: me.clientId, name: me.name, color: me.color }));
-                } catch { /* socket going away; reconnect will retry */ }
+                announcePresence();
             };
             ws.onmessage = (ev) => {
                 let parsed;
@@ -4311,6 +4579,11 @@ function App() {
                     }
                 } else if (parsed.t === "cell.set" || STRUCTURAL_PREFIXES.some((p) => String(parsed.t || "").startsWith(p))) {
                     applyOrDeferRemoteOp(parsed);
+                } else if (parsed.t === "op.ack" || parsed.t === "doc.ack") {
+                    if (typeof parsed.version === "number") syncVersionRef.current = parsed.version;
+                    markCloudSaved(parsed);
+                    const meta = typeof parsed.version === "number" ? parsed : { ...parsed, version: syncVersionRef.current };
+                    mirrorFromSocket(journeysRef.current, meta);
                 }
             };
             ws.onclose = () => { if (wsRef.current === ws) { wsRef.current = null; setPeers([]); setLocks([]); } scheduleReconnect(); };
@@ -4336,7 +4609,7 @@ function App() {
             editingCellIdRef.current = null;
             if (ws) { ws.onclose = null; ws.onerror = null; try { ws.close(); } catch { /* ignore */ } }
         };
-    }, [sync.status, sync.mapId, applyOrDeferRemote, applyOrDeferRemoteOp]);
+    }, [announcePresence, applyOrDeferRemote, applyOrDeferRemoteOp, markCloudSaved, mirrorFromSocket, sync.mapId, sync.status]);
 
     // Phase 9 replaces the old "push the entire journeys array on every change"
     // behavior with explicit op emits from the edit handlers. The Worker still
@@ -4561,16 +4834,29 @@ function App() {
     const openProject = useCallback(async (id) => {
         const p = await dbGetProject(id);
         if (!p) return;
+        if (p.cloudMapId && getMapToken(p.cloudMapId)) {
+            await mountCloudMap(p.cloudMapId, getMapToken(p.cloudMapId), getMapSession(p.cloudMapId));
+            return;
+        }
         setCurrentId(id);
         replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
         clearHistory();
         setLastSaved(p.updatedAt || null);
+        setLastSavedBy(null);
         setTab(0);
         setEditMode(true);
+        setViewOnly(false);
+        setSync({ mapId: null, role: null, status: "off", error: null });
         setView("project");
         localStorage.setItem(LAST_KEY, String(id));
         writeRoute(id);
-    }, [clearHistory, replaceJourneys]);
+    }, [clearHistory, mountCloudMap, replaceJourneys]);
+
+    const openSharedMap = useCallback(async (mapId) => {
+        const token = getMapToken(mapId);
+        if (!token) return;
+        await mountCloudMap(mapId, token, getMapSession(mapId));
+    }, [mountCloudMap]);
 
     const goLibrary = useCallback(() => {
         setSelected(null);
@@ -4629,6 +4915,8 @@ function App() {
         clearHistory();
         setTab(0);
         setEditMode(true);
+        setViewOnly(false);
+        setSync({ mapId: null, role: null, status: "off", error: null });
         setView("project");
         localStorage.setItem(LAST_KEY, String(id));
         writeRoute(id);
@@ -4645,6 +4933,8 @@ function App() {
             replaceJourneys([journey]);
             clearHistory();
             setTab(0);
+            setViewOnly(false);
+            setSync({ mapId: null, role: null, status: "off", error: null });
             setView("project");
             writeRoute(id);
             await refreshProjects();
@@ -4823,6 +5113,19 @@ function App() {
         return () => window.removeEventListener("keydown", onKeyDown);
     }, [editMode, selected, handleCellMode, handleCellAlign]);
 
+    useEffect(() => {
+        const onKeyDown = (e) => {
+            if (!editMode || !selected || e.key !== "Escape") return;
+            const cell = journeysRef.current[selected.jIdx]?.subJourneys?.[selected.sjIdx]?.rows?.[selected.rowIdx]?.cells?.[selected.cellIdx];
+            if ((cell?.mode || "text") !== "tags") return;
+            e.preventDefault();
+            setSelected(null);
+            releaseLock();
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [editMode, releaseLock, selected]);
+
     // The cell the format toolbar currently targets.
     const selectedCell = selected
         ? journeys[selected.jIdx]?.subJourneys?.[selected.sjIdx]?.rows?.[selected.rowIdx]?.cells?.[selected.cellIdx]
@@ -4840,11 +5143,12 @@ function App() {
     if (!ready) return null;
 
     // ── Home / library screen ──
-    if (!viewOnly && view === "library") {
+    if (view === "library") {
         return (
             <>
-                <LibraryScreen projects={projects} currentId={currentId}
-                    onOpen={openProject} onNew={newProject}
+                <LibraryScreen projects={projects} sharedMaps={sharedMaps} currentId={currentId}
+                    profile={profile} onProfileRename={renameProfile}
+                    onOpen={openProject} onOpenShared={openSharedMap} onNew={newProject}
                     onRename={renameProject} onDelete={deleteProject}
                     onLoad={() => setModal(true)} />
                 {modal && <LoadModal onLoad={(text, mode, opts) => loadFromText(text, mode, { ...opts, forceNew: true })} onClose={() => setModal(false)} currentProjectName={currentName} existingJourneys={[]} />}
@@ -4861,7 +5165,7 @@ function App() {
                 onDownloadSheet={exportCurrentSheet} onDownloadProject={exportProject}
                 onStandaloneExport={exportStandaloneHtml}
                 onPromptSheet={copyPromptCurrentSheet} onPromptProject={copyPromptProject}
-                canExport={journeys.length > 0} hasMultipleSheets={journeys.length > 1} saveState={saveState} lastSaved={lastSaved}
+                canExport={journeys.length > 0} hasMultipleSheets={journeys.length > 1} saveState={saveState} lastSaved={lastSaved} lastSavedBy={lastSavedBy}
                 viewOnly={viewOnly}
                 editMode={editMode} onSetEdit={(v) => setEditMode(v)}
                 canUndo={historyState.canUndo} canRedo={historyState.canRedo}

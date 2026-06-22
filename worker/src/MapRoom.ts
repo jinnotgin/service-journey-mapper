@@ -60,6 +60,12 @@ interface SocketAttachment {
   lockedAt?: number;
 }
 
+interface SaveMeta {
+  updatedAt: number;
+  updatedByClientId?: string;
+  updatedByName?: string;
+}
+
 const MAX_DOC_BYTES = 2 * 1024 * 1024; // 2 MB ceiling per document
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // password sessions live 12 hours
 const LOCK_TTL_MS = 15000; // a lock with no heartbeat for this long is stale (Phase 8)
@@ -264,11 +270,13 @@ export class MapRoom {
 
     const newVersion = currentVersion + 1;
     const now = Date.now();
-    this.persistSnapshot(journeys, newVersion, now);
+    const saveMeta = this.saveMetaFor(ws, now);
+    this.persistSnapshot(journeys, newVersion, saveMeta);
 
     // Broadcast the accepted doc to every OTHER connected client.
-    const update = JSON.stringify({ t: "doc.update", version: newVersion, journeys });
+    const update = JSON.stringify({ t: "doc.update", version: newVersion, journeys, ...saveMeta });
     this.broadcastExcept(ws, update);
+    ws.send(JSON.stringify({ t: "doc.ack", version: newVersion, ...saveMeta }));
   }
 
   // ── Phase 9 op handling ─────────────────────────────────────────────────
@@ -328,9 +336,11 @@ export class MapRoom {
       tsMap[cellId] = ts;
       this.setMeta("cellTs", JSON.stringify(tsMap));
       // cell.set does NOT bump the global version (content is commutative).
-      this.persistSnapshot(next, currentVersion, now);
-      const frame = JSON.stringify({ t: "cell.set", cellId, fields: op.fields, ts });
+      const saveMeta = this.saveMetaFor(ws, now);
+      this.persistSnapshot(next, currentVersion, saveMeta);
+      const frame = JSON.stringify({ t: "cell.set", cellId, fields: op.fields, ts, ...saveMeta });
       this.broadcastExcept(ws, frame);
+      ws.send(JSON.stringify({ t: "op.ack", op: op.t, version: currentVersion, ...saveMeta }));
       return;
     }
 
@@ -351,11 +361,13 @@ export class MapRoom {
       return;
     }
     const newVersion = currentVersion + 1;
-    this.persistSnapshot(next, newVersion, now);
+    const saveMeta = this.saveMetaFor(ws, now);
+    this.persistSnapshot(next, newVersion, saveMeta);
     // Re-broadcast the op (+ the new version) to OTHER clients. They apply it by
     // id to their local journeys and adopt `version`.
-    const frame = JSON.stringify({ ...op, version: newVersion });
+    const frame = JSON.stringify({ ...op, version: newVersion, ...saveMeta });
     this.broadcastExcept(ws, frame);
+    ws.send(JSON.stringify({ t: "op.ack", op: op.t, version: newVersion, ...saveMeta }));
   }
 
   /** The current whole-document snapshot as a parsed journeys array. */
@@ -366,7 +378,7 @@ export class MapRoom {
   }
 
   /** Persist a snapshot at `version` (prune older rows) and bump updatedAt. */
-  private persistSnapshot(journeys: unknown, version: number, now: number): void {
+  private persistSnapshot(journeys: unknown, version: number, saveMeta: SaveMeta): void {
     const docJson = JSON.stringify(journeys);
     this.sql.exec(
       "INSERT INTO snapshot (version, json) VALUES (?, ?) ON CONFLICT(version) DO UPDATE SET json = excluded.json",
@@ -375,7 +387,18 @@ export class MapRoom {
     );
     this.sql.exec("DELETE FROM snapshot WHERE version <> ?", version);
     this.setMeta("version", String(version));
-    this.setMeta("updatedAt", String(now));
+    this.setMeta("updatedAt", String(saveMeta.updatedAt));
+    if (saveMeta.updatedByClientId) this.setMeta("updatedByClientId", saveMeta.updatedByClientId);
+    if (saveMeta.updatedByName) this.setMeta("updatedByName", saveMeta.updatedByName);
+  }
+
+  private saveMetaFor(ws: WebSocket, updatedAt: number): SaveMeta {
+    const a = ws.deserializeAttachment() as SocketAttachment | null;
+    return {
+      updatedAt,
+      updatedByClientId: a?.clientId,
+      updatedByName: a?.name || "Someone",
+    };
   }
 
   /** Per-cell last-write timestamps for cell.set LWW (stored as one meta blob). */
@@ -529,11 +552,21 @@ export class MapRoom {
     t: string;
     version: number;
     journeys: unknown;
+    updatedAt: number | null;
+    updatedByClientId: string | null;
+    updatedByName: string | null;
   } {
     const version = Number(this.getMeta("version") || "1");
     const row = this.sql.exec("SELECT json FROM snapshot WHERE version = ?", version).toArray()[0];
     const journeys = row ? JSON.parse(row.json as string) : [];
-    return { t, version, journeys };
+    return {
+      t,
+      version,
+      journeys,
+      updatedAt: this.numberMeta("updatedAt"),
+      updatedByClientId: this.getMeta("updatedByClientId"),
+      updatedByName: this.getMeta("updatedByName"),
+    };
   }
 
   // ── internal endpoints ───────────────────────────────────────────────
@@ -553,6 +586,7 @@ export class MapRoom {
     this.setMeta("version", "1");
     this.setMeta("createdAt", String(now));
     this.setMeta("updatedAt", String(now));
+    this.setMeta("updatedByName", "Owner");
     this.sql.exec("INSERT INTO snapshot (version, json) VALUES (?, ?)", 1, docJson);
     for (const role of ["owner", "editor", "viewer"] as const) {
       this.sql.exec(
@@ -598,6 +632,9 @@ export class MapRoom {
         version,
         role,
         name: this.getMeta("name"),
+        updatedAt: this.numberMeta("updatedAt"),
+        updatedByClientId: this.getMeta("updatedByClientId"),
+        updatedByName: this.getMeta("updatedByName"),
       }),
       { headers: { "Content-Type": "application/json" } },
     );
@@ -825,6 +862,13 @@ export class MapRoom {
   private getMeta(k: string): string | null {
     const row = this.sql.exec("SELECT v FROM meta WHERE k = ?", k).toArray()[0];
     return row ? (row.v as string) : null;
+  }
+
+  private numberMeta(k: string): number | null {
+    const raw = this.getMeta(k);
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
   }
 
   private setMeta(k: string, v: string): void {
