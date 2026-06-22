@@ -85,6 +85,16 @@ export default {
         return await getMap(parts[2], url, env, cors);
       }
 
+      // DELETE /api/maps/:id  — owner-only: permanently delete the map
+      if (
+        request.method === "DELETE" &&
+        parts.length === 3 &&
+        parts[0] === "api" &&
+        parts[1] === "maps"
+      ) {
+        return await deleteMap(parts[2], request, env, cors);
+      }
+
       return errorJson(404, "Not found", cors);
     } catch (err) {
       return errorJson(500, err instanceof Error ? err.message : "Internal error", cors);
@@ -162,6 +172,29 @@ async function accessMap(
   const bodyText = await request.text();
   const stub = env.MAP_ROOM.get(env.MAP_ROOM.idFromName(mapId));
   const res = await stub.fetch("https://do/access", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: bodyText,
+  });
+  const text = await res.text();
+  return new Response(text, {
+    status: res.status,
+    headers: { "Content-Type": "application/json", ...cors },
+  });
+}
+
+// DELETE /api/maps/:id — owner-only: permanently wipe the map from the DO.
+// The owner token is passed in the JSON body (not a header) to match the same
+// auth pattern used by all other owner-only endpoints.
+async function deleteMap(
+  mapId: string,
+  request: Request,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const bodyText = await request.text();
+  const stub = env.MAP_ROOM.get(env.MAP_ROOM.idFromName(mapId));
+  const res = await stub.fetch("https://do/delete", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: bodyText,

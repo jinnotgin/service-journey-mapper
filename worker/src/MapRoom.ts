@@ -104,6 +104,8 @@ export class MapRoom {
         return this.handleLinks(await request.json());
       case "POST /access":
         return this.handleAccess(await request.json());
+      case "POST /delete":
+        return this.handleDelete(await request.json());
       default:
         return new Response("Not found", { status: 404 });
     }
@@ -472,6 +474,34 @@ export class MapRoom {
       JSON.stringify({ ok: true, role, passwordRequired: false, session, expires }),
       { headers: { "Content-Type": "application/json" } },
     );
+  }
+
+  // ── owner delete ─────────────────────────────────────────────────────
+
+  /** Owner-only: permanently wipe all map data and kick connected WebSockets. */
+  private async handleDelete(body: { token?: string }): Promise<Response> {
+    const role = await this.roleForToken(body.token ?? null);
+    if (role !== "owner") {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Close all live WebSocket connections so peers get an immediate disconnect.
+    for (const ws of this.state.getWebSockets()) {
+      try { ws.close(4001, "Map deleted"); } catch { /* ignore */ }
+    }
+
+    // Wipe all stored data. mapId will be absent → future GET/WS requests 404.
+    this.sql.exec("DELETE FROM meta");
+    this.sql.exec("DELETE FROM snapshot");
+    this.sql.exec("DELETE FROM capabilities");
+    this.sql.exec("DELETE FROM sessions");
+
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   /** True if this map currently requires a password. */

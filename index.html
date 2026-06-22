@@ -1072,6 +1072,9 @@ const getMapToken = (mapId) => {
 const setMapToken = (mapId, token) => {
     try { localStorage.setItem(mapTokenKey(mapId), token); } catch { /* ignore */ }
 };
+const removeMapToken = (mapId) => {
+    try { localStorage.removeItem(mapTokenKey(mapId)); } catch { /* ignore */ }
+};
 
 // Password session (Phase 5): when a map requires a password, POST /api/maps/:id/access
 // returns a short-lived session token that proves the password factor. It is kept
@@ -1171,6 +1174,18 @@ async function apiSetPassword(mapId, ownerToken, password) {
 // Owner-only: remove the map password (Phase 5).
 async function apiClearPassword(mapId, ownerToken) {
     return apiManageLink(mapId, ownerToken, { action: "clearPassword" });
+}
+
+// Owner-only: permanently delete the map from the server.
+async function apiDeleteMap(mapId, ownerToken) {
+    const res = await fetch(`${SYNC_API_BASE}/api/maps/${encodeURIComponent(mapId)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: ownerToken }),
+    });
+    if (res.status === 403) throw new Error("Only the map owner can delete it.");
+    if (!res.ok) throw new Error(`Could not delete map (${res.status})`);
+    return res.json();
 }
 
 function InlineTitleEdit({ value, fallback, className, inputClassName, disabled, onCommit }) {
@@ -1674,12 +1689,14 @@ function PasswordControl({ mapId, enabled, onChange }) {
     );
 }
 
-function ShareControl({ sync, onEnableSync }) {
+function ShareControl({ sync, onEnableSync, onStopSharing }) {
     const [links, setLinks] = useState(null); // {editor:{token,enabled}, viewer:{...}}
     const [pwEnabled, setPwEnabled] = useState(false); // Phase 5: map password status
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [copiedSelf, setCopiedSelf] = useState(false);
+    const [confirmStop, setConfirmStop] = useState(false);
+    const [stopping, setStopping] = useState(false);
     const isOwner = sync.role === "owner";
 
     const loadLinks = useCallback(async () => {
@@ -1695,6 +1712,18 @@ function ShareControl({ sync, onEnableSync }) {
     }, [isOwner, sync.mapId]);
 
     const handleEnable = async () => { await onEnableSync(); };
+    const stopSharing = async () => {
+        setStopping(true);
+        try {
+            await apiDeleteMap(sync.mapId, getMapToken(sync.mapId));
+            removeMapToken(sync.mapId);
+            onStopSharing();
+        } catch (e) {
+            setError(e.message || "Could not delete map");
+            setStopping(false);
+            setConfirmStop(false);
+        }
+    };
     const copySelf = async () => {
         try {
             await navigator.clipboard.writeText(mapLinkFor(sync.mapId, getMapToken(sync.mapId)));
@@ -1735,6 +1764,27 @@ function ShareControl({ sync, onEnableSync }) {
                             <ShareLinkRow mapId={sync.mapId} kind="view" link={links.viewer} onChange={setLinks} />
                             <PasswordControl mapId={sync.mapId} enabled={pwEnabled}
                                 onChange={(pe) => setPwEnabled(pe)} />
+                            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, display: "grid", gap: 6 }}>
+                                {confirmStop ? (
+                                    <>
+                                        <span style={{ fontSize: "11px", color: "var(--text-sec)" }}>
+                                            This permanently deletes the cloud map. Collaborators will lose access.
+                                        </span>
+                                        <div style={{ display: "flex", gap: 6 }}>
+                                            <button className="menu-item danger" style={{ flex: 1 }} onClick={stopSharing} disabled={stopping}>
+                                                {stopping ? "Deleting…" : "Yes, delete"}
+                                            </button>
+                                            <button className="menu-item" style={{ flex: 1 }} onClick={() => setConfirmStop(false)} disabled={stopping}>
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <button className="menu-item danger" onClick={() => setConfirmStop(true)}>
+                                        Stop sharing &amp; delete
+                                    </button>
+                                )}
+                            </div>
                         </>
                     ) : (
                         <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-sec)" }}>No links available.</span>
@@ -1770,7 +1820,7 @@ function PresenceStack({ peers }) {
 function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadSheet, onDownloadProject, onStandaloneExport, onPromptSheet, onPromptProject, canExport, hasMultipleSheets, saveState, lastSaved,
         viewOnly,
         editMode, onSetEdit, canUndo, canRedo, onUndo, onRedo,
-        sync, onEnableSync, peers }) {
+        sync, onEnableSync, onStopSharing, peers }) {
     const [promptCopied, setPromptCopied] = useState(false);
     const copyPrompt = async (close, scope) => {
         await (scope === "project" ? onPromptProject() : onPromptSheet());
@@ -1805,7 +1855,7 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                             </button>
                         </div>
                     )}
-                    {!viewOnly && <ShareControl sync={sync} onEnableSync={onEnableSync} />}
+                    {!viewOnly && <ShareControl sync={sync} onEnableSync={onEnableSync} onStopSharing={onStopSharing} />}
                     {!viewOnly && <div className="ab-status" aria-live="polite">
                         {saveState === "saving" ? (
                             <span className="save-state save-saving">Saving...</span>
@@ -3142,6 +3192,21 @@ function App() {
         }
     }, [sync.status, currentName]);
 
+    // Stop sharing: called after the server-side delete succeeds and the token
+    // has already been removed from localStorage. Closes the WS, resets sync
+    // state, and navigates back to the local project (if one exists) or the library.
+    const stopSync = useCallback(() => {
+        const localId = currentId;
+        setSync({ mapId: null, role: null, status: "off", error: null });
+        setPeers([]);
+        if (localId != null) {
+            writeRoute(localId, { replace: true });
+        } else {
+            writeMapRoute(null, { replace: true });
+            setView("library");
+        }
+    }, [currentId]);
+
     useEffect(() => {
         document.title = currentName && view === "project"
             ? `${currentName} - Lanescape`
@@ -4000,7 +4065,7 @@ function App() {
                 editMode={editMode} onSetEdit={(v) => setEditMode(v)}
                 canUndo={historyState.canUndo} canRedo={historyState.canRedo}
                 onUndo={undo} onRedo={redo}
-                sync={sync} onEnableSync={enableSync} peers={peers} />
+                sync={sync} onEnableSync={enableSync} onStopSharing={stopSync} peers={peers} />
             {!viewOnly && editMode && journeys.length > 0 && (
                 <FormatToolbar cell={selectedCell} selectedKey={selectedKey}
                     onMode={(m) => selected && handleCellMode(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, m)}
