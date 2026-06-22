@@ -1309,6 +1309,10 @@ const cloudMetaFromData = (mapId, role, data) => {
     return meta;
 };
 const dbMarkProjectCloud = (id, mapId, role, data = {}) => db.projects.update(id, cloudMetaFromData(mapId, role, data));
+const dbUnmarkProjectCloud = (id) => db.projects.update(id, {
+    cloudMapId: null, cloudRole: null, cloudVersion: null,
+    cloudUpdatedAt: null, cloudUpdatedByName: null, cloudUpdatedByClientId: null,
+});
 const dbSaveCloudMirror = (id, journeys, mapId, role, data = {}) => {
     const now = Date.now();
     return db.projects.update(id, {
@@ -2984,7 +2988,7 @@ function LibraryScreen({ projects, sharedMaps, currentId, profile, onProfileRena
                 <div className="lib-footer-left">
                     <span>Made by <a href="https://itsjin.com" target="_blank" rel="noreferrer">Jin</a></span>
                     <span className="lib-separator" aria-hidden="true" />
-                    <span className="lib-version">v2</span>
+                    <span className="lib-version">v3</span>
                 </div>
                 <div className="lib-privacy">
                     <LucideIcon name="shieldCheck" />
@@ -4115,18 +4119,22 @@ function App() {
 
     // Stop sharing: called after the server-side delete succeeds and the token
     // has already been removed from localStorage. Closes the WS, resets sync
-    // state, and navigates back to the local project (if one exists) or the library.
-    const stopSync = useCallback(() => {
+    // state, clears the cloud badge on the local project, and navigates back
+    // to the local project (if one exists) or the library.
+    const stopSync = useCallback(async () => {
         const localId = currentId;
         setSync({ mapId: null, role: null, status: "off", error: null });
         setPeers([]);
+        // Clear the cloud fields so the project no longer shows the "Cloud" badge.
         if (localId != null) {
+            await dbUnmarkProjectCloud(localId);
             writeRoute(localId, { replace: true });
         } else {
             writeMapRoute(null, { replace: true });
             setView("library");
         }
-    }, [currentId]);
+        await refreshProjects();
+    }, [currentId, refreshProjects]);
 
     useEffect(() => {
         document.title = currentName && view === "project"
@@ -4866,7 +4874,10 @@ function App() {
     const goLibrary = useCallback(() => {
         setSelected(null);
         setView("library");
-        writeRoute(null);
+        // writeMapRoute(null) clears both the project and map params (and any
+        // stray ?token=), so returning home from a synced cloud map doesn't
+        // leave ?map= in the URL.
+        writeMapRoute(null);
         refreshProjects();
     }, [refreshProjects]);
 
