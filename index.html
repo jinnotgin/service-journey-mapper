@@ -242,7 +242,7 @@
         /* Line of visibility = the blueprint's defining moment. A tall, quiet
            band of canvas separates the frontstage cluster from the backstage
            cluster, with a single dashed boundary floating through it. */
-        .row-divider>.ll{background:transparent!important;color:var(--text-sec)!important;border-bottom:0!important}
+        .row-divider>.ll{background:var(--canvas)!important;color:var(--text-sec)!important;border-bottom:0!important}
         .row-divider>.dc{background:transparent!important;color:var(--text-sec);font-weight:700;text-align:center;padding:16px 12px!important;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:1.3px;border-bottom:0!important}
         .row-divider .lane-label{align-items:center}
         .row-divider .lane-main{color:var(--text-sec)}
@@ -403,7 +403,7 @@
             .lib-privacy{justify-content:center}
         }
         @media print{
-            .tab-bar,.m-ov,.ab-actions,.cell-toolbar,.menu-wrap,.add-col-c,.add-row-bar{display:none}
+            .tab-bar,.m-ov,.ab-actions,.cell-toolbar,.menu-wrap,.add-col-c,.add-row-bar,.insert-zone,.ins-btn,.edit-bottom-pad{display:none}
             .app-bar,.stage-outer{position:static}
             .ll{position:static}
         }
@@ -494,6 +494,19 @@
         .add-row-bar{padding:6px 0 10px;background:var(--canvas);border:0}
         .add-row-btn{background:var(--surface);border:1px dashed var(--border);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);font-weight:600;color:var(--text-sec);cursor:pointer;font-family:inherit}
         .add-row-btn:hover{background:var(--bg);color:var(--text);border-color:var(--text-sec)}
+
+        /* hover-revealed insert affordances (edit mode): the transparent zone is
+           the boundary/gap target; the visible button stays compact. */
+        .insert-zone{position:absolute;z-index:14;display:flex;align-items:center;justify-content:center;pointer-events:auto}
+        .ins-stage-r-zone,.ins-sub-r-zone{top:4px;bottom:4px;right:-16px;width:32px}
+        .ins-stage-b-zone{left:14px;right:14px;bottom:5px;height:28px}
+        .stg-empty-subrow .ins-stage-b-zone{top:58px;bottom:12px;height:auto}
+        .ins-row-t-zone{top:calc(-1 * var(--lane-gap));left:0;right:0;height:var(--lane-gap)}
+        .ins-btn{position:static;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:1px solid var(--accent-line);background:var(--surface);color:var(--accent-strong);font-size:15px;font-weight:700;line-height:1;cursor:pointer;padding:0;font-family:inherit;box-shadow:0 1px 3px oklch(20% .006 70 / .2);opacity:0;pointer-events:none;transition:opacity .12s ease-out}
+        .ins-btn:hover{background:var(--accent-soft);border-color:var(--accent)}
+        .insert-zone:hover>.ins-btn,.insert-zone:focus-within>.ins-btn{opacity:1;pointer-events:auto}
+        /* edit-mode-only breathing room below the last lane (hidden in view/print) */
+        .edit-bottom-pad{height:120px}
 
         /* Selection lives on the note surface only, never the cell rectangle,
            so editing never reveals the underlying table grid. */
@@ -3241,6 +3254,10 @@ function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPr
                     <>
                     <span className="drag-handle row-drag" draggable title="Drag to reorder row"
                         onDragStart={(e) => onRowDragStart(e, rowIdx)} onDragEnd={onDragEnd}>⠿</span>
+                    <span className="insert-zone ins-row-t-zone">
+                        <button type="button" className="ins-btn" title="Add row here"
+                            onClick={() => onRowAction("insertAbove")}>+</button>
+                    </span>
                     <span className="row-menu">
                         <Menu align="left">
                             {(close) => (
@@ -3568,7 +3585,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                     const lc = leafCount(s);
                                     const sHasSub = (s.subStages?.length || 0) > 0;
                                     return (
-                                        <td key={si} className={`stg-c${dropTarget?.type === "stage" && dropTarget.stageIdx === si ? ` drop-${dropTarget.side}` : ""}`} colSpan={lc}
+                                        <td key={si} className={`stg-c${hasSub && !sHasSub ? " stg-empty-subrow" : ""}${dropTarget?.type === "stage" && dropTarget.stageIdx === si ? ` drop-${dropTarget.side}` : ""}`} colSpan={lc}
                                             rowSpan={hasSub && !sHasSub ? 2 : 1}
                                             style={{ minWidth: lc * COL_W }}
                                             onDragOver={editMode ? (e) => stageDragOver(e, si) : undefined}
@@ -3588,6 +3605,18 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                         </>
                                                     )}
                                                 </Menu>
+                                                {si < stages.length - 1 && (
+                                                    <span className="insert-zone ins-stage-r-zone">
+                                                        <button type="button" className="ins-btn" title="Add stage here"
+                                                            onClick={() => onStage("addStage", { stageIdx: si })}>+</button>
+                                                    </span>
+                                                )}
+                                                {!sHasSub && (
+                                                    <span className="insert-zone ins-stage-b-zone">
+                                                        <button type="button" className="ins-btn" title="Add sub-stage"
+                                                            onClick={() => onStage("addSubStage", { stageIdx: si })}>+</button>
+                                                    </span>
+                                                )}
                                                 </>
                                             )}
                                             <span className="stage-card">
@@ -3636,6 +3665,10 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                             </>
                                                         )}
                                                     </Menu>
+                                                    <span className="insert-zone ins-sub-r-zone">
+                                                        <button type="button" className="ins-btn" title="Add sub-stage here"
+                                                            onClick={() => onStage("addSubStage", { stageIdx: si, subIdx: ssi })}>+</button>
+                                                    </span>
                                                     </>
                                                 )}
                                                 <span className="step-chip">
@@ -3697,6 +3730,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                     )}
                 </div>
             ))}
+            {editMode && <div className="edit-bottom-pad" aria-hidden="true" />}
         </div>
     );
 }
@@ -4463,16 +4497,19 @@ function App() {
             return commitOp({ t: "stage.move", journeyId: j.id, stageId: stage.id, afterStageId });
         }
         if (action === "addSubStage") {
-            const { stageIdx } = payload;
+            const { stageIdx, subIdx } = payload;
             const stage = stages[stageIdx];
             if (!stage) return;
             const subs = stage.subStages || [];
             const subStage = { id: newId(), title: "New" };
+            const afterSubStageId = subIdx != null
+                ? (subs[subIdx]?.id ?? null)
+                : (subs.length ? subs[subs.length - 1].id : null);
             return commitOp({
                 t: "substage.insert",
                 journeyId: j.id,
                 stageId: stage.id,
-                afterSubStageId: subs.length ? subs[subs.length - 1].id : null,
+                afterSubStageId,
                 subStage,
                 cellIds: cellIdsByRow(j, 1),
             });
