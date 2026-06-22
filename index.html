@@ -1309,6 +1309,10 @@ const cloudMetaFromData = (mapId, role, data) => {
     return meta;
 };
 const dbMarkProjectCloud = (id, mapId, role, data = {}) => db.projects.update(id, cloudMetaFromData(mapId, role, data));
+const dbUnmarkProjectCloud = (id) => db.projects.update(id, {
+    cloudMapId: null, cloudRole: null, cloudVersion: null,
+    cloudUpdatedAt: null, cloudUpdatedByName: null, cloudUpdatedByClientId: null,
+});
 const dbSaveCloudMirror = (id, journeys, mapId, role, data = {}) => {
     const now = Date.now();
     return db.projects.update(id, {
@@ -4115,18 +4119,22 @@ function App() {
 
     // Stop sharing: called after the server-side delete succeeds and the token
     // has already been removed from localStorage. Closes the WS, resets sync
-    // state, and navigates back to the local project (if one exists) or the library.
-    const stopSync = useCallback(() => {
+    // state, clears the cloud badge on the local project, and navigates back
+    // to the local project (if one exists) or the library.
+    const stopSync = useCallback(async () => {
         const localId = currentId;
         setSync({ mapId: null, role: null, status: "off", error: null });
         setPeers([]);
+        // Clear the cloud fields so the project no longer shows the "Cloud" badge.
         if (localId != null) {
+            await dbUnmarkProjectCloud(localId);
             writeRoute(localId, { replace: true });
         } else {
             writeMapRoute(null, { replace: true });
             setView("library");
         }
-    }, [currentId]);
+        await refreshProjects();
+    }, [currentId, refreshProjects]);
 
     useEffect(() => {
         document.title = currentName && view === "project"
