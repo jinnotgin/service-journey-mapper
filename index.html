@@ -31,9 +31,9 @@
             --fs-2xl: 26px;
             /* Warm-neutral ramp, close to shadcn's black and white default */
             --ink-bar:     oklch(99% .002 70);
-            --ink-stage:   oklch(95.5% .004 70);
-            --ink-sub:     oklch(92.5% .004 70);
-            --ink-divider: oklch(48% .008 70);
+            --ink-stage:   oklch(96.2% .006 70);
+            --ink-sub:     oklch(93.8% .006 70);
+            --ink-divider: oklch(60% .008 70);
             /* Primary action is restrained and neutral; semantic row colors stay separate */
             --accent:        oklch(24% .006 70);
             --accent-strong: oklch(18% .006 70);
@@ -53,12 +53,29 @@
             --surface-2: oklch(96.5% .004 70);
             --border: oklch(89% .006 70);
             --border-light: oklch(93.5% .004 70);
+            --grid-line: oklch(91% .004 70 / .62);
+            --grid-strong: oklch(83% .008 70);
+            --note: oklch(99.2% .003 70);
+            /* Filled notes use a translucent fill so the lane tint reads through:
+               the note lifts off the lane rather than punching a white hole in it. */
+            --note-fill: oklch(100% 0 0 / .4);
+            --note-border: oklch(84% .008 70 / .55);
+            --note-shadow: 0 1px 2px oklch(20% .006 70 / .04), 0 4px 12px oklch(20% .006 70 / .035);
             --text: oklch(27% .008 70);
             --text-sec: oklch(52% .006 70);
             --shadow-sm: 0 1px 2px oklch(20% .006 70 / .05), 0 1px 3px oklch(20% .006 70 / .07);
             --shadow-md: 0 8px 24px oklch(20% .006 70 / .11);
             --shadow-lg: 0 18px 50px oklch(20% .006 70 / .2);
             --radius: 10px;
+            /* Canvas track model: lanes are rounded objects floating on the page,
+               separated by whitespace gutters. No continuous grid lines. */
+            --canvas: oklch(96.8% .004 70);
+            --lane-gap: 9px;
+            --lane-r: 13px;
+            --canvas-pad: 10px;
+            --lane-w: 180px;
+            /* Sticky offset for stage/step labels: clears the sticky lane rail. */
+            --stage-label-left: 192px;
             --appbar-h: 52px;
             --toolbar-h: 0px;
         }
@@ -73,6 +90,8 @@
         .ab-back:hover{background:var(--surface-2);border-color:var(--text-sec);box-shadow:0 1px 2px oklch(20% .006 70 / .08)}
         .ab-brand{display:flex;align-items:center;min-width:0;max-width:min(760px,52vw);line-height:1.15}
         .ab-title{font-size:var(--fs-lg);font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+        .cloud-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;margin-left:8px;color:var(--blue);background:oklch(96% .018 245);border:1px solid oklch(86% .035 245);flex:0 0 auto}
+        .cloud-badge svg{width:15px;height:15px;stroke:currentColor}
         .ab-spacer{flex:1 1 auto;min-width:8px}
         .inline-title{cursor:default}
         .inline-title.editable{cursor:text;border-radius:5px;transition:background .12s,box-shadow .12s}
@@ -89,6 +108,10 @@
         .ab-btn:hover{background:var(--surface-2);border-color:var(--border)}
         .ab-btn:disabled{opacity:.4;cursor:not-allowed}
         .history-actions{display:inline-flex;align-items:center;gap:1px}
+        .presence-stack{display:inline-flex;align-items:center;flex-shrink:0}
+        .presence-av{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;border:2px solid var(--surface);margin-left:-7px;box-shadow:0 1px 2px oklch(20% .006 70 / .18);cursor:default;user-select:none;text-shadow:0 1px 1px oklch(20% .006 70 / .35)}
+        .presence-av:first-child{margin-left:0}
+        .presence-av.more{background:var(--surface-2);color:var(--text-sec);text-shadow:none}
         .history-btn{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:7px;background:transparent;cursor:pointer;padding:0;transition:background .15s,border-color .15s,opacity .15s}
         .history-btn:hover:not(:disabled){background:var(--surface-2);border-color:var(--border)}
         .history-btn:disabled{cursor:not-allowed;opacity:.34}
@@ -105,6 +128,7 @@
         .save-dot{width:7px;height:7px;border-radius:999px;display:inline-block;background:var(--green)}
         .save-saving{color:oklch(82% .05 80)}
         .save-saved{color:var(--text-sec)}
+        .save-by{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
         /* ===== MAIN ===== */
         .main-content{padding-bottom:50px;min-height:60vh}
@@ -140,35 +164,63 @@
         .ch-hdr h2{font-size:var(--fs-xl);color:var(--text);font-weight:700;letter-spacing:-.015em}
 
         /* ===== STAGE HDR (STICKY) ===== */
-        .stage-outer{position:sticky;top:calc(var(--appbar-h,52px) + var(--toolbar-h,0px));z-index:35;background:var(--ink-stage);border-bottom:1px solid var(--border);box-shadow:0 3px 8px oklch(20% .006 70 / .08)}
+        .stage-outer{position:sticky;top:calc(var(--appbar-h,52px) + var(--toolbar-h,0px));z-index:35;background:var(--canvas);padding:4px var(--canvas-pad) 0;box-shadow:0 10px 16px -8px oklch(20% .006 70 / .12)}
         .scroll-hide{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
         .scroll-hide::-webkit-scrollbar{display:none}
 
         /* ===== SUB-JOURNEY HDR ===== */
-        .sj-scroll{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;background:var(--ink-sub);border:1px solid var(--border);border-top:none}
+        .sj-scroll{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;background:var(--canvas)}
         .sj-scroll::-webkit-scrollbar{display:none}
 
         /* ===== BP TABLE ===== */
-        .bp{border-collapse:collapse;table-layout:fixed;width:max-content}
-        .bp td{border:1px solid var(--border-light);padding:11px 13px;vertical-align:top;text-align:left;font-size:var(--fs-sm)}
+        /* No grid lines anywhere. The table is pure column-alignment plumbing;
+           lanes read as rounded tracks separated by vertical gutters. */
+        .bp{border-collapse:separate;border-spacing:0;table-layout:fixed;width:max-content}
+        .bp td{border:0;padding:11px 13px;vertical-align:top;text-align:left;font-size:var(--fs-sm)}
+
+        /* Body lanes float on the canvas with whitespace gutters between them. */
+        .bpw .bp{border-spacing:0 var(--lane-gap)}
+        /* Round each lane into one continuous track: left corners on the sticky
+           label, right corners on the trailing data cell (mode-aware via :has). */
+        .bpw .bp td.ll{border-top-left-radius:var(--lane-r);border-bottom-left-radius:var(--lane-r)}
+        .bpw .bp tr>td:last-child:not(.add-col-c),
+        .bpw .bp tr>td:has(+ .add-col-c){border-top-right-radius:var(--lane-r);border-bottom-right-radius:var(--lane-r)}
+        /* Trailing add-column lane in the body is pure empty space: no fill, no
+           border, no rounding. The "+" lives only in the sticky stage header. */
+        .bpw .bp .add-col-c{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important}
 
         /* Lane label */
-        .ll{width:180px;min-width:180px;max-width:180px;position:sticky;left:0;z-index:10;font-weight:700;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:.6px;background:var(--surface);border-right:2px solid var(--border)}
+        .ll{width:var(--lane-w);min-width:var(--lane-w);max-width:var(--lane-w);position:sticky;left:0;z-index:10;font-weight:720;font-size:var(--fs-2xs);text-transform:none;letter-spacing:0;background:var(--surface);padding:16px 14px 16px 17px!important}
+        .lane-label{display:flex;align-items:flex-start;gap:9px;line-height:1.25;min-width:0}
+        .lane-icon{width:20px;height:20px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:oklch(99% .002 70 / .78);color:currentColor;border:1px solid oklch(100% 0 0 / .52);box-shadow:0 1px 2px oklch(20% .006 70 / .04)}
+        .lane-icon svg{width:14px;height:14px;stroke:currentColor}
+        .lane-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
+        .lane-kicker{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:color-mix(in oklch, currentColor 58%, var(--text-sec))}
+        .lane-main{font-size:var(--fs-xs);font-weight:800;letter-spacing:.025em;text-transform:uppercase;overflow-wrap:anywhere;color:currentColor}
 
-        /* Stage header cells */
-        .stg-ll{background:var(--ink-stage)!important;color:var(--text-sec)!important;border:1px solid var(--border)!important;border-right:2px solid var(--border)!important;text-align:left!important}
-        .stg-c{min-width:260px;background:var(--ink-stage)!important;color:var(--text)!important;font-weight:700!important;font-size:var(--fs-md)!important;letter-spacing:-.005em!important;text-align:center!important;vertical-align:middle!important;border:1px solid var(--border)!important}
+        /* Stage header cells. The label rail stays an OPAQUE canvas tile so
+           columns scrolling underneath it never bleed through. */
+        .stg-ll{background:var(--canvas)!important;color:var(--text-sec)!important;text-align:left!important}
+        .stg-c{min-width:260px;background:transparent!important;color:var(--text)!important;font-weight:700!important;font-size:var(--fs-md)!important;letter-spacing:0!important;text-align:left!important;vertical-align:middle!important;padding:9px 6px!important}
+        /* Stage card spans the full stage width (shows coverage); the label
+           inside is sticky so it stays readable across a wide stage. */
+        .stage-card{display:flex;align-items:center;justify-content:flex-start;gap:9px;min-height:36px;margin:0 3px;padding:7px 11px 7px 8px;border:1px solid oklch(84% .01 70 / .78);border-radius:9px;background:oklch(98.4% .005 70);box-shadow:0 1px 2px oklch(20% .006 70 / .04);text-align:left}
+        .stage-card-label{position:sticky;left:var(--stage-label-left);display:inline-flex;align-items:center;gap:9px;min-width:0;max-width:100%}
+        .stage-title{line-height:1.25;overflow-wrap:anywhere}
 
         /* SJ header cells */
-        .sj-ll{background:var(--ink-sub)!important;color:var(--text-sec)!important;border:1px solid var(--border)!important;border-right:2px solid var(--border)!important;font-size:var(--fs-2xs)!important;text-align:left!important}
-        .sj-tc{background:var(--ink-sub)!important;color:var(--text-sec)!important;font-weight:650!important;font-size:var(--fs-2xs)!important;text-transform:uppercase!important;letter-spacing:1.4px!important;text-align:center!important;padding:8px 12px!important;border:1px solid var(--border)!important}
+        .sj-ll{background:var(--canvas)!important;color:var(--text-sec)!important;font-size:var(--fs-2xs)!important;text-align:left!important}
+        .sj-tc{background:transparent!important;color:var(--text-sec)!important;font-weight:650!important;font-size:var(--fs-2xs)!important;text-transform:uppercase!important;letter-spacing:1.4px!important;text-align:center!important;padding:8px 12px!important}
 
         /* Data cell */
-        .dc{min-width:260px}
+        .dc{min-width:260px;min-height:82px;position:relative;padding:13px 14px!important;background-clip:padding-box;transition:background .12s ease-out,box-shadow .12s ease-out}
         .dc-span{min-width:auto!important;width:auto!important}
 
         /* Wrapper */
-        .bpw{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-top:none}
+        /* Canvas inset lives on the non-scrolling wrapper, NOT the scroll
+           container, so nothing can scroll into the gap left of the sticky rail. */
+        .bp-lane-wrap{padding:0 var(--canvas-pad);background:var(--canvas)}
+        .bpw{overflow-x:auto;background:var(--canvas);padding:0 0 var(--lane-gap)}
         .bpw::-webkit-scrollbar{height:10px}
         .bpw::-webkit-scrollbar-track{background:var(--surface-2)}
         .bpw::-webkit-scrollbar-thumb{background:var(--border);border-radius:5px;border:2px solid var(--surface-2)}
@@ -178,8 +230,8 @@
         /* ===== ROW TYPES =====
            Label column carries a soft tint + readable colored label; the data
            column stays near-white so written content always leads. */
-        .row-parties>.ll{background:oklch(96% .004 256);color:var(--text-sec)}
-        .row-parties>.dc{background:var(--surface-2)}
+        .row-parties>.ll{background:oklch(96.5% .012 250);color:oklch(42% .075 250)}
+        .row-parties>.dc{background:oklch(98.3% .006 250)}
 
         .row-operator>.ll{background:var(--surface);color:var(--text)}
         .row-operator>.dc{background:var(--surface)}
@@ -190,8 +242,19 @@
         .row-fs-system>.ll{background:oklch(93% .035 245);color:oklch(45% .11 250)}
         .row-fs-system>.dc{background:oklch(98% .012 245)}
 
-        .row-divider>.ll{background:var(--ink-divider);color:oklch(94% .004 70);border-right-color:oklch(100% 0 0 / .25)}
-        .row-divider>.dc{background:var(--ink-divider);color:oklch(94% .004 70);font-weight:600;text-align:center;padding:7px 12px;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:1.6px}
+        /* Line of visibility = the blueprint's defining moment. A tall, quiet
+           band of canvas separates the frontstage cluster from the backstage
+           cluster, with a single dashed boundary floating through it. */
+        .row-divider>.ll{background:var(--canvas)!important;color:var(--text-sec)!important;border-bottom:0!important}
+        .row-divider>.dc{background:transparent!important;color:var(--text-sec);font-weight:700;text-align:center;padding:16px 12px!important;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:1.3px;border-bottom:0!important}
+        .row-divider .lane-label{align-items:center}
+        .row-divider .lane-main{color:var(--text-sec)}
+        /* The divider is a pure boundary: any cell content is made weightless
+           (font-size:0) so it can never inflate the row, and the dashed line is
+           a plain full-width block. */
+        .row-divider .cell-note{min-height:0;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;display:block;color:transparent;font-size:0;line-height:0;position:relative}
+        .row-divider .cell-note::before{content:"";display:block;width:100%;border-top:1.5px dashed oklch(64% .01 70 / .7)}
+        .row-divider .cell-note:focus{outline:none;box-shadow:none!important}
 
         .row-bs-human>.ll{background:oklch(94% .04 80);color:oklch(48% .1 65)}
         .row-bs-human>.dc{background:oklch(98.5% .012 80)}
@@ -227,12 +290,18 @@
         .emotion-text{font-size:var(--fs-xs);font-weight:600}
         .emotion-neg{color:var(--red)}.emotion-pos{color:var(--green)}.emotion-neu{color:var(--gold)}
 
-        .stage-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--accent-strong);color:var(--accent-ink);border:1px solid var(--accent-strong);font-weight:700;font-size:var(--fs-sm)}
+        .stage-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--accent-strong);color:var(--accent-ink);border:1px solid var(--accent-strong);font-weight:800;font-size:var(--fs-xs);font-variant-numeric:tabular-nums}
 
         /* ===== EDITABLE ===== */
-        td[contenteditable="true"]{cursor:text;outline:none;transition:box-shadow .12s,background .12s}
-        td[contenteditable="true"]:hover{box-shadow:inset 0 0 0 1.5px var(--accent-line)}
-        td[contenteditable="true"]:focus{box-shadow:inset 0 0 0 2px var(--accent)}
+        .cell-note{min-height:70px;width:100%;border-radius:8px;padding:10px 11px;outline:none;cursor:text;transition:box-shadow .12s ease-out,background .12s ease-out,border-color .12s ease-out;color:var(--text)}
+        .cell-note:empty::before{content:attr(data-placeholder);color:oklch(62% .006 70 / .65);font-weight:600;opacity:0;transition:opacity .12s ease-out;pointer-events:none}
+        .dc:hover .cell-note:empty::before,.dc.cell-sel .cell-note:empty::before{opacity:1}
+        /* Only plain text / bullet notes get a surface, and it is translucent.
+           Boxes carry their own item surfaces; tags carry their own chips. */
+        .dc.cell-filled:not(.cell-boxes):not(.cell-tags-mode) .cell-note{background:var(--note-fill);border:1px solid var(--note-border);box-shadow:var(--note-shadow)}
+        .dc:hover .cell-note{box-shadow:inset 0 0 0 1px var(--accent-line)}
+        .cell-note:focus{background:var(--note);box-shadow:0 0 0 3px var(--accent-soft), inset 0 0 0 2px var(--accent)!important;border-color:transparent}
+        .row-divider .cell-note:empty::before{content:""!important;opacity:1!important;display:block;width:100%;border-top:1.5px dashed oklch(64% .01 70 / .7)}
 
         /* ===== TAB BAR ===== */
         .tab-bar{position:fixed;bottom:0;left:0;right:0;height:42px;background:var(--surface-2);border-top:1px solid var(--border);display:flex;align-items:flex-end;padding:0 8px;z-index:100}
@@ -279,16 +348,31 @@
 
         /* ===== LIBRARY (home screen) ===== */
         .lib{max-width:1120px;margin:0 auto;padding:48px 24px 86px}
-        .lib-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:28px;margin-bottom:26px}
+        .lib-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;gap:28px;margin-bottom:26px}
+        .lib-right{display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between}
+        .lib-eyebrow-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+        .lib-eyebrow-row .lib-eyebrow{margin-bottom:0}
+        .profile-wrap{display:inline-flex}
+        .profile-wrap .menu-trigger{width:auto;height:auto;padding:0;border:0;background:transparent;box-shadow:none}
+        .profile-wrap .menu-trigger:hover{background:transparent}
+        .profile-trigger{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);font:inherit;font-size:var(--fs-xs);font-weight:700;cursor:pointer;box-shadow:0 1px 1px oklch(20% .006 70 / .05);white-space:nowrap}
+        .profile-trigger:hover{background:var(--surface-2)}
+        .profile-trigger .presence-av{margin-left:0;width:22px;height:22px;border-width:0;font-size:9px}
+        .profile-form{display:grid;gap:8px;padding:8px;min-width:230px}
+        .profile-form label{font-size:var(--fs-2xs);font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-sec)}
+        .profile-form-actions{display:flex;gap:6px}
         .lib-eyebrow{font-size:var(--fs-xs);font-weight:700;color:oklch(42% .08 220);margin-bottom:8px}
         .lib-head h1{font-size:34px;font-weight:800;letter-spacing:0;color:var(--text);line-height:1.08}
         .lib-head p{font-size:var(--fs-sm);color:var(--text-sec);margin-top:10px;max-width:56ch;line-height:1.6}
         .lib-actions{display:flex;gap:8px;flex-shrink:0}
         .lib-actions .btn-s,.lib-actions .btn-p{min-height:40px}
         .project-list{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:0 12px 30px oklch(30% .012 70 / .08)}
+        .library-section{margin-top:22px}
+        .library-section:first-of-type{margin-top:0}
+        .library-section-title{font-size:var(--fs-xs);font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-sec);margin:0 0 8px 2px}
         .project-row{width:100%;display:grid;grid-template-columns:minmax(0,1fr) 118px 168px 38px;align-items:center;gap:18px;text-align:left;background:var(--surface);border:0;border-bottom:1px solid var(--border-light);padding:17px 18px 17px 20px;cursor:pointer;font-family:inherit;color:var(--text);transition:background .15s,box-shadow .15s}
         .project-row:last-child{border-bottom:0}
-        .project-row:hover{background:oklch(97% .006 70);box-shadow:inset 3px 0 0 oklch(55% .12 220)}
+        .project-row:hover{background:oklch(97% .006 70)}
         .project-row.current{background:oklch(97.5% .012 220)}
         .project-row.current:hover{background:oklch(96.5% .015 220)}
         .project-row.add{grid-template-columns:1fr;justify-items:center;color:var(--text-sec);border-top:1px dashed var(--border);font-weight:700;background:oklch(98.5% .003 70);padding:15px 18px}
@@ -296,6 +380,7 @@
         .pc-main{min-width:0}
         .pc-name{font-weight:760;font-size:var(--fs-md);color:var(--text);letter-spacing:0;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
         .pc-badge{display:inline-flex;align-items:center;background:oklch(92.5% .04 220);color:oklch(34% .1 220);font-size:var(--fs-2xs);font-weight:800;padding:3px 7px;border-radius:6px;text-transform:none;letter-spacing:0;margin-bottom:6px}
+        .pc-badge.cloud{background:oklch(95% .025 245);color:oklch(38% .1 245);margin-left:6px}
         .pc-count,.pc-updated{font-size:var(--fs-xs);color:var(--text-sec);white-space:nowrap}
         .pc-updated{font-variant-numeric:tabular-nums}
         .pc-menu{display:flex;justify-content:flex-end}
@@ -337,26 +422,26 @@
             .lib-privacy{justify-content:center}
         }
         @media print{
-            .tab-bar,.m-ov,.ab-actions,.cell-toolbar,.menu-wrap,.add-col-c,.add-row-bar{display:none}
+            .tab-bar,.m-ov,.ab-actions,.cell-toolbar,.menu-wrap,.add-col-c,.add-row-bar,.insert-zone,.ins-btn,.edit-bottom-pad{display:none}
             .app-bar,.stage-outer{position:static}
             .ll{position:static}
         }
 
         /* ===== EDIT MODE ===== */
-        .cell-toolbar{position:fixed;z-index:320;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;padding:7px;background:oklch(32% .008 70);border:1px solid oklch(40% .006 70);border-radius:8px;box-shadow:var(--shadow-md);width:max-content;max-width:none;white-space:nowrap}
+        .cell-toolbar{position:fixed;z-index:320;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;padding:7px;background:oklch(99% .003 70);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);width:max-content;max-width:none;white-space:nowrap}
         .tb-group{display:flex;align-items:center;gap:3px}
-        .tb-sep{width:1px;height:20px;background:oklch(46% .006 70);margin:0 5px}
-        .tb-btn{background:oklch(38% .008 70);border:1px solid oklch(47% .006 70);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;color:oklch(82% .005 70);font-family:inherit;line-height:1.1;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:30px;transition:background .13s ease-out,border-color .13s ease-out,color .13s ease-out,transform .13s ease-out}
+        .tb-sep{width:1px;height:20px;background:var(--border-light);margin:0 5px}
+        .tb-btn{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:var(--fs-xs);font-weight:650;cursor:pointer;color:var(--text-sec);font-family:inherit;line-height:1.1;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:30px;transition:background .13s ease-out,border-color .13s ease-out,color .13s ease-out,transform .13s ease-out}
         .tb-btn svg{width:15px;height:15px;display:block;stroke:currentColor;flex:0 0 auto}
         .tb-btn.icon-only{width:32px;padding:0}
-        .tb-btn:hover:not(:disabled){background:oklch(51% .011 70);border-color:oklch(64% .008 70);color:oklch(99% .002 70)}
-        .tb-btn:active:not(:disabled){transform:translateY(.5px);background:oklch(46% .01 70)}
-        .tb-btn:focus-visible{outline:2px solid oklch(80% .09 250);outline-offset:1px}
-        .tb-btn.active{background:oklch(96% .003 70);border-color:oklch(96% .003 70);color:oklch(22% .006 70)}
-        .tb-btn.active:hover:not(:disabled){background:oklch(88% .004 70);border-color:oklch(84% .005 70);color:oklch(20% .006 70)}
-        .tb-btn.active:active:not(:disabled){background:oklch(82% .005 70);transform:translateY(.5px)}
+        .tb-btn:hover:not(:disabled){background:var(--surface-2);border-color:var(--text-sec);color:var(--text)}
+        .tb-btn:active:not(:disabled){transform:translateY(.5px);background:oklch(94% .004 70)}
+        .tb-btn:focus-visible{outline:2px solid oklch(62% .08 250);outline-offset:1px}
+        .tb-btn.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+        .tb-btn.active:hover:not(:disabled){background:var(--accent-strong);border-color:var(--accent-strong);color:var(--accent-ink)}
+        .tb-btn.active:active:not(:disabled){background:var(--accent-strong);transform:translateY(.5px)}
         .tb-btn:disabled{opacity:.4;cursor:not-allowed}
-        .tb-hint{font-size:var(--fs-xs);color:oklch(62% .005 70);padding:0 4px;white-space:nowrap}
+        .tb-hint{font-size:var(--fs-xs);color:var(--text-sec);padding:0 4px;white-space:nowrap}
 
         /* dropdown menus */
         .menu-wrap{position:relative;display:inline-block}
@@ -397,8 +482,9 @@
         .stg-c:hover>.menu-wrap,.stg-c:focus-within>.menu-wrap,
         .sub-c:hover>.menu-wrap,.sub-c:focus-within>.menu-wrap,
         .ll:hover .row-menu,.ll:focus-within .row-menu{opacity:1;pointer-events:auto}
-        .hdr-edit{outline:none;cursor:text}
-        .hdr-edit:focus{box-shadow:inset 0 0 0 2px var(--accent);border-radius:4px}
+        .hdr-edit{outline:none;cursor:text;border-radius:5px;transition:background .12s ease-out,box-shadow .12s ease-out}
+        .hdr-edit:hover{background:var(--accent-soft);box-shadow:0 0 0 4px var(--accent-soft)}
+        .hdr-edit:focus{background:var(--surface);box-shadow:0 0 0 3px var(--accent-soft), inset 0 0 0 2px var(--accent);border-radius:5px}
         .drag-handle{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;border:1px solid oklch(100% 0 0 / .2);background:oklch(100% 0 0 / .08);color:inherit;cursor:grab;font-size:.66rem;line-height:1;vertical-align:middle;user-select:none;opacity:0;pointer-events:none;transition:opacity .14s ease-out,background .14s ease-out}
         .stg-c:hover>.drag-handle,.stg-c:focus-within>.drag-handle,
         .sub-c:hover>.drag-handle,.sub-c:focus-within>.drag-handle,
@@ -416,25 +502,50 @@
         .add-row-bar.drop-end{box-shadow:inset 0 3px 0 var(--accent);background:var(--accent-soft)}
 
         /* sub-stage header row */
-        .sub-c{background:var(--ink-sub)!important;color:var(--text-sec)!important;font-weight:600!important;font-size:var(--fs-xs)!important;text-align:center!important;vertical-align:middle!important;border:1px solid var(--border)!important}
+        .sub-c{background:transparent!important;color:var(--text-sec)!important;font-weight:600!important;font-size:var(--fs-xs)!important;text-align:center!important;vertical-align:middle!important;border:0!important;padding:10px 12px!important}
+        .step-chip{display:flex;align-items:center;justify-content:flex-start;min-height:30px;margin:0 3px;padding:5px 10px;border:1px solid oklch(86% .01 70 / .65);border-radius:8px;background:oklch(98.8% .004 70);box-shadow:0 1px 1px oklch(20% .006 70 / .025);line-height:1.2}
+        .step-chip-label{position:sticky;left:var(--stage-label-left);display:inline-block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
         /* add column / add row affordances */
-        .add-col-c{min-width:62px;width:62px;background:var(--ink-stage)!important;text-align:center!important;border:1px solid var(--border)!important;vertical-align:middle!important}
+        .add-col-c{min-width:62px;width:62px;background:transparent!important;text-align:center!important;border:0!important;vertical-align:middle!important}
         .add-btn{background:var(--surface);color:var(--text);border:1px dashed var(--border);border-radius:6px;padding:5px 11px;font-size:var(--fs-sm);font-weight:700;cursor:pointer;font-family:inherit}
         .add-btn:hover{background:var(--surface-2)}
-        .add-row-bar{padding:7px 12px;background:var(--surface-2);border:1px solid var(--border);border-top:none}
+        .add-row-bar{padding:6px 0 10px;background:var(--canvas);border:0}
         .add-row-btn{background:var(--surface);border:1px dashed var(--border);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);font-weight:600;color:var(--text-sec);cursor:pointer;font-family:inherit}
         .add-row-btn:hover{background:var(--bg);color:var(--text);border-color:var(--text-sec)}
 
-        /* selected cell highlight */
-        .dc.cell-sel{box-shadow:inset 0 0 0 2px var(--accent)}
+        /* hover-revealed insert affordances (edit mode): the transparent zone is
+           the boundary/gap target; the visible button stays compact. */
+        .insert-zone{position:absolute;z-index:14;display:flex;align-items:center;justify-content:center;pointer-events:auto}
+        .ins-stage-r-zone,.ins-sub-r-zone{top:4px;bottom:4px;right:-16px;width:32px}
+        .ins-stage-b-zone{left:14px;right:14px;bottom:5px;height:28px}
+        .stg-empty-subrow .ins-stage-b-zone{top:58px;bottom:12px;height:auto}
+        .ins-row-t-zone{top:calc(-1 * var(--lane-gap));left:0;right:0;height:var(--lane-gap)}
+        .ins-btn{position:static;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:1px solid var(--accent-line);background:var(--surface);color:var(--accent-strong);font-size:15px;font-weight:700;line-height:1;cursor:pointer;padding:0;font-family:inherit;box-shadow:0 1px 3px oklch(20% .006 70 / .2);opacity:0;pointer-events:none;transition:opacity .12s ease-out}
+        .ins-btn:hover{background:var(--accent-soft);border-color:var(--accent)}
+        .insert-zone:hover>.ins-btn,.insert-zone:focus-within>.ins-btn{opacity:1;pointer-events:auto}
+        /* edit-mode-only breathing room below the last lane (hidden in view/print) */
+        .edit-bottom-pad{height:120px}
+
+        /* Selection lives on the note surface only, never the cell rectangle,
+           so editing never reveals the underlying table grid. */
+        .dc.cell-sel .cell-note{background:var(--note);border-radius:9px;box-shadow:0 0 0 3px var(--accent-soft), inset 0 0 0 1px var(--accent-line)}
+
+        /* cell locked by another collaborator (Phase 8): read-only, outlined in
+           the holder's color, with an initials badge in the corner */
+        .dc.cell-locked{position:relative;cursor:not-allowed;box-shadow:inset 0 0 0 2px oklch(60% .14 280 / .55)}
+        .cell-lock-badge{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 3px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;line-height:1;color:#fff;border:1.5px solid var(--surface);box-shadow:0 1px 2px oklch(20% .006 70 / .25);user-select:none;pointer-events:none;text-shadow:0 1px 1px oklch(20% .006 70 / .35)}
+        .cell-locked-html{display:block}
 
         /* alignment */
         .al-center{text-align:center!important}
         .al-left{text-align:left!important}
 
-        /* tags-mode cell */
-        .cell-tags{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+        /* tags-mode cell — chips get breathing room matching the note inset */
+        .cell-tags{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:34px;padding:5px 8px;border-radius:9px;transition:box-shadow .12s ease-out,background .12s ease-out}
+        .dc.cell-tags-mode.cell-sel .cell-tags{background:var(--note-fill);box-shadow:0 0 0 3px var(--accent-soft), inset 0 0 0 1px var(--accent-line)}
+        .cell-empty-hint{color:oklch(62% .006 70 / .65);font-size:var(--fs-xs);font-weight:600}
+        .dc:not(.cell-sel):not(:hover) .cell-empty-hint{opacity:.55}
         .tag-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:var(--fs-2xs);font-weight:600}
         .tag-x{cursor:pointer;font-weight:700;opacity:.55;font-size:var(--fs-xs)}
         .tag-x:hover{opacity:1}
@@ -460,12 +571,13 @@
         .tag-suggest-new .tag-suggest-hint{color:var(--accent-strong)}
 
         /* bullets-mode cell */
-        .cell-bullets>div,.cell-bullets>p{padding-left:14px;position:relative;margin-bottom:3px}
-        .cell-bullets>div::before,.cell-bullets>p::before{content:'•';position:absolute;left:2px;color:var(--accent-strong);font-weight:700}
+        .cell-bullets .cell-note>div,.cell-bullets .cell-note>p{padding-left:14px;position:relative;margin-bottom:3px}
+        .cell-bullets .cell-note>div::before,.cell-bullets .cell-note>p::before{content:'•';position:absolute;left:2px;color:var(--accent-strong);font-weight:700}
 
         /* boxes-mode cell (card-style bullet items) */
-        .cell-boxes>div,.cell-boxes>p{background:oklch(99% .002 70 / .7);border:1px solid oklch(20% .006 70 / .1);border-radius:5px;padding:5px 9px;margin-bottom:5px}
-        .cell-boxes>div:last-child,.cell-boxes>p:last-child{margin-bottom:0}
+        .cell-boxes .cell-note{background:transparent!important;border:0!important;box-shadow:none!important;padding:0}
+        .cell-boxes .cell-note>div,.cell-boxes .cell-note>p{background:var(--note-fill);border:1px solid var(--note-border);border-radius:8px;padding:7px 10px;margin-bottom:6px;box-shadow:var(--note-shadow)}
+        .cell-boxes .cell-note>div:last-child,.cell-boxes .cell-note>p:last-child{margin-bottom:0}
 
         /* per-cell save / discard mini-toolbar */
 
@@ -498,14 +610,19 @@ const nextStageNum = (stages) => {
     return nums.length ? Math.max(...nums) + 1 : (stages?.length || 0) + 1;
 };
 
-const newCell = () => ({ mode: "text", html: "", align: "left" });
+// Opaque, immutable entity id (Phase 7). Stable for the entity's lifetime;
+// reordering never changes it. Same fallback shape as the presence clientId.
+const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `e_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`);
+
+const newCell = () => ({ id: newId(), mode: "text", html: "", align: "left" });
 const newRow  = (total) => ({
+    id: newId(),
     rowType: "row-operator",
     laneLabel: "New row",
     cells: Array.from({ length: Math.max(total, 1) }, newCell),
 });
 const blankCells = (total, mode = "text", align = "left") =>
-    Array.from({ length: Math.max(total, 1) }, () => ({ mode, html: "", align }));
+    Array.from({ length: Math.max(total, 1) }, () => ({ id: newId(), mode, html: "", align }));
 
 const rowWidth = (cells) => (cells || []).reduce((a, c) => a + (c.colspan || 1), 0);
 function moveArrayRange(items, from, count, to) {
@@ -533,12 +650,17 @@ function cellsToLeafCells(cells) {
 
 function leafCellsToCells(leaves) {
     const out = [];
+    const usedIds = new Set();
     (leaves || []).forEach((leaf) => {
         const { __spanKey, ...cell } = leaf;
         const last = out[out.length - 1];
         if (last && last.__spanKey === __spanKey) {
             last.colspan = (last.colspan || 1) + 1;
         } else {
+            // A split span can re-emit the same id on two separate cells; keep
+            // ids unique by minting a fresh one for the duplicate.
+            if (cell.id && usedIds.has(cell.id)) cell.id = newId();
+            if (cell.id) usedIds.add(cell.id);
             out.push({ ...cell, __spanKey, colspan: 1 });
         }
     });
@@ -612,30 +734,47 @@ function normalizeRowCells(cells, total) {
     return nc;
 }
 
-// A divider row is always a single cell merged across every column.
+// A divider row is always a single cell merged across every column. Carry the
+// first cell's id forward so collapsing/expanding keeps a stable id.
 function collapseDivider(cells, total) {
     const first = cells[0] || newCell();
-    const c = { mode: "text", html: first.html ?? "", align: first.align || "center" };
+    const c = { id: first.id || newId(), mode: "text", html: first.html ?? "", align: first.align || "center" };
     if (total > 1) c.colspan = total;
     return [c];
 }
 // Expand a (former) divider back into one cell per column.
 function expandDivider(cells, total) {
     const first = { ...(cells[0] || newCell()) };
+    if (!first.id) first.id = newId();
     delete first.colspan;
     return normalizeRowCells([first], total);
 }
 
-// Normalize loaded data: ensure stages/cells carry the fields the editor needs.
+// Backfill an `id` on a stage and, recursively, every nested sub-stage / column
+// leaf (Phase 7). Existing ids are preserved; only missing ones are minted.
+function hydrateStage(s) {
+    return {
+        ...s,
+        id: s.id || newId(),
+        subStages: (s.subStages || []).map(hydrateStage),
+    };
+}
+
+// Normalize loaded data: ensure stages/cells carry the fields the editor needs,
+// and backfill stable opaque ids on every entity (journey, stage + nested
+// sub-stage, sub-journey, row, cell) so old local/cloud docs upgrade
+// transparently. Existing ids are never overwritten.
 function hydrate(journeys) {
     return (journeys || []).map((j) => {
-        const stages = (j.stages || []).map((s) => ({ ...s, subStages: s.subStages || [] }));
+        const stages = (j.stages || []).map(hydrateStage);
         const total = totalLeaves(stages);
         const subJourneys = (j.subJourneys || []).map((sj) => ({
             ...sj,
+            id: sj.id || newId(),
             rows: (sj.rows || []).map((r) => {
                 const rowType = r.rowType;
                 let cells = (r.cells || []).map((c) => ({
+                    id: c.id || newId(),
                     mode: c.mode || "text",
                     html: c.html ?? "",
                     align: c.align || "left",
@@ -644,11 +783,394 @@ function hydrate(journeys) {
                 }));
                 cells = normalizeRowCells(cells, total);
                 if (rowType === DIVIDER_TYPE) cells = collapseDivider(cells, total);
-                return { ...r, rowType, cells };
+                return { ...r, id: r.id || newId(), rowType, cells };
             }),
         }));
-        return { ...j, stages, subJourneys };
+        return { ...j, id: j.id || newId(), stages, subJourneys };
     });
+}
+
+// ═══════════════════════════════════════
+// PHASE 9 — atomic op-based sync: applyOp
+// ═══════════════════════════════════════
+// Mirror of worker/src/ops.ts. Applies a single op to a journeys array BY ID
+// (never by array index) so the client and the Worker (and every peer) converge
+// on a byte-identical tree. Returns the next journeys array, or null when the op
+// cannot be applied cleanly (unknown id) — the inbound handler then waits for the
+// server's doc.reject full-snapshot resync (the universal convergence backstop).
+//
+// Used for INBOUND remote ops only. Locally, the existing immutable updaters do
+// the optimistic mutation and emit the matching op; we never re-apply our own.
+
+// Id-aware leaf insert: like insertLeafIntoRow but uses a supplied cell id so
+// every peer mints the SAME id for a new column cell.
+function insertLeafWithId(cells, at, cellId) {
+    let pos = 0;
+    for (let i = 0; i < cells.length; i++) {
+        const w = cells[i].colspan || 1;
+        if (at < pos + w) {
+            const nc = cells.slice();
+            if (at === pos) nc.splice(i, 0, { id: cellId || newId(), mode: "text", html: "", align: "left" });
+            else nc[i] = { ...nc[i], colspan: w + 1 };
+            return nc;
+        }
+        pos += w;
+    }
+    return [...cells, { id: cellId || newId(), mode: "text", html: "", align: "left" }];
+}
+
+const opFindJourney = (J, id) => { const i = J.findIndex((j) => j.id === id); return i < 0 ? null : { idx: i, j: J[i] }; };
+const opColumnLeafIndex = (stages, columnId) => {
+    let leaf = 0;
+    for (const s of stages || []) {
+        const subs = s.subStages || [];
+        if (s.id === columnId) return leaf;
+        if (subs.length) { for (const ss of subs) { if (ss.id === columnId) return leaf; leaf++; } }
+        else leaf++;
+    }
+    return -1;
+};
+const opLocateColumn = (stages, columnId) => {
+    let leafIdx = 0;
+    for (let stageIdx = 0; stageIdx < (stages || []).length; stageIdx++) {
+        const s = stages[stageIdx];
+        const subs = s.subStages || [];
+        if (s.id === columnId && !subs.length) return { stageIdx, subIdx: null, leafIdx };
+        if (subs.length) {
+            for (let subIdx = 0; subIdx < subs.length; subIdx++) {
+                if (subs[subIdx].id === columnId) return { stageIdx, subIdx, leafIdx };
+                leafIdx++;
+            }
+        } else leafIdx++;
+    }
+    return null;
+};
+const opLocateRow = (J, rowId) => {
+    for (let jIdx = 0; jIdx < J.length; jIdx++) {
+        const sjs = J[jIdx].subJourneys || [];
+        for (let sjIdx = 0; sjIdx < sjs.length; sjIdx++) {
+            const r = (sjs[sjIdx].rows || []).findIndex((x) => x.id === rowId);
+            if (r >= 0) return { jIdx, sjIdx, rowIdx: r };
+        }
+    }
+    return null;
+};
+const opInsertAfter = (arr, afterId, item) => {
+    if (afterId == null) return [item, ...arr];
+    const at = arr.findIndex((x) => x.id === afterId);
+    if (at < 0) return null;
+    const next = arr.slice(); next.splice(at + 1, 0, item); return next;
+};
+const opMoveAfter = (arr, id, afterId) => {
+    const from = arr.findIndex((x) => x.id === id);
+    if (from < 0) return null;
+    const without = arr.slice(); const [moved] = without.splice(from, 1);
+    if (afterId == null) return [moved, ...without];
+    const at = without.findIndex((x) => x.id === afterId);
+    if (at < 0) return null;
+    without.splice(at + 1, 0, moved); return without;
+};
+const opMapRows = (j, fn) => ({
+    ...j,
+    subJourneys: (j.subJourneys || []).map((sj) => ({
+        ...sj, rows: (sj.rows || []).map((r) => ({ ...r, cells: fn(r.cells || [], r) })),
+    })),
+});
+const opReplaceJourney = (J, idx, nj) => { const n = J.slice(); n[idx] = nj; return n; };
+
+function applyOp(journeys, op) {
+    if (!op || typeof op.t !== "string") return null;
+    const J = Array.isArray(journeys) ? journeys : [];
+    switch (op.t) {
+        case "cell.set": {
+            if (!op.cellId) return null;
+            const f = op.fields || {};
+            let found = false;
+            const next = J.map((j) => ({ ...j, subJourneys: (j.subJourneys || []).map((sj) => ({
+                ...sj, rows: (sj.rows || []).map((r) => ({ ...r, cells: (r.cells || []).map((c) => {
+                    if (c.id !== op.cellId) return c;
+                    found = true;
+                    const nc = { ...c };
+                    if ("html" in f) nc.html = f.html;
+                    if ("tags" in f) nc.tags = f.tags;
+                    if ("mode" in f) nc.mode = f.mode;
+                    if ("align" in f) nc.align = f.align;
+                    return nc;
+                }) })),
+            })) }));
+            return found ? next : null;
+        }
+        case "row.insert": {
+            for (let jIdx = 0; jIdx < J.length; jIdx++) {
+                const sjs = J[jIdx].subJourneys || [];
+                const sjIdx = sjs.findIndex((sj) => sj.id === op.subJourneyId);
+                if (sjIdx < 0) continue;
+                const total = totalLeaves(J[jIdx].stages || []);
+                let cells = normalizeRowCells(op.row.cells || [], total);
+                if (op.row.rowType === DIVIDER_TYPE) cells = collapseDivider(cells, total);
+                const rows = opInsertAfter(sjs[sjIdx].rows || [], op.afterRowId ?? null, { ...op.row, cells });
+                if (!rows) return null;
+                const nsjs = sjs.slice(); nsjs[sjIdx] = { ...sjs[sjIdx], rows };
+                return opReplaceJourney(J, jIdx, { ...J[jIdx], subJourneys: nsjs });
+            }
+            return null;
+        }
+        case "row.delete": {
+            const loc = opLocateRow(J, op.rowId); if (!loc) return null;
+            const j = J[loc.jIdx]; const nsjs = (j.subJourneys || []).slice();
+            nsjs[loc.sjIdx] = { ...nsjs[loc.sjIdx], rows: (nsjs[loc.sjIdx].rows || []).filter((r) => r.id !== op.rowId) };
+            return opReplaceJourney(J, loc.jIdx, { ...j, subJourneys: nsjs });
+        }
+        case "row.move": {
+            const loc = opLocateRow(J, op.rowId); if (!loc) return null;
+            const j = J[loc.jIdx]; const nsjs = (j.subJourneys || []).slice();
+            const rows = opMoveAfter(nsjs[loc.sjIdx].rows || [], op.rowId, op.afterRowId ?? null);
+            if (!rows) return null;
+            nsjs[loc.sjIdx] = { ...nsjs[loc.sjIdx], rows };
+            return opReplaceJourney(J, loc.jIdx, { ...j, subJourneys: nsjs });
+        }
+        case "row.setType": {
+            const loc = opLocateRow(J, op.rowId); if (!loc) return null;
+            const j = J[loc.jIdx]; const total = totalLeaves(j.stages || []);
+            const nsjs = (j.subJourneys || []).slice(); const rows = (nsjs[loc.sjIdx].rows || []).slice();
+            const cur = rows[loc.rowIdx];
+            const wasDivider = cur.rowType === DIVIDER_TYPE, willDivider = op.rowType === DIVIDER_TYPE;
+            let cells = cur.cells || [];
+            if (willDivider && !wasDivider) cells = collapseDivider(cells, total);
+            else if (!willDivider && wasDivider) cells = expandDivider(cells, total);
+            rows[loc.rowIdx] = { ...cur, rowType: op.rowType, cells };
+            nsjs[loc.sjIdx] = { ...nsjs[loc.sjIdx], rows };
+            return opReplaceJourney(J, loc.jIdx, { ...j, subJourneys: nsjs });
+        }
+        case "row.setLabel": case "row.setColor": {
+            const loc = opLocateRow(J, op.rowId); if (!loc) return null;
+            const j = J[loc.jIdx]; const nsjs = (j.subJourneys || []).slice();
+            const rows = (nsjs[loc.sjIdx].rows || []).slice();
+            rows[loc.rowIdx] = op.t === "row.setLabel"
+                ? { ...rows[loc.rowIdx], laneLabel: op.label }
+                : { ...rows[loc.rowIdx], customColor: op.color || undefined };
+            nsjs[loc.sjIdx] = { ...nsjs[loc.sjIdx], rows };
+            return opReplaceJourney(J, loc.jIdx, { ...j, subJourneys: nsjs });
+        }
+        case "column.insert": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).slice();
+            const newColumnId = op.columnId || op.stageId; if (!newColumnId) return null;
+            let leafIdx, insertStageIdx;
+            if ((op.afterColumnId ?? null) == null) { leafIdx = 0; insertStageIdx = 0; }
+            else {
+                const loc = opLocateColumn(stages, op.afterColumnId); if (!loc) return null;
+                leafIdx = loc.leafIdx + 1; insertStageIdx = loc.stageIdx + 1;
+            }
+            stages.splice(insertStageIdx, 0, op.stage || { id: newColumnId, title: "New Stage", subStages: [] });
+            const cellIds = op.cellIds || {};
+            const nj = opMapRows({ ...f.j, stages }, (cells, row) => row.rowType === DIVIDER_TYPE
+                ? collapseDivider(cells, totalLeaves(stages))
+                : insertLeafWithId(cells, leafIdx, row.id ? cellIds[row.id] : undefined));
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "column.delete": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
+            const loc = opLocateColumn(stages, op.columnId); if (!loc) return null;
+            const leafIdx = loc.leafIdx;
+            if (loc.subIdx == null) stages.splice(loc.stageIdx, 1);
+            else stages[loc.stageIdx].subStages.splice(loc.subIdx, 1);
+            const newTotal = Math.max(totalLeaves(stages), 1);
+            const nj = opMapRows({ ...f.j, stages }, (cells, row) => row.rowType === DIVIDER_TYPE
+                ? collapseDivider(cells, newTotal) : removeLeafFromRow(cells, leafIdx));
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "column.move": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
+            const loc = opLocateColumn(stages, op.columnId); if (!loc) return null;
+            const from = loc.leafIdx;
+            let to;
+            if ((op.afterColumnId ?? null) == null) to = 0;
+            else { const al = opLocateColumn(stages, op.afterColumnId); if (!al) return null; to = al.leafIdx + 1; }
+            if (loc.subIdx == null) {
+                const afterLoc = (op.afterColumnId ?? null) == null ? null : opLocateColumn(stages, op.afterColumnId);
+                const afterStageId = afterLoc ? stages[afterLoc.stageIdx].id : null;
+                const movedStages = opMoveAfter(stages, op.columnId, afterStageId);
+                if (!movedStages) return null;
+                stages.splice(0, stages.length, ...movedStages);
+            } else if ((op.afterColumnId ?? null) == null || opLocateColumn(stages, op.afterColumnId)?.stageIdx === loc.stageIdx) {
+                const subs = stages[loc.stageIdx].subStages;
+                const movedSubs = opMoveAfter(subs, op.columnId, op.afterColumnId ?? null);
+                if (!movedSubs) return null;
+                stages[loc.stageIdx] = { ...stages[loc.stageIdx], subStages: movedSubs };
+            }
+            const nj = { ...f.j, stages, subJourneys: (f.j.subJourneys || []).map((sj) => ({
+                ...sj, rows: (sj.rows || []).map((r) => moveLeafRangeInRow(r, from, 1, to)),
+            })) };
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "stage.insert": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).slice();
+            const inserted = opInsertAfter(stages, op.afterStageId ?? null, op.stage); if (!inserted) return null;
+            const insertIdx = (op.afterStageId ?? null) == null ? 0 : inserted.findIndex((s) => s.id === op.stage.id);
+            const leafIdx = leafStart(inserted, insertIdx);
+            const addLeaves = leafCount(op.stage);
+            const cellIds = op.cellIds || {};
+            const nj = opMapRows({ ...f.j, stages: inserted }, (cells, row) => {
+                if (row.rowType === DIVIDER_TYPE) return collapseDivider(cells, totalLeaves(inserted));
+                let c = cells; const ids = row.id ? cellIds[row.id] : undefined;
+                for (let k = 0; k < addLeaves; k++) c = insertLeafWithId(c, leafIdx + k, ids ? ids[k] : undefined);
+                return c;
+            });
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "stage.delete": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).slice();
+            const sIdx = stages.findIndex((s) => s.id === op.stageId); if (sIdx < 0) return null;
+            const start = leafStart(stages, sIdx), cnt = leafCount(stages[sIdx]);
+            stages.splice(sIdx, 1);
+            const newTotal = Math.max(totalLeaves(stages), 1);
+            const nj = opMapRows({ ...f.j, stages }, (cells, row) => {
+                if (row.rowType === DIVIDER_TYPE) return collapseDivider(cells, newTotal);
+                let c = cells; for (let k = 0; k < cnt; k++) c = removeLeafFromRow(c, start); return c;
+            });
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "stage.move": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).slice();
+            const fromIdx = stages.findIndex((s) => s.id === op.stageId); if (fromIdx < 0) return null;
+            let toIdx;
+            if ((op.afterStageId ?? null) == null) toIdx = 0;
+            else { const ai = stages.findIndex((s) => s.id === op.afterStageId); if (ai < 0) return null; toIdx = ai + 1; }
+            const start = leafStart(stages, fromIdx), cnt = leafCount(stages[fromIdx]), target = leafStart(stages, toIdx);
+            const movedStages = moveArrayRange(stages, fromIdx, 1, toIdx);
+            if (movedStages === stages) return opReplaceJourney(J, f.idx, { ...f.j });
+            const nj = { ...f.j, stages: movedStages, subJourneys: (f.j.subJourneys || []).map((sj) => ({
+                ...sj, rows: (sj.rows || []).map((r) => moveLeafRangeInRow(r, start, cnt, target)),
+            })) };
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "stage.setLabel": case "stage.setNum": {
+            for (let jIdx = 0; jIdx < J.length; jIdx++) {
+                const stages = (J[jIdx].stages || []).slice();
+                const sIdx = stages.findIndex((s) => s.id === op.stageId); if (sIdx < 0) continue;
+                stages[sIdx] = op.t === "stage.setLabel" ? { ...stages[sIdx], title: op.label } : { ...stages[sIdx], num: op.num };
+                return opReplaceJourney(J, jIdx, { ...J[jIdx], stages });
+            }
+            return null;
+        }
+        case "substage.insert": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
+            const sIdx = stages.findIndex((s) => s.id === op.stageId); if (sIdx < 0) return null;
+            const before = stages[sIdx].subStages.length;
+            const subs = opInsertAfter(stages[sIdx].subStages, op.afterSubStageId ?? null, op.subStage); if (!subs) return null;
+            stages[sIdx] = { ...stages[sIdx], subStages: subs };
+            const oldL = Math.max(before, 1), newL = Math.max(before + 1, 1);
+            if (newL <= oldL) return opReplaceJourney(J, f.idx, { ...f.j, stages });
+            const localIdx = subs.findIndex((s) => s.id === op.subStage.id);
+            const gi = leafStart(stages, sIdx) + localIdx;
+            const cellIds = op.cellIds || {};
+            const nj = opMapRows({ ...f.j, stages }, (cells, row) => row.rowType === DIVIDER_TYPE
+                ? collapseDivider(cells, totalLeaves(stages))
+                : insertLeafWithId(cells, gi, row.id ? cellIds[row.id] : undefined));
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "substage.delete": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
+            const sIdx = stages.findIndex((s) => s.id === op.stageId); if (sIdx < 0) return null;
+            const subs = stages[sIdx].subStages;
+            const subIdx = subs.findIndex((s) => s.id === op.subStageId); if (subIdx < 0) return null;
+            const before = subs.length; subs.splice(subIdx, 1);
+            const oldL = Math.max(before, 1), newL = Math.max(before - 1, 1);
+            if (newL >= oldL) return opReplaceJourney(J, f.idx, { ...f.j, stages });
+            const gi = leafStart(stages, sIdx) + Math.min(subIdx, oldL - 1);
+            const nj = opMapRows({ ...f.j, stages }, (cells, row) => row.rowType === DIVIDER_TYPE
+                ? collapseDivider(cells, Math.max(totalLeaves(stages), 1))
+                : removeLeafFromRow(cells, gi));
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "substage.move": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const stages = (f.j.stages || []).map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
+            const sIdx = stages.findIndex((s) => s.id === op.stageId); if (sIdx < 0) return null;
+            const subs = stages[sIdx].subStages;
+            const fromIdx = subs.findIndex((s) => s.id === op.subStageId);
+            if (fromIdx < 0 || subs.length <= 1) return null;
+            let toIdx;
+            if ((op.afterSubStageId ?? null) == null) toIdx = 0;
+            else { const ai = subs.findIndex((s) => s.id === op.afterSubStageId); if (ai < 0) return null; toIdx = ai + 1; }
+            const start = leafStart(stages, sIdx), fromLeaf = start + fromIdx, toLeaf = start + toIdx;
+            const movedSubs = moveArrayRange(subs, fromIdx, 1, toIdx);
+            if (movedSubs === subs) return opReplaceJourney(J, f.idx, { ...f.j });
+            stages[sIdx] = { ...stages[sIdx], subStages: movedSubs };
+            const nj = { ...f.j, stages, subJourneys: (f.j.subJourneys || []).map((sj) => ({
+                ...sj, rows: (sj.rows || []).map((r) => moveLeafRangeInRow(r, fromLeaf, 1, toLeaf)),
+            })) };
+            return opReplaceJourney(J, f.idx, nj);
+        }
+        case "substage.setLabel": {
+            for (let jIdx = 0; jIdx < J.length; jIdx++) {
+                const stages = (J[jIdx].stages || []).map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
+                const sIdx = stages.findIndex((s) => s.id === op.stageId); if (sIdx < 0) continue;
+                const subIdx = stages[sIdx].subStages.findIndex((s) => s.id === op.subStageId); if (subIdx < 0) return null;
+                stages[sIdx].subStages[subIdx] = { ...stages[sIdx].subStages[subIdx], title: op.label };
+                return opReplaceJourney(J, jIdx, { ...J[jIdx], stages });
+            }
+            return null;
+        }
+        case "subjourney.insert": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            const sjs = opInsertAfter(f.j.subJourneys || [], op.afterSubJourneyId ?? null, op.subJourney); if (!sjs) return null;
+            return opReplaceJourney(J, f.idx, { ...f.j, subJourneys: sjs });
+        }
+        case "subjourney.delete": {
+            for (let jIdx = 0; jIdx < J.length; jIdx++) {
+                const sjs = J[jIdx].subJourneys || [];
+                if (!sjs.some((sj) => sj.id === op.subJourneyId)) continue;
+                return opReplaceJourney(J, jIdx, { ...J[jIdx], subJourneys: sjs.filter((sj) => sj.id !== op.subJourneyId) });
+            }
+            return null;
+        }
+        case "subjourney.move": {
+            for (let jIdx = 0; jIdx < J.length; jIdx++) {
+                const sjs = J[jIdx].subJourneys || [];
+                if (!sjs.some((sj) => sj.id === op.subJourneyId)) continue;
+                const moved = opMoveAfter(sjs, op.subJourneyId, op.afterSubJourneyId ?? null); if (!moved) return null;
+                return opReplaceJourney(J, jIdx, { ...J[jIdx], subJourneys: moved });
+            }
+            return null;
+        }
+        case "subjourney.setLabel": {
+            for (let jIdx = 0; jIdx < J.length; jIdx++) {
+                const sjs = (J[jIdx].subJourneys || []).slice();
+                const sjIdx = sjs.findIndex((sj) => sj.id === op.subJourneyId); if (sjIdx < 0) continue;
+                sjs[sjIdx] = { ...sjs[sjIdx], label: op.label };
+                return opReplaceJourney(J, jIdx, { ...J[jIdx], subJourneys: sjs });
+            }
+            return null;
+        }
+        case "journey.insert": {
+            return opInsertAfter(J, op.afterJourneyId ?? null, op.journey);
+        }
+        case "journey.delete": {
+            if (!J.some((j) => j.id === op.journeyId)) return null;
+            return J.filter((j) => j.id !== op.journeyId);
+        }
+        case "journey.move": {
+            return opMoveAfter(J, op.journeyId, op.afterJourneyId ?? null);
+        }
+        case "journey.rename": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            return opReplaceJourney(J, f.idx, { ...f.j, title: op.name });
+        }
+        case "journey.setStageLabel": {
+            const f = opFindJourney(J, op.journeyId); if (!f) return null;
+            return opReplaceJourney(J, f.idx, { ...f.j, stageLabel: op.label });
+        }
+        default: return null;
+    }
 }
 
 // Palettes
@@ -707,15 +1229,60 @@ const ROW_TYPES = [
     ["row-suggest", "Suggestions"],
 ];
 
+const ROW_META = {
+    "row-operator": { icon: "user", kicker: "Journey", fallback: "Actions" },
+    "row-parties": { icon: "users", kicker: "Map", fallback: "Parties" },
+    "row-fs-human": { icon: "userRound", kicker: "Frontstage", fallback: "Human" },
+    "row-fs-system": { icon: "monitor", kicker: "Frontstage", fallback: "System" },
+    [DIVIDER_TYPE]: { icon: "eye", kicker: "", fallback: "Line of visibility" },
+    "row-bs-human": { icon: "users", kicker: "Backstage", fallback: "Human" },
+    "row-bs-system": { icon: "settings", kicker: "Backstage", fallback: "System" },
+    "row-support": { icon: "layers", kicker: "Enabler", fallback: "Support process" },
+    "row-pain": { icon: "alertTriangle", kicker: "Signal", fallback: "Pain points" },
+    "row-verbatim": { icon: "quote", kicker: "Voice", fallback: "Verbatim" },
+    "row-emotion": { icon: "smile", kicker: "Signal", fallback: "Emotion" },
+    "row-suggest": { icon: "lightbulb", kicker: "Improve", fallback: "Opportunities" },
+};
+
+function cleanLaneLabel(label = "") {
+    return String(label)
+        .replace(/^[\s👤⚙️🛠️]+/u, "")
+        .replace(/^(FS|BS)\s+(Human|System)\s*:\s*/i, "")
+        .replace(/^(Human|System)\s*:\s*/i, "")
+        .trim();
+}
+
+function LaneLabel({ rowType, label, editable, onCommit }) {
+    const meta = ROW_META[rowType] || { icon: "layers", kicker: "", fallback: "Lane" };
+    const display = cleanLaneLabel(label) || meta.fallback;
+    return (
+        <span className="lane-label">
+            <span className="lane-icon"><LucideIcon name={meta.icon} /></span>
+            <span className="lane-copy">
+                {meta.kicker && <span className="lane-kicker">{meta.kicker}</span>}
+                <span className={`lane-main${editable ? " hdr-edit" : ""}`} contentEditable={editable} suppressContentEditableWarning
+                    onBlur={editable ? (e) => onCommit(e.currentTarget.textContent) : undefined}>
+                    {display}
+                </span>
+            </span>
+        </span>
+    );
+}
+
 // ═══════════════════════════════════════
 // PERSISTENCE (Dexie / IndexedDB)
 // ═══════════════════════════════════════
 const db = new Dexie("ServiceJourneyMapperDB");
 db.version(1).stores({ projects: "++id, name, updatedAt" });
+db.version(2).stores({
+    projects: "++id, name, updatedAt, cloudMapId",
+    sharedMaps: "mapId, name, lastOpenedAt",
+});
 
 const LAST_KEY = "sjm:lastProjectId";
 
 const dbListProjects   = () => db.projects.orderBy("updatedAt").reverse().toArray();
+const dbListSharedMaps = () => db.sharedMaps.orderBy("lastOpenedAt").reverse().toArray();
 const dbGetProject     = (id) => db.projects.get(id);
 const dbDeleteProject  = (id) => db.projects.delete(id);
 const dbSaveJourneys   = (id, journeys) => db.projects.update(id, { journeys, updatedAt: Date.now() });
@@ -723,6 +1290,45 @@ const dbRenameProject  = (id, name) => db.projects.update(id, { name, updatedAt:
 const dbCreateProject  = (name, journeys = []) => {
     const now = Date.now();
     return db.projects.add({ name, journeys, createdAt: now, updatedAt: now });
+};
+const dbFindProjectByCloudMap = async (mapId) => {
+    if (!mapId) return null;
+    return db.projects.where("cloudMapId").equals(mapId).first();
+};
+const cloudMetaFromData = (mapId, role, data) => {
+    const meta = {
+        cloudMapId: mapId,
+        cloudRole: role || data?.role || null,
+        cloudUpdatedAt: data?.updatedAt || Date.now(),
+        cloudUpdatedByName: data?.updatedByName || null,
+        cloudUpdatedByClientId: data?.updatedByClientId || null,
+    };
+    // Only write cloudVersion when the source actually carries one. Versionless
+    // frames (e.g. cell.set) must not clobber the stored version to 0.
+    if (typeof data?.version === "number") meta.cloudVersion = data.version;
+    return meta;
+};
+const dbMarkProjectCloud = (id, mapId, role, data = {}) => db.projects.update(id, cloudMetaFromData(mapId, role, data));
+const dbSaveCloudMirror = (id, journeys, mapId, role, data = {}) => {
+    const now = Date.now();
+    return db.projects.update(id, {
+        journeys,
+        updatedAt: now,
+        ...cloudMetaFromData(mapId, role, { ...data, updatedAt: data.updatedAt || now }),
+    });
+};
+const dbUpsertSharedMap = (mapId, patch) => {
+    if (!mapId) return Promise.resolve();
+    const now = Date.now();
+    return db.sharedMaps.put({
+        mapId,
+        name: patch?.name || "Shared map",
+        role: patch?.role || null,
+        lastOpenedAt: now,
+        updatedAt: patch?.updatedAt || now,
+        updatedByName: patch?.updatedByName || null,
+        updatedByClientId: patch?.updatedByClientId || null,
+    });
 };
 
 // ═══════════════════════════════════════
@@ -995,6 +1601,203 @@ function writeRoute(projectId, { replace = false } = {}) {
     window.history[replace ? "replaceState" : "pushState"](state, "", url);
 }
 
+// ═══════════════════════════════════════
+// COLLABORATIVE SYNC (client)
+// ═══════════════════════════════════════
+// Whole-document, last-write-wins sync against the Lanescape sync Worker.
+// See docs/collab-sync.md. Phase 1 is HTTP only (create + hydrate); the live
+// WebSocket channel arrives in Phase 2.
+const ROUTE_MAP_PARAM = "map";
+// API base: localhost during dev, the deployed Worker in production.
+// Paste your workers.dev subdomain here once deployed.
+const SYNC_API_BASE = /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)
+    ? "http://localhost:8787"
+    : "https://lanescape-sync.jinn.workers.dev";
+
+function routeMapId() {
+    return new URLSearchParams(window.location.search).get(ROUTE_MAP_PARAM) || null;
+}
+
+// ── Presence identity (Phase 3) ──
+// A stable, ephemeral identity for the presence avatar stack: a per-browser
+// clientId, a friendly anonymous name, and a deterministic color (HSL hue
+// hashed from the clientId). Persisted in localStorage so a refresh keeps the
+// same identity; falls back to an in-memory value if storage is unavailable.
+const PRESENCE_ANIMALS = ["Otter", "Heron", "Lynx", "Fox", "Wren", "Tapir", "Ibis", "Koel", "Gull", "Mole", "Vole", "Newt", "Crane", "Finch", "Marten"];
+const presenceIdKey = "sjm:presenceId";
+const presenceNameKey = "sjm:presenceName";
+
+function hashHue(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    return h % 360;
+}
+
+let _presenceIdentity = null;
+function getPresenceIdentity() {
+    if (_presenceIdentity) return _presenceIdentity;
+    let clientId = null;
+    let name = null;
+    try {
+        clientId = localStorage.getItem(presenceIdKey);
+        name = localStorage.getItem(presenceNameKey);
+    } catch { /* storage unavailable */ }
+    if (!clientId) {
+        clientId = (crypto.randomUUID ? crypto.randomUUID() : `c_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`);
+        try { localStorage.setItem(presenceIdKey, clientId); } catch { /* ignore */ }
+    }
+    if (!name) {
+        const animal = PRESENCE_ANIMALS[hashHue(clientId) % PRESENCE_ANIMALS.length];
+        name = `Anonymous ${animal}`;
+        try { localStorage.setItem(presenceNameKey, name); } catch { /* ignore */ }
+    }
+    const hue = hashHue(clientId);
+    const color = `hsl(${hue} 62% 48%)`;
+    _presenceIdentity = { clientId, name, color };
+    return _presenceIdentity;
+}
+
+function setPresenceName(name) {
+    const current = getPresenceIdentity();
+    const nextName = (name || "").trim().slice(0, 80) || current.name;
+    try { localStorage.setItem(presenceNameKey, nextName); } catch { /* ignore */ }
+    _presenceIdentity = { ...current, name: nextName };
+    return _presenceIdentity;
+}
+
+// Initials for an avatar badge ("Anonymous Otter" -> "AO", "Guest-12" -> "G").
+function presenceInitials(name) {
+    if (!name) return "?";
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.trim().slice(0, 2).toUpperCase();
+}
+
+// The owner/edit token is kept in localStorage keyed by map id, never left in
+// the URL after first use.
+const mapTokenKey = (mapId) => `sjm:mapToken:${mapId}`;
+const getMapToken = (mapId) => {
+    try { return localStorage.getItem(mapTokenKey(mapId)); } catch { return null; }
+};
+const setMapToken = (mapId, token) => {
+    try { localStorage.setItem(mapTokenKey(mapId), token); } catch { /* ignore */ }
+};
+const removeMapToken = (mapId) => {
+    try { localStorage.removeItem(mapTokenKey(mapId)); } catch { /* ignore */ }
+};
+
+// Password session (Phase 5): when a map requires a password, POST /api/maps/:id/access
+// returns a short-lived session token that proves the password factor. It is kept
+// in sessionStorage (per-tab, cleared on close) keyed by map id, and passed to
+// hydrate (/doc) and the WS (/sync) as &session=. The password is never stored.
+const mapSessionKey = (mapId) => `sjm:mapSession:${mapId}`;
+const getMapSession = (mapId) => {
+    try { return sessionStorage.getItem(mapSessionKey(mapId)); } catch { return null; }
+};
+const setMapSession = (mapId, session) => {
+    try {
+        if (session) sessionStorage.setItem(mapSessionKey(mapId), session);
+        else sessionStorage.removeItem(mapSessionKey(mapId));
+    } catch { /* ignore */ }
+};
+
+function writeMapRoute(mapId, { replace = false } = {}) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete(ROUTE_PROJECT_PARAM);
+    if (mapId == null) url.searchParams.delete(ROUTE_MAP_PARAM);
+    else url.searchParams.set(ROUTE_MAP_PARAM, mapId);
+    // Tokens accepted via ?token= on first open are consumed into localStorage
+    // and stripped from the address bar.
+    url.searchParams.delete("token");
+    const state = { serviceJourneyMapper: true, view: mapId == null ? "library" : "project", mapId: mapId ?? null };
+    window.history[replace ? "replaceState" : "pushState"](state, "", url);
+}
+
+// POST /api/maps — mint a cloud map from the current journeys. Returns
+// { mapId, version, tokens:{owner,editor,viewer} }.
+async function apiCreateMap({ name, journeys }) {
+    const res = await fetch(`${SYNC_API_BASE}/api/maps`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, journeys }),
+    });
+    if (!res.ok) throw new Error(`Could not enable sync (${res.status})`);
+    return res.json();
+}
+
+// GET /api/maps/:id — hydrate. Returns { journeys, version, role, name }.
+// When the map is password-gated, pass the session token (from apiAccessMap) as
+// &session=; a 401 means a (re)password prompt is needed.
+async function apiGetMap(mapId, token, session) {
+    const res = await fetch(`${SYNC_API_BASE}/api/maps/${encodeURIComponent(mapId)}?token=${encodeURIComponent(token || "")}&session=${encodeURIComponent(session || "")}`);
+    if (res.status === 401) { const e = new Error("This map requires a password."); e.passwordRequired = true; throw e; }
+    if (res.status === 403) throw new Error("This link is not valid or has been disabled.");
+    if (res.status === 404) throw new Error("This map no longer exists.");
+    if (!res.ok) throw new Error(`Could not load map (${res.status})`);
+    return res.json();
+}
+
+// POST /api/maps/:id/access — password gate (Phase 5). Exchanges a link token
+// (+ optional password) for access. Returns { ok, role, passwordRequired, session? }.
+// The password is sent in the POST body, never the URL. Owners + non-password
+// maps return { ok:true, passwordRequired:false } with no session needed.
+async function apiAccessMap(mapId, token, password) {
+    const body = { token };
+    if (password != null) body.password = password;
+    const res = await fetch(`${SYNC_API_BASE}/api/maps/${encodeURIComponent(mapId)}/access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    });
+    if (res.status === 403) throw new Error("This link is not valid or has been disabled.");
+    if (res.status === 404) throw new Error("This map no longer exists.");
+    if (res.status === 401) return { ok: false, passwordRequired: true }; // wrong/missing password
+    if (!res.ok) throw new Error(`Could not open map (${res.status})`);
+    return res.json();
+}
+
+// POST /api/maps/:id/links — owner-only link management (Phase 4). Returns
+// { links: { editor:{token,enabled}, viewer:{token,enabled} } }.
+async function apiManageLink(mapId, ownerToken, body) {
+    const res = await fetch(`${SYNC_API_BASE}/api/maps/${encodeURIComponent(mapId)}/links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: ownerToken, ...body }),
+    });
+    if (res.status === 403) throw new Error("Only the map owner can manage links.");
+    if (res.status === 404) throw new Error("This map no longer exists.");
+    if (!res.ok) throw new Error(`Could not manage links (${res.status})`);
+    return res.json();
+}
+
+// Fetch the current edit/view share links for the owner. The response also
+// carries { passwordEnabled } so the owner UI can reflect the password status.
+async function apiGetLinks(mapId, ownerToken) {
+    return apiManageLink(mapId, ownerToken, { action: "get" });
+}
+
+// Owner-only: set/change the map password (Phase 5).
+async function apiSetPassword(mapId, ownerToken, password) {
+    return apiManageLink(mapId, ownerToken, { action: "setPassword", password });
+}
+
+// Owner-only: remove the map password (Phase 5).
+async function apiClearPassword(mapId, ownerToken) {
+    return apiManageLink(mapId, ownerToken, { action: "clearPassword" });
+}
+
+// Owner-only: permanently delete the map from the server.
+async function apiDeleteMap(mapId, ownerToken) {
+    const res = await fetch(`${SYNC_API_BASE}/api/maps/${encodeURIComponent(mapId)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: ownerToken }),
+    });
+    if (res.status === 403) throw new Error("Only the map owner can delete it.");
+    if (!res.ok) throw new Error(`Could not delete map (${res.status})`);
+    return res.json();
+}
+
 function InlineTitleEdit({ value, fallback, className, inputClassName, disabled, onCommit }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(value || "");
@@ -1059,11 +1862,11 @@ function createBlankJourney(index = 0) {
             rows: [
                 { rowType: "row-parties", laneLabel: "Parties", cells: blankCells(total, "tags") },
                 { rowType: "row-operator", laneLabel: "User Actions", cells: blankCells(total, "bullets") },
-                { rowType: "row-fs-human", laneLabel: "👤 FS Human: Role", cells: blankCells(total, "bullets") },
-                { rowType: "row-fs-system", laneLabel: "⚙️ System: Frontstage System", cells: blankCells(total, "bullets") },
-                { rowType: DIVIDER_TYPE, laneLabel: "Line of Visibility", cells: [{ mode: "text", html: "━━━━━━━━ BELOW THIS LINE: BACKSTAGE ACTIONS NOT VISIBLE TO CUSTOMERS ━━━━━━━━", align: "center", colspan: total }] },
-                { rowType: "row-bs-human", laneLabel: "👤 BS Human: Role", cells: blankCells(total, "bullets") },
-                { rowType: "row-bs-system", laneLabel: "⚙️ System: Backstage System", cells: blankCells(total, "bullets") },
+                { rowType: "row-fs-human", laneLabel: "Human Role", cells: blankCells(total, "bullets") },
+                { rowType: "row-fs-system", laneLabel: "Visible System", cells: blankCells(total, "bullets") },
+                { rowType: DIVIDER_TYPE, laneLabel: "Line of Visibility", cells: [{ mode: "text", html: "", align: "center", colspan: total }] },
+                { rowType: "row-bs-human", laneLabel: "Backstage Role", cells: blankCells(total, "bullets") },
+                { rowType: "row-bs-system", laneLabel: "Internal System", cells: blankCells(total, "bullets") },
                 { rowType: "row-support", laneLabel: "Support Process", cells: blankCells(total, "bullets") },
                 { rowType: "row-pain", laneLabel: "Pain Points", cells: blankCells(total, "boxes") },
                 { rowType: "row-emotion", laneLabel: "Emotion", cells: blankCells(total, "text", "center") },
@@ -1272,6 +2075,11 @@ function buildExampleProject() {
 // TOP APP BAR
 // ═══════════════════════════════════════
 const LUCIDE_PATHS = {
+    alertTriangle: [
+        <path key="1" d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />,
+        <path key="2" d="M12 9v4" />,
+        <path key="3" d="M12 17h.01" />
+    ],
     alignCenter: [
         <path key="1" d="M17 12H7" />,
         <path key="2" d="M19 18H5" />,
@@ -1282,6 +2090,24 @@ const LUCIDE_PATHS = {
         <path key="2" d="M17 18H3" />,
         <path key="3" d="M21 6H3" />
     ],
+    cloud: [
+        <path key="1" d="M17.5 19H8a5 5 0 1 1 1.1-9.88A6 6 0 0 1 20 12.5 3.5 3.5 0 0 1 17.5 19Z" />
+    ],
+    eye: [
+        <path key="1" d="M2.06 12.35a1 1 0 0 1 0-.7C3.52 7.46 7.52 5 12 5s8.48 2.46 9.94 6.65a1 1 0 0 1 0 .7C20.48 16.54 16.48 19 12 19s-8.48-2.46-9.94-6.65" />,
+        <circle key="2" cx="12" cy="12" r="3" />
+    ],
+    layers: [
+        <path key="1" d="m12.83 2.18 8.5 4.7a.75.75 0 0 1 0 1.31l-8.5 4.7a1.75 1.75 0 0 1-1.66 0l-8.5-4.7a.75.75 0 0 1 0-1.31l8.5-4.7a1.75 1.75 0 0 1 1.66 0" />,
+        <path key="2" d="m22 12-9.17 5.07a1.75 1.75 0 0 1-1.66 0L2 12" />,
+        <path key="3" d="m22 16-9.17 5.07a1.75 1.75 0 0 1-1.66 0L2 16" />
+    ],
+    lightbulb: [
+        <path key="1" d="M15 14c.2-1 .7-1.7 1.5-2.5A4.9 4.9 0 0 0 18 8 6 6 0 0 0 6 8c0 1.3.5 2.5 1.5 3.5.8.8 1.3 1.5 1.5 2.5" />,
+        <path key="2" d="M9 18h6" />,
+        <path key="3" d="M10 22h4" />,
+        <path key="4" d="M10 14h4" />
+    ],
     list: [
         <path key="1" d="M8 6h13" />,
         <path key="2" d="M8 12h13" />,
@@ -1289,6 +2115,11 @@ const LUCIDE_PATHS = {
         <path key="4" d="M3 6h.01" />,
         <path key="5" d="M3 12h.01" />,
         <path key="6" d="M3 18h.01" />
+    ],
+    monitor: [
+        <rect key="1" width="20" height="14" x="2" y="3" rx="2" />,
+        <path key="2" d="M8 21h8" />,
+        <path key="3" d="M12 17v4" />
     ],
     moreVertical: [
         <circle key="1" cx="12" cy="12" r="1" fill="currentColor" />,
@@ -1298,6 +2129,10 @@ const LUCIDE_PATHS = {
     pencil: [
         <path key="1" d="M21.17 6.17a2.12 2.12 0 0 0-3-3L3 18.34V22h3.66z" />,
         <path key="2" d="m15 5 4 4" />
+    ],
+    quote: [
+        <path key="1" d="M3 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2H4c-1.25 0-2 .75-2 2v6c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1" />,
+        <path key="2" d="M15 21c3 0 7-1 7-8V5c0-1.25-.75-2-2-2h-4c-1.25 0-2 .75-2 2v6c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1" />
     ],
     redo2: [
         <path key="1" d="m15 14 5-5-5-5" />,
@@ -1309,6 +2144,16 @@ const LUCIDE_PATHS = {
     shieldCheck: [
         <path key="1" d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />,
         <path key="2" d="m9 12 2 2 4-4" />
+    ],
+    settings: [
+        <path key="1" d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />,
+        <circle key="2" cx="12" cy="12" r="3" />
+    ],
+    smile: [
+        <circle key="1" cx="12" cy="12" r="10" />,
+        <path key="2" d="M8 14s1.5 2 4 2 4-2 4-2" />,
+        <path key="3" d="M9 9h.01" />,
+        <path key="4" d="M15 9h.01" />
     ],
     tag: [
         <path key="1" d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />,
@@ -1324,6 +2169,20 @@ const LUCIDE_PATHS = {
     undo2: [
         <path key="1" d="M9 14 4 9l5-5" />,
         <path key="2" d="M4 9h10.5A5.5 5.5 0 0 1 20 14.5 5.5 5.5 0 0 1 14.5 20H11" />
+    ],
+    user: [
+        <path key="1" d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />,
+        <circle key="2" cx="12" cy="7" r="4" />
+    ],
+    userRound: [
+        <circle key="1" cx="12" cy="8" r="5" />,
+        <path key="2" d="M20 21a8 8 0 0 0-16 0" />
+    ],
+    users: [
+        <path key="1" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />,
+        <circle key="2" cx="9" cy="7" r="4" />,
+        <path key="3" d="M22 21v-2a4 4 0 0 0-3-3.87" />,
+        <path key="4" d="M16 3.13a4 4 0 0 1 0 7.75" />
     ]
 };
 
@@ -1335,10 +2194,314 @@ function LucideIcon({ name }) {
     );
 }
 
+// Share / enable-sync control in the app bar. Phase 1: turns a local project
+// into a cloud map and surfaces shareable edit/view links.
+// Build a shareable link for a map + token (?map=<id>&token=<token>).
+function mapLinkFor(mapId, token) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete(ROUTE_PROJECT_PARAM);
+    url.searchParams.set(ROUTE_MAP_PARAM, mapId || "");
+    if (token) url.searchParams.set("token", token);
+    else url.searchParams.delete("token");
+    return url.toString();
+}
+
+// Owner-only management of one share link (edit or view): copy, enable/disable,
+// rotate. Lives inside the Share menu. State is driven by the server-fetched
+// link, so it works after a reload (no in-memory token dependency).
+function ShareLinkRow({ mapId, kind, link, onChange }) {
+    const [copied, setCopied] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [confirmRotate, setConfirmRotate] = useState(false);
+    const role = kind === "edit" ? "editor" : "viewer";
+    const label = kind === "edit" ? "Edit link" : "View-only link";
+    const enabled = !!link?.enabled;
+    const ownerToken = getMapToken(mapId);
+
+    const copy = async () => {
+        if (!enabled || !link?.token) return;
+        try {
+            await navigator.clipboard.writeText(mapLinkFor(mapId, link.token));
+            setCopied(true); setTimeout(() => setCopied(false), 1600);
+        } catch { /* ignore */ }
+    };
+    const toggle = async () => {
+        setBusy(true);
+        try {
+            const { links } = await apiManageLink(mapId, ownerToken, { action: "setEnabled", role, enabled: !enabled });
+            onChange(links);
+        } catch (e) { /* surfaced by caller status */ } finally { setBusy(false); }
+    };
+    const rotate = async () => {
+        setBusy(true);
+        try {
+            const { links } = await apiManageLink(mapId, ownerToken, { action: "rotate", role });
+            onChange(links);
+            setConfirmRotate(false);
+        } catch (e) { /* ignore */ } finally { setBusy(false); }
+    };
+
+    return (
+        <div style={{ display: "grid", gap: 5 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-sec)" }}>{label}</span>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: enabled ? "var(--text-sec)" : "var(--muted)" }}>
+                    {enabled ? "Active" : "Disabled"}
+                </span>
+            </div>
+            <button className="menu-item" onClick={copy} disabled={!enabled || busy}>
+                {copied ? "Copied ✓" : (enabled ? `Copy ${kind} link` : "Link disabled")}
+            </button>
+            <div style={{ display: "flex", gap: 6 }}>
+                <button className="menu-item" style={{ flex: 1 }} onClick={toggle} disabled={busy}>
+                    {enabled ? "Disable" : "Enable"}
+                </button>
+                {confirmRotate ? (
+                    <button className="menu-item danger" style={{ flex: 1 }} onClick={rotate} disabled={busy}>
+                        {busy ? "Rotating…" : "Confirm rotate"}
+                    </button>
+                ) : (
+                    <button className="menu-item" style={{ flex: 1 }} onClick={() => setConfirmRotate(true)} disabled={busy}
+                        title="Invalidate the current link and generate a new one">
+                        Rotate
+                    </button>
+                )}
+            </div>
+            {confirmRotate && (
+                <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                    Rotating invalidates the old {kind} link.{" "}
+                    <button className="link-btn" onClick={() => setConfirmRotate(false)}
+                        style={{ background: "none", border: "none", padding: 0, color: "var(--text-sec)", cursor: "pointer", textDecoration: "underline", fontSize: "11px", fontFamily: "inherit" }}>
+                        Cancel
+                    </button>
+                </span>
+            )}
+        </div>
+    );
+}
+
+// Owner-only password section in the Share menu (Phase 5). Shows the current
+// status (Off / On) and lets the owner set, change, or remove a single map
+// password that gates all share links. The password is sent to the server (over
+// setPassword) and never stored client-side.
+function PasswordControl({ mapId, enabled, onChange }) {
+    const [editing, setEditing] = useState(false);
+    const [value, setValue] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState("");
+    const ownerToken = getMapToken(mapId);
+
+    const save = async () => {
+        if (!value || busy) return;
+        setBusy(true); setErr("");
+        try {
+            const { passwordEnabled } = await apiSetPassword(mapId, ownerToken, value);
+            onChange(!!passwordEnabled);
+            setEditing(false); setValue("");
+        } catch (e) { setErr(e.message || "Could not save password"); }
+        finally { setBusy(false); }
+    };
+    const remove = async () => {
+        setBusy(true); setErr("");
+        try {
+            const { passwordEnabled } = await apiClearPassword(mapId, ownerToken);
+            onChange(!!passwordEnabled);
+        } catch (e) { setErr(e.message || "Could not remove password"); }
+        finally { setBusy(false); }
+    };
+
+    return (
+        <div style={{ display: "grid", gap: 5, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-sec)" }}>Password</span>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: enabled ? "var(--text-sec)" : "var(--muted)" }}>
+                    {enabled ? "On" : "Off"}
+                </span>
+            </div>
+            {editing ? (
+                <div style={{ display: "grid", gap: 6 }}>
+                    <input className="m-input" type="password" value={value} placeholder="New password"
+                        autoComplete="new-password" autoFocus
+                        onChange={(e) => { setValue(e.target.value); if (err) setErr(""); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } }} />
+                    <div style={{ display: "flex", gap: 6 }}>
+                        <button className="menu-item" style={{ flex: 1 }} onClick={save} disabled={!value || busy}>
+                            {busy ? "Saving…" : "Save"}
+                        </button>
+                        <button className="menu-item" style={{ flex: 1 }} onClick={() => { setEditing(false); setValue(""); setErr(""); }} disabled={busy}>
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div style={{ display: "flex", gap: 6 }}>
+                    <button className="menu-item" style={{ flex: 1 }} onClick={() => setEditing(true)} disabled={busy}>
+                        {enabled ? "Change password" : "Set password"}
+                    </button>
+                    {enabled && (
+                        <button className="menu-item danger" style={{ flex: 1 }} onClick={remove} disabled={busy}>
+                            {busy ? "Removing…" : "Remove"}
+                        </button>
+                    )}
+                </div>
+            )}
+            {enabled && !editing && (
+                <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                    People opening a share link must enter this password.
+                </span>
+            )}
+            {err && <span style={{ fontSize: "11px", color: "var(--red)" }}>{err}</span>}
+        </div>
+    );
+}
+
+function ShareControl({ sync, onEnableSync, onStopSharing }) {
+    const [links, setLinks] = useState(null); // {editor:{token,enabled}, viewer:{...}}
+    const [pwEnabled, setPwEnabled] = useState(false); // Phase 5: map password status
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const [copiedSelf, setCopiedSelf] = useState(false);
+    const [confirmStop, setConfirmStop] = useState(false);
+    const [stopping, setStopping] = useState(false);
+    const isOwner = sync.role === "owner";
+
+    const loadLinks = useCallback(async () => {
+        if (!isOwner || !sync.mapId) return;
+        setLoading(true); setError("");
+        try {
+            const { links, passwordEnabled } = await apiGetLinks(sync.mapId, getMapToken(sync.mapId));
+            setLinks(links);
+            setPwEnabled(!!passwordEnabled);
+        } catch (e) {
+            setError(e.message || "Could not load links");
+        } finally { setLoading(false); }
+    }, [isOwner, sync.mapId]);
+
+    const handleEnable = async () => { await onEnableSync(); };
+    const stopSharing = async () => {
+        setStopping(true);
+        try {
+            await apiDeleteMap(sync.mapId, getMapToken(sync.mapId));
+            removeMapToken(sync.mapId);
+            onStopSharing();
+        } catch (e) {
+            setError(e.message || "Could not delete map");
+            setStopping(false);
+            setConfirmStop(false);
+        }
+    };
+    const copySelf = async () => {
+        try {
+            await navigator.clipboard.writeText(mapLinkFor(sync.mapId, getMapToken(sync.mapId)));
+            setCopiedSelf(true); setTimeout(() => setCopiedSelf(false), 1600);
+        } catch { /* ignore */ }
+    };
+
+    if (sync.status !== "synced") {
+        return (
+            <button className="ab-back" onClick={handleEnable} disabled={sync.status === "enabling"}
+                title="Create a shareable cloud copy of this map">
+                {sync.status === "enabling" ? "Sharing…" : "Share map"}
+            </button>
+        );
+    }
+
+    return (
+        <Menu trigger="Share ▾" align="right" onOpen={loadLinks}>
+            {() => (
+                <div style={{ padding: "10px 12px", minWidth: 280, display: "grid", gap: 12 }}>
+                    <div className="menu-label">Anyone with a link can join</div>
+                    {!isOwner ? (
+                        <div style={{ display: "grid", gap: 6 }}>
+                            <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-sec)" }}>
+                                You're in this shared map as {sync.role}.
+                            </span>
+                            <button className="menu-item" onClick={copySelf}>
+                                {copiedSelf ? "Copied ✓" : "Copy this link"}
+                            </button>
+                        </div>
+                    ) : loading && !links ? (
+                        <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-sec)" }}>Loading links…</span>
+                    ) : error ? (
+                        <span style={{ fontSize: "var(--fs-sm)", color: "var(--red)" }}>{error}</span>
+                    ) : links ? (
+                        <>
+                            <ShareLinkRow mapId={sync.mapId} kind="edit" link={links.editor} onChange={setLinks} />
+                            <ShareLinkRow mapId={sync.mapId} kind="view" link={links.viewer} onChange={setLinks} />
+                            <PasswordControl mapId={sync.mapId} enabled={pwEnabled}
+                                onChange={(pe) => setPwEnabled(pe)} />
+                            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, display: "grid", gap: 6 }}>
+                                {confirmStop ? (
+                                    <>
+                                        <span style={{ fontSize: "11px", color: "var(--text-sec)" }}>
+                                            This permanently deletes the cloud map. Collaborators will lose access.
+                                        </span>
+                                        <div style={{ display: "flex", gap: 6 }}>
+                                            <button className="menu-item danger" style={{ flex: 1 }} onClick={stopSharing} disabled={stopping}>
+                                                {stopping ? "Deleting…" : "Yes, delete"}
+                                            </button>
+                                            <button className="menu-item" style={{ flex: 1 }} onClick={() => setConfirmStop(false)} disabled={stopping}>
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <button className="menu-item danger" onClick={() => setConfirmStop(true)}>
+                                        Stop sharing &amp; delete
+                                    </button>
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        <span style={{ fontSize: "var(--fs-sm)", color: "var(--text-sec)" }}>No links available.</span>
+                    )}
+                </div>
+            )}
+        </Menu>
+    );
+}
+
+// Presence avatar stack (Phase 3): a compact, overlapping row of badges for the
+// other people currently in this map. Caps at 5 avatars + a "+N" badge.
+function PresenceStack({ peers }) {
+    if (!peers || peers.length === 0) return null;
+    const MAX = 5;
+    const shown = peers.slice(0, MAX);
+    const extra = peers.length - shown.length;
+    return (
+        <div className="presence-stack" aria-label={`${peers.length} other ${peers.length === 1 ? "person" : "people"} here`}>
+            {shown.map((p) => (
+                <span key={p.clientId} className="presence-av" title={p.name || "Anonymous"}
+                    style={{ background: p.color || "var(--text-sec)" }}>
+                    {presenceInitials(p.name)}
+                </span>
+            ))}
+            {extra > 0 && (
+                <span className="presence-av more" title={`${extra} more`}>+{extra}</span>
+            )}
+        </div>
+    );
+}
+
+function saveStatusLabel(saveState, lastSaved) {
+    if (saveState === "saving") return "Saving...";
+    if (!lastSaved) return "";
+    return `Saved ${fmtDate(lastSaved)}`;
+}
+
+function saveStatusTooltip(lastSaved, lastSavedBy) {
+    if (!lastSaved) return "";
+    const who = lastSavedBy || "you";
+    return `Saved by ${who} ${fmtDate(lastSaved)}`;
+}
+
 function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadSheet, onDownloadProject, onStandaloneExport, onPromptSheet, onPromptProject, canExport, hasMultipleSheets, saveState, lastSaved,
-        viewOnly,
-        editMode, onSetEdit, canUndo, canRedo, onUndo, onRedo }) {
+        lastSavedBy, viewOnly,
+        editMode, onSetEdit, canUndo, canRedo, onUndo, onRedo,
+        sync, onEnableSync, onStopSharing, peers }) {
     const [promptCopied, setPromptCopied] = useState(false);
+    const savedLabel = saveStatusLabel(saveState, lastSaved);
+    const savedTooltip = saveStatusTooltip(lastSaved, lastSavedBy);
     const copyPrompt = async (close, scope) => {
         await (scope === "project" ? onPromptProject() : onPromptSheet());
         setPromptCopied(true);
@@ -1349,16 +2512,24 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
         <header className="app-bar" ref={innerRef}>
             <div className="app-bar-main">
                 <div className="ab-left">
-                    {!viewOnly && (
+                    {(!viewOnly || sync.status === "synced") && (
                         <button className="ab-back" onClick={onLibrary} title="Back to your projects">← Library</button>
                     )}
                     <div className="ab-brand">
                         <InlineTitleEdit className="ab-title" value={currentName} fallback="Untitled project"
                             disabled={!currentName || viewOnly} onCommit={onRenameCurrent} />
+                        {sync.status === "synced" && (
+                            <span className="cloud-badge" title={`Cloud copy (${sync.role || "shared"})`} aria-label="Cloud copy">
+                                <LucideIcon name="cloud" />
+                            </span>
+                        )}
                     </div>
                 </div>
                 <div className="ab-spacer" />
                 <div className="ab-actions">
+                    {sync.status === "synced" && peers && peers.length > 0 && (
+                        <PresenceStack peers={peers} />
+                    )}
                     {!viewOnly && (
                         <div className="history-actions" aria-label="History controls">
                             <button className="history-btn" onClick={onUndo} disabled={!canUndo} title="Undo (⌘/Ctrl+Z)" aria-label="Undo">
@@ -1369,15 +2540,16 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                             </button>
                         </div>
                     )}
-                    {!viewOnly && <div className="ab-status" aria-live="polite">
+                    {!viewOnly && <ShareControl sync={sync} onEnableSync={onEnableSync} onStopSharing={onStopSharing} />}
+                    <div className="ab-status" aria-live="polite">
                         {saveState === "saving" ? (
                             <span className="save-state save-saving">Saving...</span>
                         ) : lastSaved ? (
-                            <span className="save-state save-saved" title={`Last saved ${fmtDate(lastSaved)}`}>
-                                <span className="save-dot" />Saved
+                            <span className="save-state save-saved" title={savedTooltip}>
+                                <span className="save-dot" /><span className="save-by">{savedLabel}</span>
                             </span>
                         ) : null}
-                    </div>}
+                    </div>
                     {!viewOnly && (
                         <div className="ab-seg" role="group" aria-label="Editing mode">
                             <button className={editMode ? "on" : ""} aria-pressed={editMode}
@@ -1610,6 +2782,56 @@ function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onClose
     );
 }
 
+// Password gate (Phase 5): shown when opening a password-protected share link.
+// `onSubmit(password)` returns null on success or an error string to display.
+function PasswordGateModal({ onSubmit, onCancel }) {
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const [busy, setBusy] = useState(false);
+    const inputRef = useRef(null);
+    useEffect(() => { inputRef.current?.focus(); }, []);
+    useEffect(() => {
+        const h = (e) => { if (e.key === "Escape") onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel]);
+
+    const submit = async () => {
+        if (!password || busy) return;
+        setBusy(true); setError("");
+        const err = await onSubmit(password);
+        if (err) { setError(err); setBusy(false); }
+        // On success the modal unmounts (passwordGate cleared by the parent).
+    };
+
+    return (
+        <div className="m-ov" onClick={onCancel}>
+            <div className="m-box m-sm" onClick={(e) => e.stopPropagation()}>
+                <div className="m-hdr">
+                    <h3>Password required</h3>
+                    <button className="m-close" onClick={onCancel} aria-label="Close">✕</button>
+                </div>
+                <div className="m-body" style={{ display: "grid", gap: 10 }}>
+                    <p style={{ margin: 0, color: "var(--text-sec)", fontSize: "var(--fs-sm)" }}>
+                        This shared map is protected. Enter the password to open it.
+                    </p>
+                    <input ref={inputRef} className="m-input" type="password" value={password}
+                        placeholder="Password" autoComplete="current-password"
+                        onChange={(e) => { setPassword(e.target.value); if (error) setError(""); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } }} />
+                    {error && <span style={{ color: "var(--red)", fontSize: "var(--fs-sm)" }}>{error}</span>}
+                </div>
+                <div className="m-ft">
+                    <button className="btn-s" onClick={onCancel}>Cancel</button>
+                    <button className="btn-p" onClick={submit} disabled={!password || busy}>
+                        {busy ? "Checking…" : "Open map"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ═══════════════════════════════════════
 // LIBRARY (home screen) — project list
 // ═══════════════════════════════════════
@@ -1625,12 +2847,20 @@ function ProjectCard({ p, current, onOpen, onRename, onDelete }) {
         if (n && n !== p.name) onRename(p.id, n); else setDraft(p.name);
     };
     const count = p.journeys?.length || 0;
+    // Cloud-linked projects show the collaborative edit (who/when), not the local
+    // mirror's write time. fall back to the local Modified timestamp otherwise.
+    const cloudWhen = p.cloudMapId ? (p.cloudUpdatedAt || p.updatedAt) : null;
+    const cloudWho = p.cloudUpdatedByName;
+    const updatedLabel = p.cloudMapId
+        ? (cloudWho ? `Updated by ${cloudWho} ${fmtDate(cloudWhen)}` : `Updated ${fmtDate(cloudWhen)}`)
+        : `Modified ${fmtDate(p.updatedAt)}`;
     return (
         <div className={`project-row${current ? " current" : ""}`} role="button" tabIndex={0}
             onClick={() => !editing && onOpen(p.id)}
             onKeyDown={(e) => { if (!editing && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onOpen(p.id); } }}>
             <div className="pc-main">
                 {current && <span className="pc-badge">Last opened</span>}
+                {p.cloudMapId && <span className="pc-badge cloud">Cloud</span>}
                 {editing ? (
                     <input ref={inputRef} className="m-input pc-rename" value={draft}
                         onClick={(e) => e.stopPropagation()} onChange={(e) => setDraft(e.target.value)} onBlur={commit}
@@ -1643,7 +2873,7 @@ function ProjectCard({ p, current, onOpen, onRename, onDelete }) {
                 )}
             </div>
             <div className="pc-count">{count} journey{count === 1 ? "" : "s"}</div>
-            <div className="pc-updated">Modified {fmtDate(p.updatedAt)}</div>
+            <div className="pc-updated" title={updatedLabel}>{updatedLabel}</div>
             <div className="pc-menu" onClick={(e) => e.stopPropagation()}>
                 <Menu align="right">
                     {(close) => (
@@ -1658,32 +2888,97 @@ function ProjectCard({ p, current, onOpen, onRename, onDelete }) {
     );
 }
 
-function LibraryScreen({ projects, currentId, onOpen, onNew, onRename, onDelete, onLoad }) {
+function SharedMapCard({ map, onOpen }) {
+    const when = map.updatedAt || map.lastOpenedAt;
+    const updatedLabel = map.updatedByName
+        ? `Updated by ${map.updatedByName} ${fmtDate(when)}`
+        : `Updated ${fmtDate(when)}`;
+    return (
+        <button className="project-row" onClick={() => onOpen(map.mapId)}>
+            <div className="pc-main">
+                <span className="pc-badge cloud">{map.role || "shared"}</span>
+                <div className="pc-name" title={map.name}>{map.name || "Shared map"}</div>
+            </div>
+            <div className="pc-count">Cloud</div>
+            <div className="pc-updated" title={updatedLabel}>{updatedLabel}</div>
+            <div className="pc-menu" aria-hidden="true" />
+        </button>
+    );
+}
+
+function ProfileMenu({ identity, onRename }) {
+    const [draft, setDraft] = useState(identity.name || "");
+    useEffect(() => setDraft(identity.name || ""), [identity.name]);
+    return (
+        <span className="profile-wrap">
+        <Menu trigger={
+            <span className="profile-trigger">
+                <span className="presence-av" style={{ background: identity.color || "var(--text-sec)" }}>{presenceInitials(identity.name)}</span>
+                <span>{identity.name}</span>
+            </span>
+        } align="right">
+            {(close) => (
+                <div className="profile-form">
+                    <label htmlFor="presence-name">Display name</label>
+                    <input id="presence-name" className="m-input" value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") { e.preventDefault(); onRename(draft); close(); }
+                            if (e.key === "Escape") { e.preventDefault(); setDraft(identity.name || ""); close(); }
+                        }} />
+                    <div className="profile-form-actions">
+                        <button className="btn-p" onClick={() => { onRename(draft); close(); }}>Save</button>
+                        <button className="btn-s" onClick={close}>Cancel</button>
+                    </div>
+                </div>
+            )}
+        </Menu>
+        </span>
+    );
+}
+
+function LibraryScreen({ projects, sharedMaps, currentId, profile, onProfileRename, onOpen, onOpenShared, onNew, onRename, onDelete, onLoad }) {
     return (
         <div className="lib">
             <div className="lib-head">
                 <div>
-                    <div className="lib-eyebrow">Local AI-assisted mapping workspace</div>
+                    <div className="lib-eyebrow">AI-assisted mapping workspace</div>
                     <h1>Lanescape - Service Journey Mapper</h1>
-                    <p>Create and refine service journey maps, work with any AI model to assist with mapping, and keep projects saved locally in this browser.</p>
+                    <p>Create and refine service journey maps, work with any AI model to assist with mapping, and keep projects in your browser or sync them to the cloud to collaborate and share.</p>
                 </div>
-                <div className="lib-actions">
-                    <button className="btn-s" onClick={onLoad}>Load JSON</button>
-                    <button className="btn-p" onClick={onNew}>＋ New project</button>
+                <div className="lib-right">
+                    <ProfileMenu identity={profile} onRename={onProfileRename} />
+                    <div className="lib-actions">
+                        <button className="btn-s" onClick={onLoad}>Load JSON</button>
+                        <button className="btn-p" onClick={onNew}>＋ New project</button>
+                    </div>
                 </div>
             </div>
-            {projects.length === 0 ? (
-                <div className="lib-empty">No projects yet. Create your first one to get started.</div>
-            ) : (
+            <section className="library-section">
+                <h2 className="library-section-title">Your projects</h2>
+                {projects.length === 0 ? (
+                    <div className="lib-empty">No projects yet. Create your first one to get started.</div>
+                ) : (
+                    <div className="project-list">
+                        {projects.map((p) => (
+                            <ProjectCard key={p.id} p={p} current={p.id === currentId}
+                                onOpen={onOpen} onRename={onRename} onDelete={onDelete} />
+                        ))}
+                        <button className="project-row add" onClick={onNew}>
+                            <span className="pc-add-label">＋ New project</span>
+                        </button>
+                    </div>
+                )}
+            </section>
+            {sharedMaps.length > 0 && (
+                <section className="library-section">
+                    <h2 className="library-section-title">Shared with me</h2>
                 <div className="project-list">
-                    {projects.map((p) => (
-                        <ProjectCard key={p.id} p={p} current={p.id === currentId}
-                            onOpen={onOpen} onRename={onRename} onDelete={onDelete} />
+                    {sharedMaps.map((m) => (
+                        <SharedMapCard key={m.mapId} map={m} onOpen={onOpenShared} />
                     ))}
-                    <button className="project-row add" onClick={onNew}>
-                        <span className="pc-add-label">＋ New project</span>
-                    </button>
                 </div>
+                </section>
             )}
             <footer className="lib-footer">
                 <div className="lib-footer-left">
@@ -1693,7 +2988,7 @@ function LibraryScreen({ projects, currentId, onOpen, onNew, onRename, onDelete,
                 </div>
                 <div className="lib-privacy">
                     <LucideIcon name="shieldCheck" />
-                    <span>Private by default. All data is saved in this browser only.</span>
+                    <span>Private by default. Projects stay in your browser until you share them to the cloud.</span>
                 </div>
             </footer>
         </div>
@@ -1734,7 +3029,7 @@ function TabBar({ journeys, activeTab, setActiveTab, onNew, onLoad, onDelete, vi
 // ═══════════════════════════════════════
 // DROPDOWN MENU (click-away)
 // ═══════════════════════════════════════
-function Menu({ trigger, align, children }) {
+function Menu({ trigger, align, children, onOpen }) {
     const [open, setOpen] = useState(false);
     const [pos, setPos] = useState(null);
     const triggerRef = useRef(null);
@@ -1742,16 +3037,31 @@ function Menu({ trigger, align, children }) {
 
     // Position the popup (rendered in a body-level portal so it escapes the
     // table's overflow:auto scroll containers and sticky stacking contexts).
+    // We always resolve to a `left` coordinate (even for align="right") so the
+    // result can be clamped to the viewport, preventing the popup from being
+    // clipped off the left/right edge on narrow screens. The popup width is
+    // measured from the rendered node when available; until then we fall back
+    // to the CSS min-width (184) so the very first frame is still on-screen.
     const place = useCallback(() => {
         const t = triggerRef.current;
         if (!t) return;
         const r = t.getBoundingClientRect();
-        setPos({ top: r.bottom + 3, left: r.left, right: window.innerWidth - r.right });
-    }, []);
+        const M = 8; // viewport margin
+        const w = popRef.current?.getBoundingClientRect().width || 184;
+        // Intended left: align the popup's right edge to the trigger's right
+        // edge for align="right", otherwise its left edge to the trigger's left.
+        let left = align === "right" ? r.right - w : r.left;
+        // Clamp horizontally so the popup stays fully on-screen.
+        left = Math.min(Math.max(M, left), Math.max(M, window.innerWidth - w - M));
+        setPos({ top: r.bottom + 3, left });
+    }, [align]);
 
     useEffect(() => {
         if (!open) return;
         place();
+        // Re-place once the portal has rendered so we can measure its real
+        // width and clamp accurately (the first pass uses the fallback width).
+        const raf = requestAnimationFrame(place);
         const onDown = (e) => {
             if (popRef.current?.contains(e.target) || triggerRef.current?.contains(e.target)) return;
             setOpen(false);
@@ -1760,6 +3070,7 @@ function Menu({ trigger, align, children }) {
         window.addEventListener("scroll", place, true);
         window.addEventListener("resize", place);
         return () => {
+            cancelAnimationFrame(raf);
             document.removeEventListener("mousedown", onDown);
             window.removeEventListener("scroll", place, true);
             window.removeEventListener("resize", place);
@@ -1769,10 +3080,10 @@ function Menu({ trigger, align, children }) {
     return (
         <span className="menu-wrap" ref={triggerRef}>
             <button className="menu-trigger" title="Options" aria-label="Options"
-                onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>{trigger || <LucideIcon name="moreVertical" />}</button>
+                onClick={(e) => { e.stopPropagation(); setOpen((o) => { if (!o) onOpen?.(); return !o; }); }}>{trigger || <LucideIcon name="moreVertical" />}</button>
             {open && pos && createPortal(
                 <div ref={popRef} className="menu-pop menu-portal"
-                    style={align === "right" ? { top: pos.top, right: pos.right, left: "auto" } : { top: pos.top, left: pos.left }}
+                    style={{ top: pos.top, left: pos.left }}
                     onClick={(e) => e.stopPropagation()}>
                     {typeof children === "function" ? children(() => setOpen(false)) : children}
                 </div>, document.body)}
@@ -1783,7 +3094,7 @@ function Menu({ trigger, align, children }) {
 // ═══════════════════════════════════════
 // TAG ADDER (inline, for tags-mode cells)
 // ═══════════════════════════════════════
-function TagAdder({ onAdd, existing = [] }) {
+function TagAdder({ onAdd, onCancel, existing = [] }) {
     const [text, setText] = useState("");
     const [ci, setCi] = useState(0);
     const [pickerOpen, setPickerOpen] = useState(false);
@@ -1912,7 +3223,9 @@ function TagAdder({ onAdd, existing = [] }) {
             if (open && options.length) commitOption(options[hi]);
             else addNew();
         } else if (e.key === "Escape") {
+            e.preventDefault();
             setOpen(false); setPickerOpen(false);
+            onCancel?.();
         }
     };
 
@@ -1969,20 +3282,30 @@ function TagAdder({ onAdd, existing = [] }) {
 // element is NOT focused. This avoids React resetting the caret to the start
 // while typing. The edit commits when the cell loses focus (click away, or
 // Escape to finish via the keyboard).
-function EditableCell({ html, editMode, className, style, colSpan, cellKey, onCommit, onFocusCell, onDone }) {
+function EditableCell({ html, editMode, className, style, colSpan, cellKey, cellId, lockedBy,
+        onCommit, onFocusCell, onDone, onAcquireLock, onReleaseLock }) {
     const ref = useRef(null);
+    // A peer is editing this cell: render it read-only and do not let it focus.
+    const peerLocked = !!lockedBy;
 
     useEffect(() => {
         const el = ref.current;
-        if (!el || document.activeElement === el) return;
+        // When a peer holds the lock React controls this td (badge + html via
+        // dangerouslySetInnerHTML), so don't imperatively touch innerHTML here.
+        if (!el || peerLocked || document.activeElement === el) return;
         const next = html || "";
         if (el.innerHTML !== next) el.innerHTML = next;
-    }, [html]);
+    }, [html, peerLocked]);
 
-    const handleFocus = () => { onFocusCell?.(); };
+    const handleFocus = () => {
+        onFocusCell?.();
+        // Edit-intent: acquire the lock on focus (NOT on selection/click).
+        onAcquireLock?.(cellId);
+    };
     const handleBlur = () => {
         onCommit(ref.current?.innerHTML ?? "");
         onDone?.();
+        onReleaseLock?.(); // clean release on blur (also covers Escape, which blurs)
     };
     const handleKeyDown = (e) => {
         // Escape just finishes editing (blur commits); it does not discard.
@@ -1996,39 +3319,80 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, onCo
         }
     };
 
+    // Peer-locked: React fully owns the td (read-only, no focus, badge + html).
+    if (peerLocked) {
+        return (
+            <td className={className} style={style} colSpan={colSpan}
+                data-cell-key={cellKey}
+                title={`Editing: ${lockedBy.name || "Someone"}`}>
+                <div key="locked" className="cell-note cell-locked-html" dangerouslySetInnerHTML={{ __html: html || "" }} />
+                <LockBadge lockedBy={lockedBy} />
+            </td>
+        );
+    }
+
     return (
-        <td ref={ref} className={className} style={style} colSpan={colSpan}
+        <td className={className} style={style} colSpan={colSpan}
             data-cell-key={cellKey}
-            contentEditable={editMode} suppressContentEditableWarning
-            onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} />
+            onMouseDown={(e) => {
+                if (!editMode || e.target !== e.currentTarget) return;
+                e.preventDefault();
+                ref.current?.focus();
+            }}>
+            <div key="editable" ref={ref} className="cell-note" contentEditable={editMode} suppressContentEditableWarning
+                data-placeholder={editMode ? "Add note" : ""}
+                dangerouslySetInnerHTML={{ __html: html || "" }}
+                onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} />
+        </td>
     );
 }
 
 // ═══════════════════════════════════════
 // CELL
 // ═══════════════════════════════════════
-function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, onTagsChange, onDeselect }) {
+// Small badge shown on a cell another collaborator is currently editing (Phase 8).
+function LockBadge({ lockedBy }) {
+    if (!lockedBy) return null;
+    return (
+        <span className="cell-lock-badge" style={{ background: lockedBy.color || "var(--accent)" }}
+            title={`Editing: ${lockedBy.name || "Someone"}`} aria-label={`Editing: ${lockedBy.name || "Someone"}`}>
+            {presenceInitials(lockedBy.name)}
+        </span>
+    );
+}
+
+function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, onTagsChange, onDeselect,
+        lockedBy, onAcquireLock, onReleaseLock }) {
     const mode = cell.mode || "text";
     const alignClass = (cell.align || "left") === "center" ? "al-center" : "al-left";
-    const cls = `dc ${alignClass}${cell.colspan ? " dc-span" : ""}${selected ? " cell-sel" : ""}`;
+    const peerLocked = !!lockedBy; // a DIFFERENT collaborator is editing this cell
+    const hasHtml = !!String(cell.html || "").replace(/<br\s*\/?>|&nbsp;|\s|<[^>]*>/gi, "");
+    const cls = `dc ${alignClass}${cell.colspan ? " dc-span" : ""}${selected ? " cell-sel" : ""}${peerLocked ? " cell-locked" : ""}${hasHtml ? " cell-filled" : ""}`;
     const style = rowBg ? { background: rowBg } : undefined;
 
     if (mode === "tags") {
         const tags = cell.tags || [];
+        // While a peer holds the lock, the tags cell is read-only: no select, no
+        // add/remove affordances. Tags edit is an edit-intent → acquire on entering
+        // edit (selecting in edit mode), release when deselected.
         return (
-            <td className={cls} colSpan={cell.colspan || undefined} style={style}
-                data-cell-key={cellKey} onClick={onSelect}>
+            <td className={`${cls} cell-tags-mode${tags.length ? " cell-filled" : ""}`} colSpan={cell.colspan || undefined} style={style}
+                data-cell-key={cellKey}
+                onClick={peerLocked ? undefined : () => { onSelect(); if (editMode && !selected) onAcquireLock?.(cell.id); }}>
                 <div className="cell-tags" style={{ justifyContent: (cell.align || "left") === "center" ? "center" : "flex-start" }}>
                     {tags.map((t, i) => (
                         <span key={i} className="tag-chip" style={{ background: t.bg, color: t.fg }}>
                             {t.text}
-                            {editMode && selected && <span className="tag-x" title="remove"
+                            {editMode && selected && !peerLocked && <span className="tag-x" title="remove"
                                 onClick={(e) => { e.stopPropagation(); onTagsChange(tags.filter((_, k) => k !== i)); }}>✕</span>}
                         </span>
                     ))}
-                    {!tags.length && !editMode && <span style={{ color: "var(--text-sec)" }}>—</span>}
+                    {!tags.length && <span className="cell-empty-hint">{editMode ? "Add tags" : "No tags"}</span>}
                 </div>
-                {editMode && selected && <TagAdder existing={tags} onAdd={(t) => onTagsChange([...tags, t])} />}
+                {editMode && selected && !peerLocked && <TagAdder existing={tags}
+                    onAdd={(t) => onTagsChange([...tags, t])}
+                    onCancel={onDeselect} />}
+                <LockBadge lockedBy={lockedBy} />
             </td>
         );
     }
@@ -2037,7 +3401,9 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
     return (
         <EditableCell html={cell.html} editMode={editMode}
             className={`${cls}${modeClass}`} colSpan={cell.colspan || undefined} style={style}
-            cellKey={cellKey} onCommit={onEditHtml} onFocusCell={onSelect} onDone={onDeselect} />
+            cellKey={cellKey} cellId={cell.id} lockedBy={lockedBy}
+            onCommit={onEditHtml} onFocusCell={onSelect} onDone={onDeselect}
+            onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock} />
     );
 }
 
@@ -2045,7 +3411,8 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
 // BLUEPRINT ROW
 // ═══════════════════════════════════════
 function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPrefix, dragState, dropRowIdx,
-        onSelect, onCellEdit, onCellTags, onRowAction, onRowDragStart, onRowDragOver, onRowDrop, onDragEnd, onDeselect }) {
+        onSelect, onCellEdit, onCellTags, onRowAction, onRowDragStart, onRowDragOver, onRowDrop, onDragEnd, onDeselect,
+        lockedByPeer, onAcquireLock, onReleaseLock }) {
     const rowBg = row.customColor || null;
     const isDivider = row.rowType === DIVIDER_TYPE;
     return (
@@ -2057,6 +3424,10 @@ function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPr
                     <>
                     <span className="drag-handle row-drag" draggable title="Drag to reorder row"
                         onDragStart={(e) => onRowDragStart(e, rowIdx)} onDragEnd={onDragEnd}>⠿</span>
+                    <span className="insert-zone ins-row-t-zone">
+                        <button type="button" className="ins-btn" title="Add row here"
+                            onClick={() => onRowAction("insertAbove")}>+</button>
+                    </span>
                     <span className="row-menu">
                         <Menu align="left">
                             {(close) => (
@@ -2090,22 +3461,27 @@ function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPr
                     </span>
                     </>
                 )}
-                <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
-                    onBlur={editMode ? (e) => onRowAction("label", e.currentTarget.textContent) : undefined}>
-                    {row.laneLabel}
-                </span>
+                <LaneLabel rowType={row.rowType} label={row.laneLabel} editable={editMode}
+                    onCommit={(value) => onRowAction("label", value)} />
             </td>
-            {isDivider ? (
-                <EditableCell html={(row.cells[0] || {}).html || ""} editMode={editMode}
-                    className={`dc dc-span al-center${selectedCellIdx === 0 ? " cell-sel" : ""}`}
+            {isDivider ? (() => {
+                const dCell = row.cells[0] || {};
+                const dLock = lockedByPeer?.get(dCell.id) || null;
+                return (
+                <EditableCell html={dCell.html || ""} editMode={editMode}
+                    className={`dc dc-span al-center${selectedCellIdx === 0 ? " cell-sel" : ""}${dLock ? " cell-locked" : ""}`}
                     colSpan={total} style={rowBg ? { background: rowBg } : undefined}
-                    cellKey={`${cellKeyPrefix}-0`}
-                    onCommit={(html) => onCellEdit(0, html)} onFocusCell={() => onSelect(0)} onDone={onDeselect} />
-            ) : (
+                    cellKey={`${cellKeyPrefix}-0`} cellId={dCell.id} lockedBy={dLock}
+                    onCommit={(html) => onCellEdit(0, html)} onFocusCell={() => onSelect(0)} onDone={onDeselect}
+                    onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock} />
+                );
+            })() : (
                 row.cells.map((cell, ci) => (
                     <Cell key={ci} cell={cell} editMode={editMode} rowBg={rowBg}
                         selected={ci === selectedCellIdx}
                         cellKey={`${cellKeyPrefix}-${ci}`}
+                        lockedBy={lockedByPeer?.get(cell.id) || null}
+                        onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock}
                         onSelect={() => onSelect(ci)}
                         onEditHtml={(html) => onCellEdit(ci, html)}
                         onTagsChange={(tags) => onCellTags(ci, tags)}
@@ -2263,7 +3639,8 @@ function BlueprintColGroup({ total, includeAddColumn = false }) {
 // JOURNEY VIEW
 // ═══════════════════════════════════════
 function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
-        onTitleEdit, onCellEdit, onCellTags, onRowAction, onStageAction, onAddRow }) {
+        onTitleEdit, onCellEdit, onCellTags, onRowAction, onStageAction, onAddRow,
+        lockedByPeer, onAcquireLock, onReleaseLock }) {
     const ref = useRef(null);
     const [dragState, setDragState] = useState(null);
     const [dropTarget, setDropTarget] = useState(null);
@@ -2378,7 +3755,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                     const lc = leafCount(s);
                                     const sHasSub = (s.subStages?.length || 0) > 0;
                                     return (
-                                        <td key={si} className={`stg-c${dropTarget?.type === "stage" && dropTarget.stageIdx === si ? ` drop-${dropTarget.side}` : ""}`} colSpan={lc}
+                                        <td key={si} className={`stg-c${hasSub && !sHasSub ? " stg-empty-subrow" : ""}${dropTarget?.type === "stage" && dropTarget.stageIdx === si ? ` drop-${dropTarget.side}` : ""}`} colSpan={lc}
                                             rowSpan={hasSub && !sHasSub ? 2 : 1}
                                             style={{ minWidth: lc * COL_W }}
                                             onDragOver={editMode ? (e) => stageDragOver(e, si) : undefined}
@@ -2398,16 +3775,30 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                         </>
                                                     )}
                                                 </Menu>
+                                                {si < stages.length - 1 && (
+                                                    <span className="insert-zone ins-stage-r-zone">
+                                                        <button type="button" className="ins-btn" title="Add stage here"
+                                                            onClick={() => onStage("addStage", { stageIdx: si })}>+</button>
+                                                    </span>
+                                                )}
+                                                {!sHasSub && (
+                                                    <span className="insert-zone ins-stage-b-zone">
+                                                        <button type="button" className="ins-btn" title="Add sub-stage"
+                                                            onClick={() => onStage("addSubStage", { stageIdx: si })}>+</button>
+                                                    </span>
+                                                )}
                                                 </>
                                             )}
-                                            <span style={{ display: "inline-flex", alignItems: "flex-start", justifyContent: "center", gap: "6px", textAlign: "left" }}>
+                                            <span className="stage-card">
+                                                <span className="stage-card-label">
                                                 {(s.num != null || editMode) && <span className="stage-num" style={{ flexShrink: 0 }}
                                                     contentEditable={editMode} suppressContentEditableWarning
                                                     title={editMode ? "Edit number" : undefined}
                                                     onBlur={editMode ? (e) => onStage("renumberStage", { stageIdx: si, value: e.currentTarget.textContent }) : undefined}>{s.num}</span>}
-                                                <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
+                                                <span className={`stage-title${editMode ? " hdr-edit" : ""}`} contentEditable={editMode} suppressContentEditableWarning
                                                     onBlur={editMode ? (e) => onStage("renameStage", { stageIdx: si, value: e.currentTarget.textContent }) : undefined}>
                                                     {s.title}
+                                                </span>
                                                 </span>
                                             </span>
                                         </td>
@@ -2444,11 +3835,17 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                             </>
                                                         )}
                                                     </Menu>
+                                                    <span className="insert-zone ins-sub-r-zone">
+                                                        <button type="button" className="ins-btn" title="Add sub-stage here"
+                                                            onClick={() => onStage("addSubStage", { stageIdx: si, subIdx: ssi })}>+</button>
+                                                    </span>
                                                     </>
                                                 )}
-                                                <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
+                                                <span className="step-chip">
+                                                <span className={`step-chip-label${editMode ? " hdr-edit" : ""}`} contentEditable={editMode} suppressContentEditableWarning
                                                     onBlur={editMode ? (e) => onStage("renameSubStage", { stageIdx: si, subIdx: ssi, value: e.currentTarget.textContent }) : undefined}>
                                                     {ss.title}
+                                                </span>
                                                 </span>
                                             </td>
                                         ));
@@ -2462,7 +3859,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
 
             {/* Sub-journeys (rows only; section breaks use divider rows) */}
             {journey.subJourneys.map((sj, si) => (
-                <div key={si}>
+                <div key={si} className="bp-lane-wrap">
                     <div className="bpw" data-ss="">
                         <table className="bp" style={{ minWidth: hdrW }}>
                             <BlueprintColGroup total={total} includeAddColumn={editMode} />
@@ -2482,7 +3879,9 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                         onRowDragOver={(e, targetRowIdx) => rowDragOver(e, si, targetRowIdx)}
                                         onRowDrop={(e, targetRowIdx) => rowDrop(e, si, targetRowIdx)}
                                         onDragEnd={clearDrag}
-                                        onDeselect={onDeselect} />
+                                        onDeselect={onDeselect}
+                                        lockedByPeer={lockedByPeer}
+                                        onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock} />
                                 ))}
                             </tbody>
                         </table>
@@ -2501,6 +3900,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                     )}
                 </div>
             ))}
+            {editMode && <div className="edit-bottom-pad" aria-hidden="true" />}
         </div>
     );
 }
@@ -2516,6 +3916,7 @@ function App() {
     const [view, setView] = useState("library");
     const [confirmState, setConfirmState] = useState(null);
     const [projects, setProjects] = useState([]);
+    const [sharedMaps, setSharedMaps] = useState([]);
     const [currentId, setCurrentId] = useState(null);
     const [standaloneName, setStandaloneName] = useState(null);
     const [viewOnly, setViewOnly] = useState(false);
@@ -2525,7 +3926,35 @@ function App() {
     const [editMode, setEditMode] = useState(true);
     const [selected, setSelected] = useState(null);
     const [lastSaved, setLastSaved] = useState(null);
+    const [lastSavedBy, setLastSavedBy] = useState(null);
+    const [profile, setProfile] = useState(() => getPresenceIdentity());
     const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
+    // Collaborative sync. status: "off" | "enabling" | "synced" | "error".
+    const [sync, setSync] = useState({ mapId: null, role: null, status: "off", error: null });
+    // Presence (Phase 3): other people currently in this map. Ephemeral roster
+    // pushed by the DO; excludes our own clientId. [{clientId, name, color}].
+    const [peers, setPeers] = useState([]);
+    // Cell locking (Phase 8): the DO's lock roster. Each entry is
+    // {cellId, clientId, name, color, lockedAt}. A separate presence-like channel
+    // layered on top of doc.* sync — does NOT touch the whole-doc push/version.
+    const [locks, setLocks] = useState([]);
+    // The cell we are currently editing (its stable cell.id), tracked in a ref so
+    // the heartbeat interval and release-on-hide handlers can read it without
+    // re-subscribing. null when not editing.
+    const editingCellIdRef = useRef(null);
+    // Password gate (Phase 5): when opening a password-protected share link, this
+    // holds {mapId, token} and surfaces the password modal. Cleared once a valid
+    // session is obtained (or the gate is dismissed). Owners never see it.
+    const [passwordGate, setPasswordGate] = useState(null);
+    const syncVersionRef = useRef(0);
+    // Live WebSocket channel (Phase 2). wsRef holds the open socket; a pending
+    // remote payload is stashed when a peer update arrives while the local user
+    // is actively editing a cell, then applied on the next blur.
+    const wsRef = useRef(null);
+    const pendingRemoteRef = useRef(null);
+    // Set when applying a remote payload so the push effect skips the resulting
+    // journeys change (prevents an echo loop back to the server).
+    const skipNextPushRef = useRef(false);
     const appBarRef = useRef(null);
     const saveTimer = useRef(null);
     const lastSavedRef = useRef(null);
@@ -2595,15 +4024,172 @@ function App() {
 
     const refreshProjects = useCallback(async () => {
         setProjects(await dbListProjects());
+        setSharedMaps(await dbListSharedMaps());
     }, []);
 
     const currentName = projects.find((p) => p.id === currentId)?.name || standaloneName || null;
+
+    const markCloudSaved = useCallback((meta = {}) => {
+        const at = meta.updatedAt || Date.now();
+        setLastSaved(at);
+        // An ack the server echoes back to us carries OUR own name/clientId; show
+        // "you" for our own edits, the editor's name for everyone else's.
+        const myId = getPresenceIdentity().clientId;
+        const mine = meta.updatedByClientId && meta.updatedByClientId === myId;
+        setLastSavedBy(mine ? "you" : (meta.updatedByName || "you"));
+        setSaveState("saved");
+    }, []);
+
+    const mirrorCloudState = useCallback(async (mapId, role, name, journeysData, meta = {}, localId = null) => {
+        const at = meta.updatedAt || Date.now();
+        if (localId != null) {
+            await dbSaveCloudMirror(localId, journeysData, mapId, role, { ...meta, updatedAt: at });
+        } else if (role !== "owner") {
+            await dbUpsertSharedMap(mapId, { name, role, ...meta, updatedAt: at });
+        }
+        await refreshProjects();
+    }, [refreshProjects]);
+
+    // Live mirror context for the socket/op handlers. Keeping these in a ref
+    // (instead of as effect deps) prevents the WebSocket from tearing down and
+    // reconnecting on every project rename / standalone-name change.
+    const cloudCtxRef = useRef({ mapId: null, role: null, name: null, localId: null });
+    useEffect(() => {
+        cloudCtxRef.current = {
+            mapId: sync.mapId,
+            role: sync.role,
+            name: currentName || standaloneName || "Shared map",
+            localId: currentId,
+        };
+    }, [sync.mapId, sync.role, currentName, standaloneName, currentId]);
+
+    // Mirror a server-driven update using the current context ref. Stable across
+    // renames so the socket effect needn't depend on name/id state.
+    const mirrorFromSocket = useCallback((journeysData, meta) => {
+        const ctx = cloudCtxRef.current;
+        mirrorCloudState(ctx.mapId, ctx.role, ctx.name, journeysData, meta, ctx.localId)
+            .catch((err) => console.warn("Cloud mirror update failed.", err));
+    }, [mirrorCloudState]);
+
+    const announcePresence = useCallback(() => {
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const me = getPresenceIdentity();
+        try {
+            ws.send(JSON.stringify({ t: "presence.update", clientId: me.clientId, name: me.name, color: me.color }));
+        } catch { /* socket going away; reconnect will retry */ }
+    }, []);
+
+    const renameProfile = useCallback((name) => {
+        const next = setPresenceName(name);
+        setProfile(next);
+        announcePresence();
+    }, [announcePresence]);
+
+    // Enable sync: mint a cloud map from the current journeys, keep the local
+    // (Dexie) project as a mirror, and switch the URL to ?map=<id>. Returns the
+    // share tokens (shown to the user once).
+    const enableSync = useCallback(async () => {
+        if (sync.status === "enabling" || sync.status === "synced") return null;
+        setSync((s) => ({ ...s, status: "enabling", error: null }));
+        try {
+            const { mapId, version, tokens } = await apiCreateMap({
+                name: currentName || "Untitled",
+                journeys: journeysRef.current,
+            });
+            setMapToken(mapId, tokens.owner);
+            syncVersionRef.current = version;
+            setSync({ mapId, role: "owner", status: "synced", error: null });
+            if (currentId != null) {
+                await dbMarkProjectCloud(currentId, mapId, "owner", { version, updatedAt: Date.now(), updatedByName: getPresenceIdentity().name });
+                await refreshProjects();
+            }
+            markCloudSaved({ updatedAt: Date.now(), updatedByName: getPresenceIdentity().name });
+            writeMapRoute(mapId, { replace: true });
+            return { mapId, tokens };
+        } catch (err) {
+            setSync((s) => ({ ...s, status: "error", error: err.message }));
+            return null;
+        }
+    }, [sync.status, currentName, currentId, refreshProjects, markCloudSaved]);
+
+    // Stop sharing: called after the server-side delete succeeds and the token
+    // has already been removed from localStorage. Closes the WS, resets sync
+    // state, and navigates back to the local project (if one exists) or the library.
+    const stopSync = useCallback(() => {
+        const localId = currentId;
+        setSync({ mapId: null, role: null, status: "off", error: null });
+        setPeers([]);
+        if (localId != null) {
+            writeRoute(localId, { replace: true });
+        } else {
+            writeMapRoute(null, { replace: true });
+            setView("library");
+        }
+    }, [currentId]);
 
     useEffect(() => {
         document.title = currentName && view === "project"
             ? `${currentName} - Lanescape`
             : "Lanescape - Service Journey Mapper";
     }, [currentName, view]);
+
+    // Hydrate + mount a shared cloud map once access is granted. `session` is the
+    // password session (or null when the map has no password / caller is owner).
+    // Shared by the init path and the post-password-prompt path (Phase 5).
+    const mountCloudMap = useCallback(async (mapId, token, session) => {
+        const data = await apiGetMap(mapId, token, session);
+        const hydrated = hydrate(data.journeys || []);
+        const linkedProject = await dbFindProjectByCloudMap(mapId);
+        let localId = linkedProject?.id ?? null;
+        // Owners always get a local "Your projects" mirror — e.g. when opening
+        // their own map on a second device that has no local copy yet. Non-owners
+        // stay in the lighter "Shared with me" list (no local project created).
+        if (localId == null && data.role === "owner") {
+            localId = await dbCreateProject(data.name || "Untitled project", hydrated);
+            await dbMarkProjectCloud(localId, mapId, "owner", data);
+        }
+        setCurrentId(localId);
+        setStandaloneName(data.name || "Shared map");
+        syncVersionRef.current = data.version || 0;
+        setSync({ mapId, role: data.role, status: "synced", error: null });
+        const isViewer = data.role === "viewer";
+        setViewOnly(isViewer);
+        setEditMode(!isViewer);
+        replaceJourneys(hydrated, { skipSave: true });
+        clearHistory();
+        setView("project");
+        markCloudSaved(data);
+        await mirrorCloudState(mapId, data.role, data.name || "Shared map", hydrated, data, localId);
+        writeMapRoute(mapId, { replace: true });
+        setReady(true);
+    }, [clearHistory, markCloudSaved, mirrorCloudState, replaceJourneys]);
+
+    // Submit a password for a gated map (Phase 5). On success store the session
+    // and mount the map; on failure return an error string for the modal to show.
+    const submitPassword = useCallback(async (password) => {
+        if (!passwordGate) return null;
+        const { mapId, token } = passwordGate;
+        try {
+            const res = await apiAccessMap(mapId, token, password);
+            if (!res.ok) return "Incorrect password. Please try again.";
+            if (res.session) setMapSession(mapId, res.session);
+            await mountCloudMap(mapId, token, res.session || null);
+            setPasswordGate(null);
+            return null;
+        } catch (err) {
+            return err.message || "Could not open this map.";
+        }
+    }, [passwordGate, mountCloudMap]);
+
+    // Dismiss the password prompt → fall back to the library.
+    const cancelPasswordGate = useCallback(() => {
+        setPasswordGate(null);
+        setSync({ mapId: null, role: null, status: "off", error: null });
+        writeMapRoute(null, { replace: true });
+        setView("library");
+        setReady(true);
+    }, []);
 
     // ── Init: load project list + reopen last project ──
     useEffect(() => {
@@ -2619,45 +4205,100 @@ function App() {
                 replaceJourneys(hydrate(embedded.journeys || []), { skipSave: true });
                 clearHistory();
                 setLastSaved(embedded.lastSavedAt ? new Date(embedded.lastSavedAt).getTime() : null);
+                setLastSavedBy(null);
                 setSaveState("idle");
                 setReady(true);
                 return;
             }
 
+            // Open a shared cloud map from ?map=<id>. A ?token= in the URL (from
+            // a freshly pasted share link) is consumed into localStorage, then
+            // stripped from the address bar.
+            const mapId = routeMapId();
+            if (mapId) {
+                const urlToken = new URLSearchParams(window.location.search).get("token");
+                if (urlToken) setMapToken(mapId, urlToken);
+                const token = getMapToken(mapId);
+                try {
+                    // Phase 5: probe access first. Owners + non-password maps return
+                    // passwordRequired:false (no session). A password-gated map for a
+                    // non-owner returns passwordRequired:true → show the prompt; any
+                    // session already held (this tab) is reused so a reload skips it.
+                    const existingSession = getMapSession(mapId);
+                    const access = await apiAccessMap(mapId, token, undefined);
+                    if (access.passwordRequired && !existingSession) {
+                        // Strip ?token= from the URL before prompting (don't leak it
+                        // in the address bar) but keep ?map=.
+                        writeMapRoute(mapId, { replace: true });
+                        setPasswordGate({ mapId, token });
+                        setReady(true); // render the gate; mountCloudMap runs on success
+                        return;
+                    }
+                    await mountCloudMap(mapId, token, access.session || existingSession || null);
+                    return;
+                } catch (err) {
+                    // A stale/expired session (e.g. the owner changed the password)
+                    // makes hydrate 401 → re-prompt instead of bouncing to library.
+                    if (err && err.passwordRequired) {
+                        setMapSession(mapId, null);
+                        writeMapRoute(mapId, { replace: true });
+                        setPasswordGate({ mapId, token });
+                        setReady(true);
+                        return;
+                    }
+                    setSync({ mapId: null, role: null, status: "error", error: err.message });
+                    writeMapRoute(null, { replace: true });
+                    // fall through to the library
+                }
+            }
+
             // Land on the library; the user picks (or creates) a project to enter.
             const list = await dbListProjects();
             setProjects(list);
+            setSharedMaps(await dbListSharedMaps());
             const routedId = routeProjectId();
             if (routedId != null) {
                 const p = await dbGetProject(routedId);
                 if (p) {
-                    setCurrentId(routedId);
-                    replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
-                    clearHistory();
-                    setLastSaved(p.updatedAt || null);
-                    setTab(0);
-                    setEditMode(true);
-                    setView("project");
-                    localStorage.setItem(LAST_KEY, String(routedId));
-                    writeRoute(routedId, { replace: true });
-                    setReady(true);
-                    return;
+                    if (p.cloudMapId && getMapToken(p.cloudMapId)) {
+                        await mountCloudMap(p.cloudMapId, getMapToken(p.cloudMapId), getMapSession(p.cloudMapId));
+                        return;
+                    } else {
+                        setCurrentId(routedId);
+                        replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
+                        clearHistory();
+                        setLastSaved(p.updatedAt || null);
+                        setLastSavedBy(null);
+                        setTab(0);
+                        setEditMode(true);
+                        setViewOnly(false);
+                        setView("project");
+                        localStorage.setItem(LAST_KEY, String(routedId));
+                        writeRoute(routedId, { replace: true });
+                        setReady(true);
+                        return;
+                    }
                 }
                 writeRoute(null, { replace: true });
             }
             setView("library");
             setReady(true);
         })();
-    }, [clearHistory, replaceJourneys]);
+    }, [clearHistory, mountCloudMap, replaceJourneys]);
 
     // Keep native browser Back/Forward in sync with the in-app project view.
     useEffect(() => {
-        if (viewOnly) return;
         const onPopState = () => {
             // Browser back doesn't blur the focused cell (popstate is same-document),
             // so flush any in-flight cell draft into state before we swap views.
             document.activeElement?.blur?.();
             (async () => {
+                const routedMapId = routeMapId();
+                if (routedMapId) {
+                    const token = getMapToken(routedMapId);
+                    if (token) await mountCloudMap(routedMapId, token, getMapSession(routedMapId));
+                    return;
+                }
                 const routedId = routeProjectId();
                 if (routedId == null) {
                     setSelected(null);
@@ -2673,12 +4314,18 @@ function App() {
                     await refreshProjects();
                     return;
                 }
+                if (p.cloudMapId && getMapToken(p.cloudMapId)) {
+                    await mountCloudMap(p.cloudMapId, getMapToken(p.cloudMapId), getMapSession(p.cloudMapId));
+                    return;
+                }
                 setCurrentId(routedId);
                 replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
                 clearHistory();
                 setLastSaved(p.updatedAt || null);
+                setLastSavedBy(null);
                 setTab(0);
                 setEditMode(true);
+                setViewOnly(false);
                 setSelected(null);
                 setView("project");
                 localStorage.setItem(LAST_KEY, String(routedId));
@@ -2687,7 +4334,7 @@ function App() {
         };
         window.addEventListener("popstate", onPopState);
         return () => window.removeEventListener("popstate", onPopState);
-    }, [clearHistory, refreshProjects, replaceJourneys, viewOnly]);
+    }, [clearHistory, mountCloudMap, refreshProjects, replaceJourneys]);
 
     // ── Autosave current project (debounced) ──
     useEffect(() => {
@@ -2702,10 +4349,282 @@ function App() {
         saveTimer.current = setTimeout(() => {
             dbSaveJourneys(currentId, journeysRef.current)
                 .then(refreshProjects)
-                .then(() => { setSaveState("saved"); setLastSaved(Date.now()); });
+                .then(() => { setSaveState("saved"); setLastSaved(Date.now()); setLastSavedBy("you"); });
         }, 600);
         return () => clearTimeout(saveTimer.current);
     }, [journeys, currentId, ready, refreshProjects]);
+
+    // ── Collaborative sync: live WebSocket channel (Phase 2) ──
+    // Apply a remote whole-document payload (doc.sync / doc.update / doc.reject):
+    // adopt its version and replace journeys without re-saving or re-pushing.
+    const applyRemoteDoc = useCallback((parsed) => {
+        if (!parsed || typeof parsed.version !== "number") return;
+        syncVersionRef.current = parsed.version;
+        skipNextPushRef.current = true;
+        const hydrated = hydrate(parsed.journeys || []);
+        replaceJourneys(hydrated, { skipSave: true });
+        markCloudSaved(parsed);
+        mirrorFromSocket(hydrated, parsed);
+    }, [markCloudSaved, mirrorFromSocket, replaceJourneys]);
+
+    // ── Phase 9: emit an op over the socket for a local optimistic change ──
+    // The local immutable updater has already mutated `journeys`; this only sends
+    // the matching op. Structural ops carry the baseVersion the local state was
+    // built on (the server accepts iff it still matches). cell.set is not
+    // version-gated. We never apply our own op inbound (the server broadcasts it
+    // only to OTHER clients), so no echo guard is needed for ops — the
+    // skipNextPushRef guard is only for the legacy whole-doc push effect.
+    const STRUCTURAL_PREFIXES = ["row.", "column.", "stage.", "substage.", "subjourney.", "journey."];
+    const emitOp = useCallback((op) => {
+        if (sync.status !== "synced" || sync.role === "viewer") return;
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const structural = STRUCTURAL_PREFIXES.some((p) => op.t.startsWith(p));
+        setSaveState("saving");
+        // Bump our local version optimistically for a structural op so a rapid
+        // burst of structural ops carries increasing baseVersions (the server
+        // serializes them; a stale one just triggers a doc.reject resync).
+        const frame = structural
+            ? { ...op, baseVersion: syncVersionRef.current }
+            : { ...op, ts: op.ts ?? Date.now() };
+        try { ws.send(JSON.stringify(frame)); } catch { /* socket going away; reconnect resyncs */ }
+        if (structural) syncVersionRef.current += 1;
+    }, [sync.status, sync.role]);
+    const emitOpRef = useRef(emitOp);
+    useEffect(() => { emitOpRef.current = emitOp; }, [emitOp]);
+
+    const commitOp = useCallback((op, afterCommit) => {
+        const next = applyOp(journeysRef.current, op);
+        if (!next) return false;
+        commitJourneys(next);
+        afterCommit?.(next);
+        emitOpRef.current(op);
+        return true;
+    }, [commitJourneys]);
+
+    const cellIdsByRow = useCallback((journey, leavesPerRow = 1) => {
+        const ids = {};
+        for (const sj of journey?.subJourneys || []) {
+            for (const row of sj.rows || []) {
+                if (!row.id) continue;
+                ids[row.id] = leavesPerRow === 1
+                    ? newId()
+                    : Array.from({ length: leavesPerRow }, newId);
+            }
+        }
+        return ids;
+    }, []);
+
+    const afterIdFromMovedOrder = useCallback((items, fromIdx, toIdx) => {
+        const moved = moveArrayRange(items || [], fromIdx, 1, toIdx);
+        if (moved === items) return undefined;
+        const id = items?.[fromIdx]?.id;
+        const at = moved.findIndex((x) => x.id === id);
+        return at <= 0 ? null : moved[at - 1]?.id;
+    }, []);
+
+    // Apply an INBOUND remote op (cell.set or a structural op) by id to the local
+    // journeys. Structural ops also adopt the new server `version`. If applyOp
+    // can't apply it (unknown id), do nothing — the server's doc.reject backstop
+    // will follow. Sets skipNextPushRef so the legacy push effect stays quiet.
+    const applyRemoteOp = useCallback((op) => {
+        const structural = STRUCTURAL_PREFIXES.some((p) => op.t.startsWith(p));
+        const next = applyOp(journeysRef.current, op);
+        if (!next) return; // unknown id; wait for doc.reject resync
+        if (structural && typeof op.version === "number") syncVersionRef.current = op.version;
+        skipNextPushRef.current = true;
+        replaceJourneys(next, { skipSave: true });
+        markCloudSaved(op);
+        // cell.set frames carry no version (content is commutative); fall back to
+        // the live version so the stored cloudVersion isn't clobbered to 0.
+        const meta = typeof op.version === "number" ? op : { ...op, version: syncVersionRef.current };
+        mirrorFromSocket(next, meta);
+    }, [markCloudSaved, mirrorFromSocket, replaceJourneys]);
+
+    // Defer a remote cell.set only when it targets the cell we are actively
+    // editing; a different cell can apply immediately (the Phase 9 headline win).
+    const applyOrDeferRemoteOp = useCallback((op) => {
+        if (op.t === "cell.set" && op.cellId && op.cellId === editingCellIdRef.current) {
+            const el = document.activeElement;
+            if (el && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
+                const onBlur = () => { el.removeEventListener("blur", onBlur); applyRemoteOp(op); };
+                el.addEventListener("blur", onBlur, { once: true });
+                return;
+            }
+        }
+        applyRemoteOp(op);
+    }, [applyRemoteOp]);
+
+    // If a remote payload arrives while the user is actively editing a grid
+    // cell, stash it and apply on the next blur (mirrors the popstate dance).
+    const applyOrDeferRemote = useCallback((parsed) => {
+        const el = document.activeElement;
+        const editing = el && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+        if (editing) {
+            pendingRemoteRef.current = parsed; // newest wins; applied on blur
+            const onBlur = () => {
+                el.removeEventListener("blur", onBlur);
+                const pending = pendingRemoteRef.current;
+                pendingRemoteRef.current = null;
+                if (pending) applyRemoteDoc(pending);
+            };
+            el.addEventListener("blur", onBlur, { once: true });
+        } else {
+            applyRemoteDoc(parsed);
+        }
+    }, [applyRemoteDoc]);
+
+    // ── Cell locking (Phase 8): soft advisory locks ──
+    // True only when locking should be active at all. When not synced (or not an
+    // editor in edit mode) locking is fully inert — zero behavior change vs today.
+    const lockingActive = sync.status === "synced" && editMode && sync.role !== "viewer";
+
+    // Map cellId -> {clientId,name,color} of the PEER holding it, EXCLUDING our
+    // own clientId (our own lock must never lock us out of our own cell).
+    const lockedByPeer = useMemo(() => {
+        const myId = getPresenceIdentity().clientId;
+        const m = new Map();
+        for (const l of locks) {
+            if (!l || !l.cellId || l.clientId === myId) continue;
+            m.set(l.cellId, { clientId: l.clientId, name: l.name, color: l.color });
+        }
+        return m;
+    }, [locks]);
+
+    // Send a lock.* frame if the socket is OPEN and locking is active.
+    const sendLock = useCallback((type, cellId) => {
+        if (!lockingActive || !cellId) return;
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        try { ws.send(JSON.stringify({ t: type, cellId })); } catch { /* socket going away */ }
+    }, [lockingActive]);
+
+    // Acquire on edit-intent (cell editable focus / tags-cell entering edit).
+    // Release any lock we still hold on a different cell first (e.g. moving from a
+    // tags cell, which has no blur, straight to another cell).
+    const acquireLock = useCallback((cellId) => {
+        if (!lockingActive || !cellId) return;
+        const prev = editingCellIdRef.current;
+        if (prev && prev !== cellId) sendLock("lock.release", prev);
+        editingCellIdRef.current = cellId;
+        sendLock("lock.acquire", cellId);
+    }, [lockingActive, sendLock]);
+
+    // Release on blur / Escape / tab hide / leaving the map.
+    const releaseLock = useCallback(() => {
+        const cellId = editingCellIdRef.current;
+        editingCellIdRef.current = null;
+        if (cellId) sendLock("lock.release", cellId);
+    }, [sendLock]);
+
+    // Heartbeat while editing so peers / the server keep the lock fresh (~5s).
+    useEffect(() => {
+        if (!lockingActive) return;
+        const id = setInterval(() => {
+            const cellId = editingCellIdRef.current;
+            if (cellId) sendLock("lock.heartbeat", cellId);
+        }, 5000);
+        return () => clearInterval(id);
+    }, [lockingActive, sendLock]);
+
+    // Release the lock (and blur the cell) when the tab is hidden, so a lock is
+    // not held while the editor is away. Also covers Cmd-Tab / minimise.
+    useEffect(() => {
+        const onHide = () => {
+            if (document.visibilityState !== "hidden") return;
+            const el = document.activeElement;
+            if (el && el.isContentEditable) { try { el.blur(); } catch { /* ignore */ } }
+            releaseLock();
+        };
+        document.addEventListener("visibilitychange", onHide);
+        return () => document.removeEventListener("visibilitychange", onHide);
+    }, [releaseLock]);
+
+    // Open/maintain the socket while synced; reconnect with capped backoff.
+    useEffect(() => {
+        if (sync.status !== "synced" || !sync.mapId) return;
+        const mapId = sync.mapId;
+        const token = getMapToken(mapId);
+        const session = getMapSession(mapId); // Phase 5: proof of password (if any)
+        let closed = false;
+        let retries = 0;
+        let reconnectTimer = null;
+
+        const connect = () => {
+            if (closed) return;
+            const wsBase = SYNC_API_BASE.replace(/^http/, "ws");
+            const url = `${wsBase}/api/maps/${encodeURIComponent(mapId)}/sync?token=${encodeURIComponent(token || "")}${session ? `&session=${encodeURIComponent(session)}` : ""}`;
+            let ws;
+            try { ws = new WebSocket(url); } catch { scheduleReconnect(); return; }
+            wsRef.current = ws;
+            ws.onopen = () => {
+                retries = 0;
+                // Announce our presence so peers see us (and we get the roster).
+                announcePresence();
+            };
+            ws.onmessage = (ev) => {
+                let parsed;
+                try { parsed = JSON.parse(ev.data); } catch { return; }
+                // doc.sync, doc.update and doc.reject all carry {version, journeys}
+                // and are applied the same way (reject also adopts server version).
+                if (parsed.t === "doc.sync" || parsed.t === "doc.update" || parsed.t === "doc.reject") {
+                    applyOrDeferRemote(parsed);
+                } else if (parsed.t === "presence" && Array.isArray(parsed.peers)) {
+                    const myId = getPresenceIdentity().clientId;
+                    setPeers(parsed.peers.filter((p) => p && p.clientId && p.clientId !== myId));
+                } else if (parsed.t === "locks" && Array.isArray(parsed.locks)) {
+                    setLocks(parsed.locks);
+                } else if (parsed.t === "lock.denied") {
+                    // A peer already holds the cell we just tried to edit: abandon
+                    // (blur the active cell). The incoming `locks` frame marks it locked.
+                    if (editingCellIdRef.current === parsed.cellId) {
+                        editingCellIdRef.current = null;
+                        const el = document.activeElement;
+                        if (el && el.isContentEditable) { try { el.blur(); } catch { /* ignore */ } }
+                    }
+                } else if (parsed.t === "cell.set" || STRUCTURAL_PREFIXES.some((p) => String(parsed.t || "").startsWith(p))) {
+                    applyOrDeferRemoteOp(parsed);
+                } else if (parsed.t === "op.ack" || parsed.t === "doc.ack") {
+                    if (typeof parsed.version === "number") syncVersionRef.current = parsed.version;
+                    markCloudSaved(parsed);
+                    const meta = typeof parsed.version === "number" ? parsed : { ...parsed, version: syncVersionRef.current };
+                    mirrorFromSocket(journeysRef.current, meta);
+                }
+            };
+            ws.onclose = () => { if (wsRef.current === ws) { wsRef.current = null; setPeers([]); setLocks([]); } scheduleReconnect(); };
+            ws.onerror = () => { try { ws.close(); } catch { /* ignore */ } };
+        };
+
+        const scheduleReconnect = () => {
+            if (closed) return;
+            const delay = Math.min(1000 * 2 ** retries, 15000);
+            retries += 1;
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(connect, delay);
+        };
+
+        connect();
+        return () => {
+            closed = true;
+            clearTimeout(reconnectTimer);
+            const ws = wsRef.current;
+            wsRef.current = null;
+            setPeers([]); // leaving this map; drop the roster
+            setLocks([]); // and the lock roster
+            editingCellIdRef.current = null;
+            if (ws) { ws.onclose = null; ws.onerror = null; try { ws.close(); } catch { /* ignore */ } }
+        };
+    }, [announcePresence, applyOrDeferRemote, applyOrDeferRemoteOp, markCloudSaved, mirrorFromSocket, sync.mapId, sync.status]);
+
+    // Phase 9 replaces the old "push the entire journeys array on every change"
+    // behavior with explicit op emits from the edit handlers. The Worker still
+    // accepts doc.push from older clients, but this client no longer sends it for
+    // ordinary edits; undo/redo remain local until a future snapshot-diff pass.
+    useEffect(() => {
+        if (!ready) return;
+        if (skipNextPushRef.current) { skipNextPushRef.current = false; return; }
+        // no-op by design; local mutation handlers call emitOpRef.current(op).
+    }, [journeys, ready, sync.status, sync.role]);
 
     // ── Load data (JSON array / exported project) ──
     const loadFromText = useCallback(async (text, mode = "replace", options = {}) => {
@@ -2770,200 +4689,179 @@ function App() {
     }, [commitJourneys]);
 
     // Mutate a single cell via `fn(cellCopy) -> cell`.
-    const editCell = useCallback((jIdx, sjIdx, rowIdx, cellIdx, fn) => {
-        editJourney(jIdx, (j) => {
-            const cur = j.subJourneys?.[sjIdx]?.rows?.[rowIdx]?.cells?.[cellIdx];
-            if (!cur) return j;
-            const nc = fn({ ...cur });
-            if (nc === cur || JSON.stringify(nc) === JSON.stringify(cur)) return j;
-            const sjs = j.subJourneys.slice();
-            const sj = { ...sjs[sjIdx], rows: sjs[sjIdx].rows.slice() };
-            const row = { ...sj.rows[rowIdx], cells: sj.rows[rowIdx].cells.slice() };
-            row.cells[cellIdx] = nc;
-            sj.rows[rowIdx] = row;
-            sjs[sjIdx] = sj;
-            return { ...j, subJourneys: sjs };
-        });
-    }, [editJourney]);
+    const editCell = useCallback((jIdx, sjIdx, rowIdx, cellIdx, fields) => {
+        const cell = journeysRef.current[jIdx]?.subJourneys?.[sjIdx]?.rows?.[rowIdx]?.cells?.[cellIdx];
+        if (!cell?.id) return;
+        const changed = Object.keys(fields || {}).some((k) => JSON.stringify(cell[k]) !== JSON.stringify(fields[k]));
+        if (!changed) return;
+        commitOp({ t: "cell.set", cellId: cell.id, fields, ts: Date.now() });
+    }, [commitOp]);
 
     // ── Cell handlers ──
     const handleCellEdit = useCallback((jIdx, sjIdx, rowIdx, cellIdx, html) =>
-        editCell(jIdx, sjIdx, rowIdx, cellIdx, (c) => (c.html === html ? c : { ...c, html })), [editCell]);
+        editCell(jIdx, sjIdx, rowIdx, cellIdx, { html }), [editCell]);
     const handleCellTags = useCallback((jIdx, sjIdx, rowIdx, cellIdx, tags) =>
-        editCell(jIdx, sjIdx, rowIdx, cellIdx, (c) => ({ ...c, tags })), [editCell]);
+        editCell(jIdx, sjIdx, rowIdx, cellIdx, { tags }), [editCell]);
     const handleCellMode = useCallback((jIdx, sjIdx, rowIdx, cellIdx, mode) =>
-        editCell(jIdx, sjIdx, rowIdx, cellIdx, (c) => ({ ...c, mode, ...(mode === "tags" && !c.tags ? { tags: [] } : {}) })), [editCell]);
+        editCell(jIdx, sjIdx, rowIdx, cellIdx, { mode, ...(mode === "tags" ? { tags: journeysRef.current[jIdx]?.subJourneys?.[sjIdx]?.rows?.[rowIdx]?.cells?.[cellIdx]?.tags || [] } : {}) }), [editCell]);
     const handleCellAlign = useCallback((jIdx, sjIdx, rowIdx, cellIdx, align) =>
-        editCell(jIdx, sjIdx, rowIdx, cellIdx, (c) => ({ ...c, align })), [editCell]);
+        editCell(jIdx, sjIdx, rowIdx, cellIdx, { align }), [editCell]);
 
     // ── Row handlers ──
     const handleRowAction = useCallback((jIdx, sjIdx, rowIdx, action, value) => {
-        editJourney(jIdx, (j) => {
-            const total = totalLeaves(j.stages);
-            const sjs = j.subJourneys.slice();
-            const sj = { ...sjs[sjIdx], rows: sjs[sjIdx].rows.slice() };
-            const rows = sj.rows;
-            if (action === "delete") rows.splice(rowIdx, 1);
-            else if (action === "moveTo") {
-                const toRowIdx = Math.max(0, Math.min(value?.toRowIdx ?? rowIdx, rows.length));
-                const moved = moveArrayRange(rows, rowIdx, 1, toRowIdx);
-                if (moved === rows) return j;
-                sj.rows = moved;
-                sjs[sjIdx] = sj;
-                return { ...j, subJourneys: sjs };
-            }
-            else if (action === "insertAbove") rows.splice(rowIdx, 0, newRow(total));
-            else if (action === "insertBelow") rows.splice(rowIdx + 1, 0, newRow(total));
-            else if (action === "type") {
-                const cur = rows[rowIdx];
-                const wasDivider = cur.rowType === DIVIDER_TYPE;
-                const willDivider = value === DIVIDER_TYPE;
-                let cells = cur.cells;
-                if (willDivider && !wasDivider) cells = collapseDivider(cells, total);
-                else if (!willDivider && wasDivider) cells = expandDivider(cells, total);
-                rows[rowIdx] = { ...cur, rowType: value, cells };
-            }
-            else if (action === "color") rows[rowIdx] = { ...rows[rowIdx], customColor: value || undefined };
-            else if (action === "label") {
-                if (rows[rowIdx].laneLabel === value) return j;
-                rows[rowIdx] = { ...rows[rowIdx], laneLabel: value };
-            } else return j;
-            sj.rows = rows;
-            sjs[sjIdx] = sj;
-            return { ...j, subJourneys: sjs };
-        });
-    }, [editJourney]);
+        const j = journeysRef.current[jIdx];
+        const sj = j?.subJourneys?.[sjIdx];
+        const row = sj?.rows?.[rowIdx];
+        if (!j || !sj || !row) return;
+        if (action === "delete") return commitOp({ t: "row.delete", rowId: row.id });
+        if (action === "moveTo") {
+            const toRowIdx = Math.max(0, Math.min(value?.toRowIdx ?? rowIdx, sj.rows.length));
+            const afterRowId = afterIdFromMovedOrder(sj.rows, rowIdx, toRowIdx);
+            if (afterRowId === undefined) return;
+            return commitOp({ t: "row.move", rowId: row.id, afterRowId });
+        }
+        if (action === "insertAbove" || action === "insertBelow") {
+            const afterRowId = action === "insertAbove"
+                ? (rowIdx > 0 ? sj.rows[rowIdx - 1]?.id : null)
+                : row.id;
+            return commitOp({ t: "row.insert", subJourneyId: sj.id, afterRowId, row: newRow(totalLeaves(j.stages)) });
+        }
+        if (action === "type") {
+            if (row.rowType === value) return;
+            return commitOp({ t: "row.setType", rowId: row.id, rowType: value });
+        }
+        if (action === "color") {
+            if ((row.customColor || undefined) === (value || undefined)) return;
+            return commitOp({ t: "row.setColor", rowId: row.id, color: value || undefined });
+        }
+        if (action === "label") {
+            if (row.laneLabel === value) return;
+            return commitOp({ t: "row.setLabel", rowId: row.id, label: value });
+        }
+    }, [afterIdFromMovedOrder, commitOp]);
 
     const handleAddRow = useCallback((jIdx, sjIdx) => {
-        editJourney(jIdx, (j) => {
-            const sjs = j.subJourneys.slice();
-            sjs[sjIdx] = { ...sjs[sjIdx], rows: [...sjs[sjIdx].rows, newRow(totalLeaves(j.stages))] };
-            return { ...j, subJourneys: sjs };
-        });
-    }, [editJourney]);
+        const j = journeysRef.current[jIdx];
+        const sj = j?.subJourneys?.[sjIdx];
+        if (!j || !sj) return;
+        const rows = sj.rows || [];
+        commitOp({ t: "row.insert", subJourneyId: sj.id, afterRowId: rows.length ? rows[rows.length - 1].id : null, row: newRow(totalLeaves(j.stages)) });
+    }, [commitOp]);
 
     // ── Stage / sub-stage (column) handlers ──
     const handleStageAction = useCallback((jIdx, action, payload) => {
-        editJourney(jIdx, (j) => {
-            const stages = j.stages.map((s) => ({ ...s, subStages: (s.subStages || []).slice() }));
-            const mapRows = (fn) => j.subJourneys.map((sj) => ({
-                ...sj, rows: sj.rows.map((r) => ({ ...r, cells: fn(r.cells) })),
-            }));
-
-            if (action === "addStage") {
-                const insertAt = payload.stageIdx != null ? payload.stageIdx + 1 : stages.length;
-                const leafIdx = leafStart(j.stages, payload.stageIdx != null ? payload.stageIdx : j.stages.length - 1) + leafCount(j.stages[payload.stageIdx != null ? payload.stageIdx : j.stages.length - 1]);
-                stages.splice(insertAt, 0, { num: nextStageNum(stages), title: "New Stage", subStages: [] });
-                return { ...j, stages, subJourneys: mapRows((cells) => {
-                    const c = cells.slice();
-                    c.splice(leafIdx, 0, newCell());
-                    return c;
-                }) };
-            }
-            if (action === "deleteStage") {
-                const { stageIdx } = payload;
-                if (stages.length <= 1) { alert("A journey needs at least one stage."); return j; }
-                const start = leafStart(j.stages, stageIdx);
-                const cnt = leafCount(j.stages[stageIdx]);
-                stages.splice(stageIdx, 1);
-                return { ...j, stages, subJourneys: mapRows((cells) => {
-                    let c = cells;
-                    for (let k = 0; k < cnt; k++) c = removeLeafFromRow(c, start);
-                    return c;
-                }) };
-            }
-            if (action === "moveStage") {
-                const { fromIdx } = payload;
-                const toIdx = Math.max(0, Math.min(payload.toIdx, stages.length));
-                if (fromIdx < 0 || fromIdx >= stages.length) return j;
-                const movedStages = moveArrayRange(stages, fromIdx, 1, toIdx);
-                if (movedStages === stages) return j;
-                const start = leafStart(j.stages, fromIdx);
-                const cnt = leafCount(j.stages[fromIdx]);
-                const target = toIdx >= j.stages.length ? totalLeaves(j.stages) : leafStart(j.stages, toIdx);
-                return {
-                    ...j,
-                    stages: movedStages,
-                    subJourneys: j.subJourneys.map((sj) => ({
-                        ...sj,
-                        rows: sj.rows.map((r) => moveLeafRangeInRow(r, start, cnt, target)),
-                    })),
-                };
-            }
-            if (action === "addSubStage") {
-                const { stageIdx } = payload;
-                const before = stages[stageIdx].subStages.length;
-                stages[stageIdx].subStages.push({ title: "New" });
-                const oldL = Math.max(before, 1), newL = Math.max(before + 1, 1);
-                if (newL > oldL) {
-                    const gi = leafStart(j.stages, stageIdx) + oldL;
-                    return { ...j, stages, subJourneys: mapRows((cells) => insertLeafIntoRow(cells, gi)) };
-                }
-                return { ...j, stages };
-            }
-            if (action === "deleteSubStage") {
-                const { stageIdx, subIdx } = payload;
-                const before = stages[stageIdx].subStages.length;
-                stages[stageIdx].subStages.splice(subIdx, 1);
-                const oldL = Math.max(before, 1), newL = Math.max(before - 1, 1);
-                if (newL < oldL) {
-                    const gi = leafStart(j.stages, stageIdx) + Math.min(subIdx, oldL - 1);
-                    return { ...j, stages, subJourneys: mapRows((cells) => removeLeafFromRow(cells, gi)) };
-                }
-                return { ...j, stages };
-            }
-            if (action === "moveSubStage") {
-                const { stageIdx, fromIdx } = payload;
-                const subs = stages[stageIdx]?.subStages || [];
-                const toIdx = Math.max(0, Math.min(payload.toIdx, subs.length));
-                if (subs.length <= 1 || fromIdx < 0 || fromIdx >= subs.length) return j;
-                const movedSubs = moveArrayRange(subs, fromIdx, 1, toIdx);
-                if (movedSubs === subs) return j;
-                stages[stageIdx] = { ...stages[stageIdx], subStages: movedSubs };
-                const start = leafStart(j.stages, stageIdx);
-                const fromLeaf = start + fromIdx;
-                const toLeaf = start + toIdx;
-                return {
-                    ...j,
-                    stages,
-                    subJourneys: j.subJourneys.map((sj) => ({
-                        ...sj,
-                        rows: sj.rows.map((r) => moveLeafRangeInRow(r, fromLeaf, 1, toLeaf)),
-                    })),
-                };
-            }
-            if (action === "renameStage") { stages[payload.stageIdx] = { ...stages[payload.stageIdx], title: payload.value }; return { ...j, stages }; }
-            if (action === "renumberStage") {
-                const raw = (payload.value ?? "").trim();
-                stages[payload.stageIdx] = { ...stages[payload.stageIdx], num: raw === "" ? null : (Number.isFinite(Number(raw)) ? Number(raw) : raw) };
-                return { ...j, stages };
-            }
-            if (action === "renameSubStage") {
-                stages[payload.stageIdx].subStages[payload.subIdx] = { ...stages[payload.stageIdx].subStages[payload.subIdx], title: payload.value };
-                return { ...j, stages };
-            }
-            if (action === "setStageLabel") {
-                if (j.stageLabel === payload.value) return j;
-                return { ...j, stageLabel: payload.value };
-            }
-            return j;
-        });
-    }, [editJourney]);
+        const j = journeysRef.current[jIdx];
+        if (!j) return;
+        const stages = j.stages || [];
+        if (action === "addStage") {
+            const afterStageId = payload.stageIdx != null ? stages[payload.stageIdx]?.id : (stages.length ? stages[stages.length - 1].id : null);
+            const stage = { id: newId(), num: nextStageNum(stages), title: "New Stage", subStages: [] };
+            return commitOp({ t: "stage.insert", journeyId: j.id, afterStageId, stage, cellIds: cellIdsByRow(j, leafCount(stage)) });
+        }
+        if (action === "deleteStage") {
+            const { stageIdx } = payload;
+            if (stages.length <= 1) { alert("A journey needs at least one stage."); return; }
+            const stage = stages[stageIdx];
+            if (!stage) return;
+            return commitOp({ t: "stage.delete", journeyId: j.id, stageId: stage.id });
+        }
+        if (action === "moveStage") {
+            const { fromIdx } = payload;
+            const toIdx = Math.max(0, Math.min(payload.toIdx, stages.length));
+            const stage = stages[fromIdx];
+            if (!stage) return;
+            const afterStageId = afterIdFromMovedOrder(stages, fromIdx, toIdx);
+            if (afterStageId === undefined) return;
+            return commitOp({ t: "stage.move", journeyId: j.id, stageId: stage.id, afterStageId });
+        }
+        if (action === "addSubStage") {
+            const { stageIdx, subIdx } = payload;
+            const stage = stages[stageIdx];
+            if (!stage) return;
+            const subs = stage.subStages || [];
+            const subStage = { id: newId(), title: "New" };
+            const afterSubStageId = subIdx != null
+                ? (subs[subIdx]?.id ?? null)
+                : (subs.length ? subs[subs.length - 1].id : null);
+            return commitOp({
+                t: "substage.insert",
+                journeyId: j.id,
+                stageId: stage.id,
+                afterSubStageId,
+                subStage,
+                cellIds: cellIdsByRow(j, 1),
+            });
+        }
+        if (action === "deleteSubStage") {
+            const { stageIdx, subIdx } = payload;
+            const stage = stages[stageIdx];
+            const subStage = stage?.subStages?.[subIdx];
+            if (!stage || !subStage) return;
+            return commitOp({ t: "substage.delete", journeyId: j.id, stageId: stage.id, subStageId: subStage.id });
+        }
+        if (action === "moveSubStage") {
+            const { stageIdx, fromIdx } = payload;
+            const stage = stages[stageIdx];
+            const subs = stage?.subStages || [];
+            const subStage = subs[fromIdx];
+            if (!stage || !subStage || subs.length <= 1) return;
+            const toIdx = Math.max(0, Math.min(payload.toIdx, subs.length));
+            const afterSubStageId = afterIdFromMovedOrder(subs, fromIdx, toIdx);
+            if (afterSubStageId === undefined) return;
+            return commitOp({ t: "substage.move", journeyId: j.id, stageId: stage.id, subStageId: subStage.id, afterSubStageId });
+        }
+        if (action === "renameStage") {
+            const stage = stages[payload.stageIdx];
+            if (!stage || stage.title === payload.value) return;
+            return commitOp({ t: "stage.setLabel", stageId: stage.id, label: payload.value });
+        }
+        if (action === "renumberStage") {
+            const stage = stages[payload.stageIdx];
+            if (!stage) return;
+            const raw = (payload.value ?? "").trim();
+            const num = raw === "" ? null : (Number.isFinite(Number(raw)) ? Number(raw) : raw);
+            if (stage.num === num) return;
+            return commitOp({ t: "stage.setNum", stageId: stage.id, num });
+        }
+        if (action === "renameSubStage") {
+            const stage = stages[payload.stageIdx];
+            const subStage = stage?.subStages?.[payload.subIdx];
+            if (!stage || !subStage || subStage.title === payload.value) return;
+            return commitOp({ t: "substage.setLabel", stageId: stage.id, subStageId: subStage.id, label: payload.value });
+        }
+        if (action === "setStageLabel") {
+            if (j.stageLabel === payload.value) return;
+            return commitOp({ t: "journey.setStageLabel", journeyId: j.id, label: payload.value });
+        }
+    }, [afterIdFromMovedOrder, cellIdsByRow, commitOp]);
 
     // ── Project actions ──
     const openProject = useCallback(async (id) => {
         const p = await dbGetProject(id);
         if (!p) return;
+        if (p.cloudMapId && getMapToken(p.cloudMapId)) {
+            await mountCloudMap(p.cloudMapId, getMapToken(p.cloudMapId), getMapSession(p.cloudMapId));
+            return;
+        }
         setCurrentId(id);
         replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
         clearHistory();
         setLastSaved(p.updatedAt || null);
+        setLastSavedBy(null);
         setTab(0);
         setEditMode(true);
+        setViewOnly(false);
+        setSync({ mapId: null, role: null, status: "off", error: null });
         setView("project");
         localStorage.setItem(LAST_KEY, String(id));
         writeRoute(id);
-    }, [clearHistory, replaceJourneys]);
+    }, [clearHistory, mountCloudMap, replaceJourneys]);
+
+    const openSharedMap = useCallback(async (mapId) => {
+        const token = getMapToken(mapId);
+        if (!token) return;
+        await mountCloudMap(mapId, token, getMapSession(mapId));
+    }, [mountCloudMap]);
 
     const goLibrary = useCallback(() => {
         setSelected(null);
@@ -3009,12 +4907,11 @@ function App() {
     }, [currentId, refreshProjects]);
 
     const renameJourneyTitle = useCallback((jIdx, title) => {
-        editJourney(jIdx, (j) => {
-            const nextTitle = title.trim();
-            if (!nextTitle || j.title === nextTitle) return j;
-            return { ...j, title: nextTitle };
-        });
-    }, [editJourney]);
+        const journey = journeysRef.current[jIdx];
+        const nextTitle = title.trim();
+        if (!journey || !nextTitle || journey.title === nextTitle) return;
+        commitOp({ t: "journey.rename", journeyId: journey.id, name: nextTitle });
+    }, [commitOp]);
 
     const newProject = useCallback(async () => {
         const id = await dbCreateProject(defaultName(projects), []);
@@ -3023,6 +4920,8 @@ function App() {
         clearHistory();
         setTab(0);
         setEditMode(true);
+        setViewOnly(false);
+        setSync({ mapId: null, role: null, status: "off", error: null });
         setView("project");
         localStorage.setItem(LAST_KEY, String(id));
         writeRoute(id);
@@ -3032,24 +4931,25 @@ function App() {
     const newBlankJourney = useCallback(async () => {
         const journey = createBlankJourney(journeysRef.current.length);
         let id = currentId;
-        if (id == null) {
+        if (id == null && sync.status !== "synced") {
             id = await dbCreateProject("Blank Service Journey", [journey]);
             setCurrentId(id);
             localStorage.setItem(LAST_KEY, String(id));
             replaceJourneys([journey]);
             clearHistory();
             setTab(0);
+            setViewOnly(false);
+            setSync({ mapId: null, role: null, status: "off", error: null });
             setView("project");
             writeRoute(id);
             await refreshProjects();
             return;
         }
-        commitJourneys((prev) => {
-            const next = [...prev, journey];
-            setTab(next.length - 1);
-            return next;
-        });
-    }, [clearHistory, commitJourneys, currentId, refreshProjects, replaceJourneys]);
+        const afterJourneyId = journeysRef.current.length
+            ? journeysRef.current[journeysRef.current.length - 1]?.id
+            : null;
+        commitOp({ t: "journey.insert", afterJourneyId, journey }, (next) => setTab(next.length - 1));
+    }, [clearHistory, commitOp, currentId, refreshProjects, replaceJourneys, sync.status]);
 
     const deleteJourney = useCallback((jIdx) => {
         const journey = journeysRef.current[jIdx];
@@ -3059,8 +4959,7 @@ function App() {
             message: `Delete the journey “${journey.title}”? You can undo this right after.`,
             confirmLabel: "Delete journey",
             danger: true,
-            onConfirm: () => commitJourneys((prev) => {
-                const next = prev.filter((_, i) => i !== jIdx);
+            onConfirm: () => commitOp({ t: "journey.delete", journeyId: journey.id }, (next) => {
                 setTab((cur) => {
                     if (!next.length) return 0;
                     if (cur > jIdx) return cur - 1;
@@ -3068,10 +4967,9 @@ function App() {
                     return cur;
                 });
                 setSelected(null);
-                return next;
             }),
         });
-    }, [commitJourneys]);
+    }, [commitOp]);
 
     const currentExportPayload = useCallback((scope = "project") => {
         const data = journeysRef.current;
@@ -3220,6 +5118,19 @@ function App() {
         return () => window.removeEventListener("keydown", onKeyDown);
     }, [editMode, selected, handleCellMode, handleCellAlign]);
 
+    useEffect(() => {
+        const onKeyDown = (e) => {
+            if (!editMode || !selected || e.key !== "Escape") return;
+            const cell = journeysRef.current[selected.jIdx]?.subJourneys?.[selected.sjIdx]?.rows?.[selected.rowIdx]?.cells?.[selected.cellIdx];
+            if ((cell?.mode || "text") !== "tags") return;
+            e.preventDefault();
+            setSelected(null);
+            releaseLock();
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [editMode, releaseLock, selected]);
+
     // The cell the format toolbar currently targets.
     const selectedCell = selected
         ? journeys[selected.jIdx]?.subJourneys?.[selected.sjIdx]?.rows?.[selected.rowIdx]?.cells?.[selected.cellIdx]
@@ -3228,14 +5139,21 @@ function App() {
         ? `cell-${selected.jIdx}-${selected.sjIdx}-${selected.rowIdx}-${selected.cellIdx}`
         : null;
 
+    // Password gate (Phase 5): block the app behind the prompt until a valid
+    // session is obtained (or the user cancels back to the library).
+    if (passwordGate) {
+        return <PasswordGateModal onSubmit={submitPassword} onCancel={cancelPasswordGate} />;
+    }
+
     if (!ready) return null;
 
     // ── Home / library screen ──
-    if (!viewOnly && view === "library") {
+    if (view === "library") {
         return (
             <>
-                <LibraryScreen projects={projects} currentId={currentId}
-                    onOpen={openProject} onNew={newProject}
+                <LibraryScreen projects={projects} sharedMaps={sharedMaps} currentId={currentId}
+                    profile={profile} onProfileRename={renameProfile}
+                    onOpen={openProject} onOpenShared={openSharedMap} onNew={newProject}
                     onRename={renameProject} onDelete={deleteProject}
                     onLoad={() => setModal(true)} />
                 {modal && <LoadModal onLoad={(text, mode, opts) => loadFromText(text, mode, { ...opts, forceNew: true })} onClose={() => setModal(false)} currentProjectName={currentName} existingJourneys={[]} />}
@@ -3252,11 +5170,12 @@ function App() {
                 onDownloadSheet={exportCurrentSheet} onDownloadProject={exportProject}
                 onStandaloneExport={exportStandaloneHtml}
                 onPromptSheet={copyPromptCurrentSheet} onPromptProject={copyPromptProject}
-                canExport={journeys.length > 0} hasMultipleSheets={journeys.length > 1} saveState={saveState} lastSaved={lastSaved}
+                canExport={journeys.length > 0} hasMultipleSheets={journeys.length > 1} saveState={saveState} lastSaved={lastSaved} lastSavedBy={lastSavedBy}
                 viewOnly={viewOnly}
                 editMode={editMode} onSetEdit={(v) => setEditMode(v)}
                 canUndo={historyState.canUndo} canRedo={historyState.canRedo}
-                onUndo={undo} onRedo={redo} />
+                onUndo={undo} onRedo={redo}
+                sync={sync} onEnableSync={enableSync} onStopSharing={stopSync} peers={peers} />
             {!viewOnly && editMode && journeys.length > 0 && (
                 <FormatToolbar cell={selectedCell} selectedKey={selectedKey}
                     onMode={(m) => selected && handleCellMode(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, m)}
@@ -3269,11 +5188,12 @@ function App() {
                     journeys.map((j, i) => (
                         <div key={j.id + "-" + i} style={{ display: i === tab ? "block" : "none" }}>
                             <JourneyView journey={j} jIdx={i} editMode={!viewOnly && editMode}
-                                selected={selected} onSelect={setSelected} onDeselect={() => setSelected(null)}
+                                selected={selected} onSelect={setSelected} onDeselect={() => { setSelected(null); releaseLock(); }}
                                 onTitleEdit={renameJourneyTitle}
                                 onCellEdit={handleCellEdit} onCellTags={handleCellTags}
                                 onRowAction={handleRowAction} onStageAction={handleStageAction}
-                                onAddRow={handleAddRow} />
+                                onAddRow={handleAddRow}
+                                lockedByPeer={lockedByPeer} onAcquireLock={acquireLock} onReleaseLock={releaseLock} />
                         </div>
                     ))
                 )}
