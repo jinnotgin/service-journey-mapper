@@ -56,14 +56,26 @@
             --grid-line: oklch(91% .004 70 / .62);
             --grid-strong: oklch(83% .008 70);
             --note: oklch(99.2% .003 70);
-            --note-border: oklch(84% .008 70 / .74);
-            --note-shadow: 0 1px 2px oklch(20% .006 70 / .045), 0 5px 14px oklch(20% .006 70 / .04);
+            /* Filled notes use a translucent fill so the lane tint reads through:
+               the note lifts off the lane rather than punching a white hole in it. */
+            --note-fill: oklch(100% 0 0 / .4);
+            --note-border: oklch(84% .008 70 / .55);
+            --note-shadow: 0 1px 2px oklch(20% .006 70 / .04), 0 4px 12px oklch(20% .006 70 / .035);
             --text: oklch(27% .008 70);
             --text-sec: oklch(52% .006 70);
             --shadow-sm: 0 1px 2px oklch(20% .006 70 / .05), 0 1px 3px oklch(20% .006 70 / .07);
             --shadow-md: 0 8px 24px oklch(20% .006 70 / .11);
             --shadow-lg: 0 18px 50px oklch(20% .006 70 / .2);
             --radius: 10px;
+            /* Canvas track model: lanes are rounded objects floating on the page,
+               separated by whitespace gutters. No continuous grid lines. */
+            --canvas: oklch(96.8% .004 70);
+            --lane-gap: 9px;
+            --lane-r: 13px;
+            --canvas-pad: 10px;
+            --lane-w: 180px;
+            /* Sticky offset for stage/step labels: clears the sticky lane rail. */
+            --stage-label-left: 192px;
             --appbar-h: 52px;
             --toolbar-h: 0px;
         }
@@ -149,21 +161,33 @@
         .ch-hdr h2{font-size:var(--fs-xl);color:var(--text);font-weight:700;letter-spacing:-.015em}
 
         /* ===== STAGE HDR (STICKY) ===== */
-        .stage-outer{position:sticky;top:calc(var(--appbar-h,52px) + var(--toolbar-h,0px));z-index:35;background:var(--ink-stage);border-bottom:1px solid var(--grid-strong);box-shadow:0 8px 18px oklch(20% .006 70 / .07)}
+        .stage-outer{position:sticky;top:calc(var(--appbar-h,52px) + var(--toolbar-h,0px));z-index:35;background:var(--canvas);padding:4px var(--canvas-pad) 0;box-shadow:0 10px 16px -8px oklch(20% .006 70 / .12)}
         .scroll-hide{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
         .scroll-hide::-webkit-scrollbar{display:none}
 
         /* ===== SUB-JOURNEY HDR ===== */
-        .sj-scroll{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;background:var(--ink-sub);border:1px solid var(--grid-strong);border-top:none}
+        .sj-scroll{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;background:var(--canvas)}
         .sj-scroll::-webkit-scrollbar{display:none}
 
         /* ===== BP TABLE ===== */
+        /* No grid lines anywhere. The table is pure column-alignment plumbing;
+           lanes read as rounded tracks separated by vertical gutters. */
         .bp{border-collapse:separate;border-spacing:0;table-layout:fixed;width:max-content}
-        .bp td{border:0;border-right:1px solid var(--grid-line);border-bottom:1px solid var(--grid-line);padding:11px 13px;vertical-align:top;text-align:left;font-size:var(--fs-sm)}
-        .bp tr:first-child>td{border-top:0}
+        .bp td{border:0;padding:11px 13px;vertical-align:top;text-align:left;font-size:var(--fs-sm)}
+
+        /* Body lanes float on the canvas with whitespace gutters between them. */
+        .bpw .bp{border-spacing:0 var(--lane-gap)}
+        /* Round each lane into one continuous track: left corners on the sticky
+           label, right corners on the trailing data cell (mode-aware via :has). */
+        .bpw .bp td.ll{border-top-left-radius:var(--lane-r);border-bottom-left-radius:var(--lane-r)}
+        .bpw .bp tr>td:last-child:not(.add-col-c),
+        .bpw .bp tr>td:has(+ .add-col-c){border-top-right-radius:var(--lane-r);border-bottom-right-radius:var(--lane-r)}
+        /* Trailing add-column lane in the body is pure empty space: no fill, no
+           border, no rounding. The "+" lives only in the sticky stage header. */
+        .bpw .bp .add-col-c{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important}
 
         /* Lane label */
-        .ll{width:180px;min-width:180px;max-width:180px;position:sticky;left:0;z-index:10;font-weight:720;font-size:var(--fs-2xs);text-transform:none;letter-spacing:0;background:var(--surface);border-right:1px solid var(--grid-strong)!important;padding:16px 14px 16px 17px!important}
+        .ll{width:var(--lane-w);min-width:var(--lane-w);max-width:var(--lane-w);position:sticky;left:0;z-index:10;font-weight:720;font-size:var(--fs-2xs);text-transform:none;letter-spacing:0;background:var(--surface);padding:16px 14px 16px 17px!important}
         .lane-label{display:flex;align-items:flex-start;gap:9px;line-height:1.25;min-width:0}
         .lane-icon{width:20px;height:20px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:oklch(99% .002 70 / .78);color:currentColor;border:1px solid oklch(100% 0 0 / .52);box-shadow:0 1px 2px oklch(20% .006 70 / .04)}
         .lane-icon svg{width:14px;height:14px;stroke:currentColor}
@@ -171,22 +195,29 @@
         .lane-kicker{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:color-mix(in oklch, currentColor 58%, var(--text-sec))}
         .lane-main{font-size:var(--fs-xs);font-weight:800;letter-spacing:.025em;text-transform:uppercase;overflow-wrap:anywhere;color:currentColor}
 
-        /* Stage header cells */
-        .stg-ll{background:var(--ink-stage)!important;color:var(--text-sec)!important;border-bottom:1px solid var(--grid-strong)!important;border-right:1px solid var(--grid-strong)!important;text-align:left!important}
-        .stg-c{min-width:260px;background:var(--ink-stage)!important;color:var(--text)!important;font-weight:700!important;font-size:var(--fs-md)!important;letter-spacing:0!important;text-align:center!important;vertical-align:middle!important;border-bottom:1px solid var(--grid-strong)!important;border-right:1px solid var(--grid-strong)!important;padding:11px 14px!important}
-        .stage-card{display:inline-flex;align-items:center;justify-content:flex-start;gap:9px;max-width:calc(100% - 36px);min-height:36px;padding:7px 11px 7px 8px;border:1px solid oklch(84% .01 70 / .78);border-radius:8px;background:oklch(98.4% .005 70);box-shadow:0 1px 2px oklch(20% .006 70 / .04);text-align:left}
+        /* Stage header cells. The label rail stays an OPAQUE canvas tile so
+           columns scrolling underneath it never bleed through. */
+        .stg-ll{background:var(--canvas)!important;color:var(--text-sec)!important;text-align:left!important}
+        .stg-c{min-width:260px;background:transparent!important;color:var(--text)!important;font-weight:700!important;font-size:var(--fs-md)!important;letter-spacing:0!important;text-align:left!important;vertical-align:middle!important;padding:9px 6px!important}
+        /* Stage card spans the full stage width (shows coverage); the label
+           inside is sticky so it stays readable across a wide stage. */
+        .stage-card{display:flex;align-items:center;justify-content:flex-start;gap:9px;min-height:36px;margin:0 3px;padding:7px 11px 7px 8px;border:1px solid oklch(84% .01 70 / .78);border-radius:9px;background:oklch(98.4% .005 70);box-shadow:0 1px 2px oklch(20% .006 70 / .04);text-align:left}
+        .stage-card-label{position:sticky;left:var(--stage-label-left);display:inline-flex;align-items:center;gap:9px;min-width:0;max-width:100%}
         .stage-title{line-height:1.25;overflow-wrap:anywhere}
 
         /* SJ header cells */
-        .sj-ll{background:var(--ink-sub)!important;color:var(--text-sec)!important;border-bottom:1px solid var(--grid-strong)!important;border-right:1px solid var(--grid-strong)!important;font-size:var(--fs-2xs)!important;text-align:left!important}
-        .sj-tc{background:var(--ink-sub)!important;color:var(--text-sec)!important;font-weight:650!important;font-size:var(--fs-2xs)!important;text-transform:uppercase!important;letter-spacing:1.4px!important;text-align:center!important;padding:8px 12px!important;border-bottom:1px solid var(--grid-strong)!important;border-right:1px solid var(--grid-strong)!important}
+        .sj-ll{background:var(--canvas)!important;color:var(--text-sec)!important;font-size:var(--fs-2xs)!important;text-align:left!important}
+        .sj-tc{background:transparent!important;color:var(--text-sec)!important;font-weight:650!important;font-size:var(--fs-2xs)!important;text-transform:uppercase!important;letter-spacing:1.4px!important;text-align:center!important;padding:8px 12px!important}
 
         /* Data cell */
         .dc{min-width:260px;min-height:82px;position:relative;padding:13px 14px!important;background-clip:padding-box;transition:background .12s ease-out,box-shadow .12s ease-out}
         .dc-span{min-width:auto!important;width:auto!important}
 
         /* Wrapper */
-        .bpw{overflow-x:auto;background:var(--surface);border:1px solid var(--grid-strong);border-top:none}
+        /* Canvas inset lives on the non-scrolling wrapper, NOT the scroll
+           container, so nothing can scroll into the gap left of the sticky rail. */
+        .bp-lane-wrap{padding:0 var(--canvas-pad);background:var(--canvas)}
+        .bpw{overflow-x:auto;background:var(--canvas);padding:0 0 var(--lane-gap)}
         .bpw::-webkit-scrollbar{height:10px}
         .bpw::-webkit-scrollbar-track{background:var(--surface-2)}
         .bpw::-webkit-scrollbar-thumb{background:var(--border);border-radius:5px;border:2px solid var(--surface-2)}
@@ -208,12 +239,18 @@
         .row-fs-system>.ll{background:oklch(93% .035 245);color:oklch(45% .11 250)}
         .row-fs-system>.dc{background:oklch(98% .012 245)}
 
-        .row-divider>.ll{background:var(--surface)!important;color:var(--text-sec)!important;border-bottom:0!important}
-        .row-divider>.dc{background:var(--surface)!important;color:var(--text-sec);font-weight:700;text-align:center;padding:16px 12px!important;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:1.3px;border-bottom:0!important}
+        /* Line of visibility = the blueprint's defining moment. A tall, quiet
+           band of canvas separates the frontstage cluster from the backstage
+           cluster, with a single dashed boundary floating through it. */
+        .row-divider>.ll{background:transparent!important;color:var(--text-sec)!important;border-bottom:0!important}
+        .row-divider>.dc{background:transparent!important;color:var(--text-sec);font-weight:700;text-align:center;padding:16px 12px!important;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:1.3px;border-bottom:0!important}
         .row-divider .lane-label{align-items:center}
         .row-divider .lane-main{color:var(--text-sec)}
-        .row-divider .cell-note{min-height:20px;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;display:flex;align-items:center;justify-content:center;color:transparent;position:relative}
-        .row-divider .cell-note::before{content:"";display:block;width:100%;border-top:2px dashed oklch(58% .012 70 / .82)}
+        /* The divider is a pure boundary: any cell content is made weightless
+           (font-size:0) so it can never inflate the row, and the dashed line is
+           a plain full-width block. */
+        .row-divider .cell-note{min-height:0;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;display:block;color:transparent;font-size:0;line-height:0;position:relative}
+        .row-divider .cell-note::before{content:"";display:block;width:100%;border-top:1.5px dashed oklch(64% .01 70 / .7)}
         .row-divider .cell-note:focus{outline:none;box-shadow:none!important}
 
         .row-bs-human>.ll{background:oklch(94% .04 80);color:oklch(48% .1 65)}
@@ -256,10 +293,12 @@
         .cell-note{min-height:70px;width:100%;border-radius:8px;padding:10px 11px;outline:none;cursor:text;transition:box-shadow .12s ease-out,background .12s ease-out,border-color .12s ease-out;color:var(--text)}
         .cell-note:empty::before{content:attr(data-placeholder);color:oklch(62% .006 70 / .65);font-weight:600;opacity:0;transition:opacity .12s ease-out;pointer-events:none}
         .dc:hover .cell-note:empty::before,.dc.cell-sel .cell-note:empty::before{opacity:1}
-        .dc.cell-filled .cell-note,.dc.cell-tags-mode.cell-filled{background:var(--note);border:1px solid var(--note-border);box-shadow:var(--note-shadow)}
+        /* Only plain text / bullet notes get a surface, and it is translucent.
+           Boxes carry their own item surfaces; tags carry their own chips. */
+        .dc.cell-filled:not(.cell-boxes):not(.cell-tags-mode) .cell-note{background:var(--note-fill);border:1px solid var(--note-border);box-shadow:var(--note-shadow)}
         .dc:hover .cell-note{box-shadow:inset 0 0 0 1px var(--accent-line)}
         .cell-note:focus{background:var(--note);box-shadow:0 0 0 3px var(--accent-soft), inset 0 0 0 2px var(--accent)!important;border-color:transparent}
-        .row-divider .cell-note:empty::before{content:""!important;opacity:1!important;display:block;width:100%;border-top:2px dashed oklch(58% .012 70 / .82)}
+        .row-divider .cell-note:empty::before{content:""!important;opacity:1!important;display:block;width:100%;border-top:1.5px dashed oklch(64% .01 70 / .7)}
 
         /* ===== TAB BAR ===== */
         .tab-bar{position:fixed;bottom:0;left:0;right:0;height:42px;background:var(--surface-2);border-top:1px solid var(--border);display:flex;align-items:flex-end;padding:0 8px;z-index:100}
@@ -315,7 +354,7 @@
         .project-list{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:0 12px 30px oklch(30% .012 70 / .08)}
         .project-row{width:100%;display:grid;grid-template-columns:minmax(0,1fr) 118px 168px 38px;align-items:center;gap:18px;text-align:left;background:var(--surface);border:0;border-bottom:1px solid var(--border-light);padding:17px 18px 17px 20px;cursor:pointer;font-family:inherit;color:var(--text);transition:background .15s,box-shadow .15s}
         .project-row:last-child{border-bottom:0}
-        .project-row:hover{background:oklch(97% .006 70);box-shadow:inset 3px 0 0 oklch(55% .12 220)}
+        .project-row:hover{background:oklch(97% .006 70)}
         .project-row.current{background:oklch(97.5% .012 220)}
         .project-row.current:hover{background:oklch(96.5% .015 220)}
         .project-row.add{grid-template-columns:1fr;justify-items:center;color:var(--text-sec);border-top:1px dashed var(--border);font-weight:700;background:oklch(98.5% .003 70);padding:15px 18px}
@@ -444,20 +483,21 @@
         .add-row-bar.drop-end{box-shadow:inset 0 3px 0 var(--accent);background:var(--accent-soft)}
 
         /* sub-stage header row */
-        .sub-c{background:var(--ink-sub)!important;color:var(--text-sec)!important;font-weight:600!important;font-size:var(--fs-xs)!important;text-align:center!important;vertical-align:middle!important;border-bottom:1px solid var(--grid-strong)!important;border-right:1px solid var(--grid-strong)!important;padding:10px 12px!important}
-        .step-chip{display:inline-flex;align-items:center;justify-content:center;max-width:calc(100% - 28px);min-height:30px;padding:5px 10px;border:1px solid oklch(84% .012 70 / .72);border-radius:8px;background:oklch(98% .005 70);box-shadow:0 1px 2px oklch(20% .006 70 / .035);line-height:1.2}
+        .sub-c{background:transparent!important;color:var(--text-sec)!important;font-weight:600!important;font-size:var(--fs-xs)!important;text-align:center!important;vertical-align:middle!important;border:0!important;padding:10px 12px!important}
+        .step-chip{display:flex;align-items:center;justify-content:flex-start;min-height:30px;margin:0 3px;padding:5px 10px;border:1px solid oklch(86% .01 70 / .65);border-radius:8px;background:oklch(98.8% .004 70);box-shadow:0 1px 1px oklch(20% .006 70 / .025);line-height:1.2}
+        .step-chip-label{position:sticky;left:var(--stage-label-left);display:inline-block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
         /* add column / add row affordances */
-        .add-col-c{min-width:62px;width:62px;background:var(--ink-stage)!important;text-align:center!important;border-bottom:1px solid var(--grid-strong)!important;border-right:1px solid var(--grid-strong)!important;vertical-align:middle!important}
+        .add-col-c{min-width:62px;width:62px;background:transparent!important;text-align:center!important;border:0!important;vertical-align:middle!important}
         .add-btn{background:var(--surface);color:var(--text);border:1px dashed var(--border);border-radius:6px;padding:5px 11px;font-size:var(--fs-sm);font-weight:700;cursor:pointer;font-family:inherit}
         .add-btn:hover{background:var(--surface-2)}
-        .add-row-bar{padding:9px 12px;background:oklch(97.8% .004 70);border:1px solid var(--grid-strong);border-top:none}
+        .add-row-bar{padding:6px 0 10px;background:var(--canvas);border:0}
         .add-row-btn{background:var(--surface);border:1px dashed var(--border);border-radius:6px;padding:6px 12px;font-size:var(--fs-xs);font-weight:600;color:var(--text-sec);cursor:pointer;font-family:inherit}
         .add-row-btn:hover{background:var(--bg);color:var(--text);border-color:var(--text-sec)}
 
-        /* selected cell highlight */
-        .dc.cell-sel{box-shadow:inset 0 0 0 2px var(--accent-ring);background-image:linear-gradient(oklch(24% .006 70 / .035), oklch(24% .006 70 / .035))}
-        .dc.cell-sel .cell-note{box-shadow:0 0 0 3px var(--accent-soft), inset 0 0 0 1px var(--accent-line)}
+        /* Selection lives on the note surface only, never the cell rectangle,
+           so editing never reveals the underlying table grid. */
+        .dc.cell-sel .cell-note{background:var(--note);border-radius:9px;box-shadow:0 0 0 3px var(--accent-soft), inset 0 0 0 1px var(--accent-line)}
 
         /* cell locked by another collaborator (Phase 8): read-only, outlined in
            the holder's color, with an initials badge in the corner */
@@ -469,8 +509,9 @@
         .al-center{text-align:center!important}
         .al-left{text-align:left!important}
 
-        /* tags-mode cell */
-        .cell-tags{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:34px}
+        /* tags-mode cell — chips get breathing room matching the note inset */
+        .cell-tags{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:34px;padding:5px 8px;border-radius:9px;transition:box-shadow .12s ease-out,background .12s ease-out}
+        .dc.cell-tags-mode.cell-sel .cell-tags{background:var(--note-fill);box-shadow:0 0 0 3px var(--accent-soft), inset 0 0 0 1px var(--accent-line)}
         .cell-empty-hint{color:oklch(62% .006 70 / .65);font-size:var(--fs-xs);font-weight:600}
         .dc:not(.cell-sel):not(:hover) .cell-empty-hint{opacity:.55}
         .tag-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:var(--fs-2xs);font-weight:600}
@@ -502,8 +543,8 @@
         .cell-bullets .cell-note>div::before,.cell-bullets .cell-note>p::before{content:'•';position:absolute;left:2px;color:var(--accent-strong);font-weight:700}
 
         /* boxes-mode cell (card-style bullet items) */
-        .cell-boxes .cell-note{background:transparent;border:0;box-shadow:none;padding:2px}
-        .cell-boxes .cell-note>div,.cell-boxes .cell-note>p{background:var(--note);border:1px solid var(--note-border);border-radius:7px;padding:6px 9px;margin-bottom:6px;box-shadow:0 1px 2px oklch(20% .006 70 / .035)}
+        .cell-boxes .cell-note{background:transparent!important;border:0!important;box-shadow:none!important;padding:0}
+        .cell-boxes .cell-note>div,.cell-boxes .cell-note>p{background:var(--note-fill);border:1px solid var(--note-border);border-radius:8px;padding:7px 10px;margin-bottom:6px;box-shadow:var(--note-shadow)}
         .cell-boxes .cell-note>div:last-child,.cell-boxes .cell-note>p:last-child{margin-bottom:0}
 
         /* per-cell save / discard mini-toolbar */
@@ -3550,6 +3591,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                 </>
                                             )}
                                             <span className="stage-card">
+                                                <span className="stage-card-label">
                                                 {(s.num != null || editMode) && <span className="stage-num" style={{ flexShrink: 0 }}
                                                     contentEditable={editMode} suppressContentEditableWarning
                                                     title={editMode ? "Edit number" : undefined}
@@ -3557,6 +3599,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                 <span className={`stage-title${editMode ? " hdr-edit" : ""}`} contentEditable={editMode} suppressContentEditableWarning
                                                     onBlur={editMode ? (e) => onStage("renameStage", { stageIdx: si, value: e.currentTarget.textContent }) : undefined}>
                                                     {s.title}
+                                                </span>
                                                 </span>
                                             </span>
                                         </td>
@@ -3596,7 +3639,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                                     </>
                                                 )}
                                                 <span className="step-chip">
-                                                <span className={editMode ? "hdr-edit" : ""} contentEditable={editMode} suppressContentEditableWarning
+                                                <span className={`step-chip-label${editMode ? " hdr-edit" : ""}`} contentEditable={editMode} suppressContentEditableWarning
                                                     onBlur={editMode ? (e) => onStage("renameSubStage", { stageIdx: si, subIdx: ssi, value: e.currentTarget.textContent }) : undefined}>
                                                     {ss.title}
                                                 </span>
@@ -3613,7 +3656,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
 
             {/* Sub-journeys (rows only; section breaks use divider rows) */}
             {journey.subJourneys.map((sj, si) => (
-                <div key={si}>
+                <div key={si} className="bp-lane-wrap">
                     <div className="bpw" data-ss="">
                         <table className="bp" style={{ minWidth: hdrW }}>
                             <BlueprintColGroup total={total} includeAddColumn={editMode} />
