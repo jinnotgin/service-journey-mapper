@@ -97,8 +97,10 @@
         .inline-title{cursor:default}
         .inline-title.editable{cursor:text;border-radius:5px;transition:background .12s,box-shadow .12s}
         .inline-title.editable:hover{background:var(--accent-soft);box-shadow:0 0 0 4px var(--accent-soft)}
-        .ab-title-wrap::after{content:"✎";position:absolute;top:50%;right:-22px;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;font-size:.68em;opacity:0;transition:opacity .12s,background .12s;color:var(--text-sec);background:var(--surface-2);pointer-events:none}
-        .ab-title-wrap:has(.inline-title.editable:hover)::after{opacity:1}
+        .ab-title-wrap::after,.ch-title-wrap::after{content:"✎";position:absolute;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;font-size:.8em;opacity:0;transition:opacity .12s,background .12s;color:var(--text-sec);background:var(--surface-2);border:1px solid var(--border);pointer-events:none}
+        .ab-title-wrap::after{right:-28px}
+        .ch-title-wrap::after{right:-28px}
+        .ab-title-wrap:has(.inline-title.editable:hover)::after,.ch-title-wrap:has(.inline-title.editable:hover)::after{opacity:1}
         .inline-title-input{font:inherit;font-weight:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:4px 8px;min-width:260px;max-width:100%;outline:none}
         .ab-brand .inline-title-input{width:min(720px,52vw);min-width:min(520px,52vw)}
         .ch-hdr .inline-title-input{width:min(900px,100%);min-width:min(720px,calc(100vw - 80px))}
@@ -162,7 +164,8 @@
 
         /* ===== CHAPTER HDR ===== */
         .ch-hdr{padding:14px 28px 12px;background:var(--surface);border-bottom:1px solid var(--border-light)}
-        .ch-hdr h2{font-size:var(--fs-xl);color:var(--text);font-weight:700;letter-spacing:-.015em}
+        .ch-hdr h2{font-size:var(--fs-xl);color:var(--text);font-weight:700;letter-spacing:-.015em;display:flex;align-items:center}
+        .ch-title-wrap{position:relative;display:inline-block;overflow:visible}
 
         /* ===== STAGE HDR (STICKY) ===== */
         .stage-outer{position:sticky;top:calc(var(--appbar-h,52px) + var(--toolbar-h,0px));z-index:35;background:var(--canvas);padding:4px var(--canvas-pad) 0;box-shadow:0 10px 16px -8px oklch(20% .006 70 / .12)}
@@ -203,6 +206,7 @@
            columns scrolling underneath it never bleed through. */
         .stg-ll{background:var(--canvas)!important;color:var(--text-sec)!important;text-align:left!important}
         .stg-c{min-width:260px;background:transparent!important;color:var(--text)!important;font-weight:700!important;font-size:var(--fs-md)!important;letter-spacing:0!important;text-align:left!important;vertical-align:middle!important;padding:9px 6px!important}
+        .stg-empty-subrow{vertical-align:top!important}
         /* Stage card spans the full stage width (shows coverage); the label
            inside is sticky so it stays readable across a wide stage. */
         .stage-card{display:flex;align-items:center;justify-content:flex-start;gap:9px;min-height:36px;margin:0 3px;padding:7px 11px 7px 8px;border:1px solid oklch(84% .01 70 / .78);border-radius:9px;background:oklch(98.4% .005 70);box-shadow:0 1px 2px oklch(20% .006 70 / .04);text-align:left}
@@ -3740,8 +3744,10 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
             {/* Chapter header */}
             <div className="ch-hdr">
                 <h2>
-                    <InlineTitleEdit value={journey.title} fallback="Untitled Journey"
-                        inputClassName="ch-title-input" onCommit={(value) => onTitleEdit(jIdx, value)} />
+                    <div className="ch-title-wrap">
+                        <InlineTitleEdit value={journey.title} fallback="Untitled Journey"
+                            inputClassName="ch-title-input" onCommit={(value) => onTitleEdit(jIdx, value)} />
+                    </div>
                 </h2>
             </div>
 
