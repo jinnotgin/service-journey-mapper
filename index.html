@@ -2984,7 +2984,7 @@ function LibraryScreen({ projects, sharedMaps, currentId, profile, onProfileRena
                 <div className="lib-footer-left">
                     <span>Made by <a href="https://itsjin.com" target="_blank" rel="noreferrer">Jin</a></span>
                     <span className="lib-separator" aria-hidden="true" />
-                    <span className="lib-version">v2</span>
+                    <span className="lib-version">v3</span>
                 </div>
                 <div className="lib-privacy">
                     <LucideIcon name="shieldCheck" />
@@ -4866,7 +4866,10 @@ function App() {
     const goLibrary = useCallback(() => {
         setSelected(null);
         setView("library");
-        writeRoute(null);
+        // writeMapRoute(null) clears both the project and map params (and any
+        // stray ?token=), so returning home from a synced cloud map doesn't
+        // leave ?map= in the URL.
+        writeMapRoute(null);
         refreshProjects();
     }, [refreshProjects]);
 
