@@ -98,9 +98,17 @@ export type Role = "owner" | "editor" | "viewer";
 const LOCALHOST_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 export function corsHeaders(origin: string | null, allowed: Set<string>): Record<string, string> {
-  // Any localhost origin is allowed for local dev; production origins must be
-  // in the explicit allowlist.
-  const ok = !!origin && (allowed.has(origin) || LOCALHOST_ORIGIN.test(origin));
+  // Exact entries: match literally. Wildcard entries (*.example.com) match any
+  // subdomain of that host — covers Cloudflare Pages preview URLs like
+  // <hash>.lanescape.pages.dev which can't be pre-enumerated.
+  const wildcardSuffixes = [...allowed]
+    .filter((s) => s.startsWith("*."))
+    .map((s) => s.slice(1)); // "*.lanescape.pages.dev" -> ".lanescape.pages.dev"
+  const ok =
+    !!origin &&
+    (allowed.has(origin) ||
+      LOCALHOST_ORIGIN.test(origin) ||
+      wildcardSuffixes.some((suffix) => origin.endsWith(suffix)));
   const allow = ok ? (origin as string) : "";
   return {
     "Access-Control-Allow-Origin": allow,

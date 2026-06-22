@@ -1010,7 +1010,7 @@ const ROUTE_MAP_PARAM = "map";
 // Paste your workers.dev subdomain here once deployed.
 const SYNC_API_BASE = /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)
     ? "http://localhost:8787"
-    : "https://lanescape-sync.YOUR-SUBDOMAIN.workers.dev";
+    : "https://lanescape-sync.jinn.workers.dev";
 
 function routeMapId() {
     return new URLSearchParams(window.location.search).get(ROUTE_MAP_PARAM) || null;

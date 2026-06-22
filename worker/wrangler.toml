@@ -14,4 +14,4 @@ new_sqlite_classes = ["MapRoom"]
 
 # Origins allowed to call the API (CORS). Override per-env as needed.
 [vars]
-ALLOWED_ORIGINS = "https://lanescape.pages.dev,http://localhost:8788,http://localhost:3000"
+ALLOWED_ORIGINS = "https://lanescape.pages.dev,*.lanescape.pages.dev,http://localhost:8788,http://localhost:3000"
