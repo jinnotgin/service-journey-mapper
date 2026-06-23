@@ -4155,7 +4155,9 @@ function App() {
     // Hydrate + mount a shared cloud map once access is granted. `session` is the
     // password session (or null when the map has no password / caller is owner).
     // Shared by the init path and the post-password-prompt path (Phase 5).
-    const mountCloudMap = useCallback(async (mapId, token, session) => {
+    // `replaceRoute` controls whether to pushState (false, user navigated from
+    // library) or replaceState (true, init / popstate / password-gate flows).
+    const mountCloudMap = useCallback(async (mapId, token, session, { replaceRoute = true } = {}) => {
         const data = await apiGetMap(mapId, token, session);
         const hydrated = hydrate(data.journeys || []);
         const linkedProject = await dbFindProjectByCloudMap(mapId);
@@ -4179,7 +4181,7 @@ function App() {
         setView("project");
         markCloudSaved(data);
         await mirrorCloudState(mapId, data.role, data.name || "Shared map", hydrated, data, localId);
-        writeMapRoute(mapId, { replace: true });
+        writeMapRoute(mapId, { replace: replaceRoute });
         setReady(true);
     }, [clearHistory, markCloudSaved, mirrorCloudState, replaceJourneys]);
 
@@ -4858,7 +4860,7 @@ function App() {
         const p = await dbGetProject(id);
         if (!p) return;
         if (p.cloudMapId && getMapToken(p.cloudMapId)) {
-            await mountCloudMap(p.cloudMapId, getMapToken(p.cloudMapId), getMapSession(p.cloudMapId));
+            await mountCloudMap(p.cloudMapId, getMapToken(p.cloudMapId), getMapSession(p.cloudMapId), { replaceRoute: false });
             return;
         }
         setCurrentId(id);
@@ -4878,7 +4880,7 @@ function App() {
     const openSharedMap = useCallback(async (mapId) => {
         const token = getMapToken(mapId);
         if (!token) return;
-        await mountCloudMap(mapId, token, getMapSession(mapId));
+        await mountCloudMap(mapId, token, getMapSession(mapId), { replaceRoute: false });
     }, [mountCloudMap]);
 
     const goLibrary = useCallback(() => {
