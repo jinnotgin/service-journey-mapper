@@ -562,7 +562,7 @@
         .hdr-edit{outline:none;cursor:text;border-radius:5px;transition:background .12s ease-out,box-shadow .12s ease-out}
         .hdr-edit:hover{background:var(--accent-soft);box-shadow:0 0 0 4px var(--accent-soft)}
         .hdr-edit:focus{background:var(--surface);box-shadow:0 0 0 3px var(--accent-soft), inset 0 0 0 2px var(--accent);border-radius:5px}
-        .drag-handle{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;border:1px solid oklch(100% 0 0 / .2);background:oklch(100% 0 0 / .08);color:inherit;cursor:grab;font-size:.66rem;line-height:1;vertical-align:middle;user-select:none;opacity:0;pointer-events:none;transition:opacity .14s ease-out,background .14s ease-out}
+        .drag-handle{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:4px;border:1px solid oklch(100% 0 0 / .2);background:oklch(100% 0 0 / .08);color:inherit;cursor:grab;font-size:.82rem;line-height:1;vertical-align:middle;user-select:none;opacity:0;pointer-events:none;transition:opacity .14s ease-out,background .14s ease-out}
         .stg-c:hover>.drag-handle,.stg-c:focus-within>.drag-handle,
         .sub-c:hover>.drag-handle,.sub-c:focus-within>.drag-handle,
         .ll:hover .row-drag,.ll:focus-within .row-drag{opacity:.78;pointer-events:auto}
@@ -571,7 +571,10 @@
         .row-drag{position:absolute;top:5px;left:5px;z-index:11;border-color:var(--border);background:oklch(99% .002 70 / .7);color:var(--text-sec)}
         .row-drag:hover{background:var(--surface)}
         .ll.ll-editing{padding-left:28px}
-        .stg-drag,.sub-drag{position:absolute;top:5px;left:5px}
+        .stg-drag,.sub-drag{position:absolute;top:4px;left:4px;border-color:var(--border);background:oklch(99% .002 70 / .7);color:var(--text-sec)}
+        .stg-drag:hover,.sub-drag:hover{background:var(--surface)}
+        /* In edit mode, nudge the stage number clear of the (larger) drag handle. */
+        .stg-c:has(.stg-drag) .stage-num{margin-left:7px}
         .dragging{opacity:.56}
         .drop-before{box-shadow:inset 4px 0 0 var(--accent), inset 0 0 0 1px var(--accent-ring)}
         .drop-after{box-shadow:inset -4px 0 0 var(--accent), inset 0 0 0 1px var(--accent-ring)}
@@ -595,7 +598,10 @@
            the boundary/gap target; the visible button stays compact. */
         .insert-zone{position:absolute;z-index:14;display:flex;align-items:center;justify-content:center;pointer-events:auto}
         .ins-stage-r-zone,.ins-sub-r-zone{top:4px;bottom:4px;right:-16px;width:32px}
-        .ins-stage-b-zone{left:14px;right:14px;bottom:5px;height:28px}
+        .ins-stage-b-zone{left:14px;right:14px;bottom:2px;height:22px}
+        /* Single-row stage (no sub-stages anywhere): reserve room below the card so
+           the add-sub-stage "+" sits clear of the title instead of over it. */
+        .stg-c:not(.stg-empty-subrow):has(.ins-stage-b-zone){vertical-align:top!important;padding-bottom:22px!important}
         .stg-empty-subrow .ins-stage-b-zone{top:58px;bottom:12px;height:auto}
         .ins-row-t-zone{top:calc(-1 * var(--lane-gap));left:0;right:0;height:var(--lane-gap)}
         .ins-btn{position:static;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:1px solid var(--accent-line);background:var(--surface);color:var(--accent-strong);font-size:15px;font-weight:700;line-height:1;cursor:pointer;padding:0;font-family:inherit;box-shadow:0 1px 3px oklch(20% .006 70 / .2);opacity:0;pointer-events:none;transition:opacity .12s ease-out}
@@ -3309,6 +3315,10 @@ function TagAdder({ onAdd, onCancel, existing = [] }) {
     const rootRef = useRef(null);
     const swatchRef = useRef(null);
     const inputRef = useRef(null);
+
+    // Selecting a tags cell mounts this adder; put the caret straight in the
+    // input so the user can type a tag without a second click.
+    useEffect(() => { inputRef.current?.focus(); }, []);
     const c = TAG_COLORS[ci];
 
     const taken = useMemo(
@@ -3611,7 +3621,9 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
                                 onClick={(e) => { e.stopPropagation(); editTags(tags.filter((_, k) => k !== i)); }}>✕</span>}
                         </span>
                     ))}
-                    {!tags.length && <span className="cell-empty-hint">{editMode ? "Add tags" : "No tags"}</span>}
+                    {/* Hide the empty-cell hint while the adder is open — its
+                        "add tag…" input already prompts, so two prompts confuse. */}
+                    {!tags.length && !(editMode && selected && !peerLocked) && <span className="cell-empty-hint">{editMode ? "Add tags" : "No tags"}</span>}
                 </div>
                 {editMode && selected && !peerLocked && <TagAdder existing={tags}
                     onAdd={(t) => editTags([...tags, t])}
