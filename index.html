@@ -2555,9 +2555,9 @@ function ShareControl({ sync, onEnableSync, onStopSharing, peers }) {
     if (sync.status !== "synced") {
         return (
             <button className="ab-back" onClick={handleEnable} disabled={sync.status === "enabling"}
-                title="Create a shareable cloud copy of this map" aria-label="Share map">
+                title="Create a shareable cloud copy of this map" aria-label="Share">
                 <LucideIcon name="share2" />
-                <span className="ab-label">{sync.status === "enabling" ? "Sharing…" : "Share map"}</span>
+                <span className="ab-label">{sync.status === "enabling" ? "Sharing…" : "Share"}</span>
             </button>
         );
     }
