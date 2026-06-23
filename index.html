@@ -94,8 +94,8 @@
         .ab-brand{display:flex;align-items:center;min-width:0;max-width:min(760px,52vw);line-height:1.15;overflow:visible}
         .ab-title-wrap{position:relative;min-width:0;flex:1 1 0;overflow:visible}
         .ab-title{font-size:var(--fs-lg);font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);display:block;max-width:100%}
-        .cloud-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;margin-left:8px;color:var(--blue);background:oklch(96% .018 245);border:1px solid oklch(86% .035 245);flex:0 0 auto}
-        .cloud-badge svg{width:15px;height:15px;stroke:currentColor}
+        .shared-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;margin-left:8px;color:var(--green);background:oklch(96% .018 150);border:1px solid oklch(84% .045 150);flex:0 0 auto}
+        .shared-badge svg{width:15px;height:15px;stroke:currentColor}
         .ab-spacer{flex:1 1 auto;min-width:8px}
         .inline-title{cursor:default}
         .inline-title.editable{cursor:text;border-radius:5px;transition:background .12s,box-shadow .12s}
@@ -512,10 +512,10 @@
         .menu-item.outline{border:1px solid var(--border);justify-content:center}
         .menu-item.center{justify-content:center}
         .menu-item.tiny{font-size:11px;font-weight:600;padding:6px 8px;color:var(--text-sec)}
-        /* Share panel — live status header + per-link capability rows */
+        /* Share panel: live status header + per-link capability rows. */
         .share-status{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;background:var(--surface-2);border-radius:8px}
-        .share-status-on .share-dot{background:var(--green)}
-        .share-dot{width:8px;height:8px;border-radius:999px;background:var(--text-sec);flex:0 0 auto}
+        .share-status-icon{display:inline-flex;align-items:center;justify-content:center;color:var(--green);flex:0 0 auto}
+        .share-status-icon svg{width:15px;height:15px;stroke:currentColor}
         .share-row-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
         .share-cap{display:flex;align-items:center;gap:7px;font-size:var(--fs-xs);font-weight:600;color:var(--text);min-width:0}
         .share-cap svg{width:15px;height:15px;stroke:currentColor;flex:0 0 auto}
@@ -527,12 +527,10 @@
         /* Demoted secondary copy button: lighter than the solid primary */
         .menu-item.soft{background:var(--surface-2);justify-content:center;font-weight:600}
         .menu-item.soft:hover:not(:disabled){background:oklch(93% .005 70)}
-        /* Per-link manage actions (turn off / new link): quiet at rest, revealed
-           on hover or keyboard focus. Space is reserved so nothing shifts. */
-        .share-link-actions{display:flex;gap:6px;opacity:0;transition:opacity .12s ease-out}
-        .share-link:hover .share-link-actions,
-        .share-link:focus-within .share-link-actions{opacity:1}
-        @media (hover:none){.share-link-actions{opacity:1}}
+        .share-copy-row{display:grid;grid-template-columns:minmax(0,1fr) 34px;gap:6px;align-items:stretch}
+        .share-copy-row>.menu-wrap{display:block}
+        .share-more-trigger{width:34px;height:100%;min-height:34px;border-radius:7px}
+        .share-manage-menu{display:grid;gap:2px;min-width:170px}
         .share-note{font-size:11px;color:var(--text-sec);line-height:1.45}
         .menu-label{padding:7px 10px 4px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
         .menu-divider{height:1px;margin:5px 0;background:var(--line)}
@@ -2237,10 +2235,19 @@ const LUCIDE_PATHS = {
         <path key="5" d="M3 12h.01" />,
         <path key="6" d="M3 18h.01" />
     ],
+    link: [
+        <path key="1" d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />,
+        <path key="2" d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    ],
     monitor: [
         <rect key="1" width="20" height="14" x="2" y="3" rx="2" />,
         <path key="2" d="M8 21h8" />,
         <path key="3" d="M12 17v4" />
+    ],
+    moreHorizontal: [
+        <circle key="1" cx="12" cy="12" r="1" fill="currentColor" />,
+        <circle key="2" cx="19" cy="12" r="1" fill="currentColor" />,
+        <circle key="3" cx="5" cy="12" r="1" fill="currentColor" />
     ],
     moreVertical: [
         <circle key="1" cx="12" cy="12" r="1" fill="currentColor" />,
@@ -2376,12 +2383,32 @@ function ShareLinkRow({ mapId, kind, link, onChange }) {
             </span>
             {enabled ? (
                 <>
-                    <button className={kind === "edit" ? "menu-item primary" : "menu-item soft"} onClick={copy} disabled={busy}>
-                        <LucideIcon name={copied ? "check" : "copy"} />
-                        {copied ? `${linkName} copied` : `Copy ${kind} link`}
-                    </button>
+                    <div className="share-copy-row">
+                        <button className={kind === "edit" ? "menu-item primary" : "menu-item soft"} onClick={copy} disabled={busy}>
+                            <LucideIcon name={copied ? "check" : "copy"} />
+                            {copied ? `${linkName} copied` : `Copy ${kind} link`}
+                        </button>
+                        <Menu
+                            align="right"
+                            trigger={<LucideIcon name="moreHorizontal" />}
+                            triggerClassName="share-more-trigger"
+                            triggerTitle={`${linkName} options`}
+                            triggerAriaLabel={`${linkName} options`}>
+                            {(close) => (
+                                <div className="share-manage-menu">
+                                    <button className="menu-item" onClick={() => { toggle(); close(); }} disabled={busy}>
+                                        {busy ? "Working…" : "Turn off"}
+                                    </button>
+                                    <button className="menu-item" onClick={() => { setConfirmRotate(true); close(); }} disabled={busy}
+                                        title="Invalidate the current link and generate a new one. Anyone using it loses access.">
+                                        <LucideIcon name="refreshCw" />New link
+                                    </button>
+                                </div>
+                            )}
+                        </Menu>
+                    </div>
                     {confirmRotate ? (
-                        <div className="share-link-actions" style={{ opacity: 1 }}>
+                        <div style={{ display: "flex", gap: 6 }}>
                             <button className="menu-item danger center" style={{ flex: 1 }} onClick={rotate} disabled={busy}>
                                 {busy ? "Working…" : "Replace link"}
                             </button>
@@ -2389,17 +2416,7 @@ function ShareLinkRow({ mapId, kind, link, onChange }) {
                                 Cancel
                             </button>
                         </div>
-                    ) : (
-                        <div className="share-link-actions">
-                            <button className="menu-item tiny" onClick={toggle} disabled={busy}>
-                                {busy ? "Working…" : "Turn off"}
-                            </button>
-                            <button className="menu-item tiny" style={{ marginLeft: "auto" }} onClick={() => setConfirmRotate(true)} disabled={busy}
-                                title="Invalidate the current link and generate a new one. Anyone using it loses access.">
-                                <LucideIcon name="refreshCw" />New link
-                            </button>
-                        </div>
-                    )}
+                    ) : null}
                 </>
             ) : (
                 <button className="menu-item outline" onClick={toggle} disabled={busy}>
@@ -2547,7 +2564,7 @@ function ShareControl({ sync, onEnableSync, onStopSharing, peers }) {
     const peerCount = peers?.length || 0;
     const trigger = (
         <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-            <span className="share-dot" style={{ background: "var(--green)" }} />
+            <span className="share-status-icon"><LucideIcon name="link" /></span>
             <span className="share-trig-label">Shared</span>
             {peerCount > 0 && <span style={{ color: "var(--text-sec)", fontWeight: 600 }}>· {peerCount}</span>}
             <span aria-hidden="true">▾</span>
@@ -2556,7 +2573,7 @@ function ShareControl({ sync, onEnableSync, onStopSharing, peers }) {
     const statusHeader = (
         <div className="share-status share-status-on">
             <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
-                <span className="share-dot" />
+                <span className="share-status-icon"><LucideIcon name="link" /></span>
                 <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>Sharing is on</div>
                     <div style={{ fontSize: "11px", color: "var(--text-sec)" }}>
@@ -2677,8 +2694,8 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                                 disabled={!currentName || viewOnly} onCommit={onRenameCurrent} />
                         </div>
                         {sync.status === "synced" && (
-                            <span className="cloud-badge" title={`Cloud copy (${sync.role || "shared"})`} aria-label="Cloud copy">
-                                <LucideIcon name="cloud" />
+                            <span className="shared-badge" title={`Shared link (${sync.role || "shared"})`} aria-label="Shared link">
+                                <LucideIcon name="link" />
                             </span>
                         )}
                         {sync.status === "connecting" && (
@@ -3212,7 +3229,7 @@ function TabBar({ journeys, activeTab, setActiveTab, onNew, onLoad, onDelete, vi
 // ═══════════════════════════════════════
 // DROPDOWN MENU (click-away)
 // ═══════════════════════════════════════
-function Menu({ trigger, align, children, onOpen }) {
+function Menu({ trigger, align, children, onOpen, triggerClassName = "", triggerTitle = "Options", triggerAriaLabel = "Options" }) {
     const [open, setOpen] = useState(false);
     const [pos, setPos] = useState(null);
     const triggerRef = useRef(null);
@@ -3262,7 +3279,7 @@ function Menu({ trigger, align, children, onOpen }) {
 
     return (
         <span className="menu-wrap" ref={triggerRef}>
-            <button className="menu-trigger" title="Options" aria-label="Options"
+            <button className={`menu-trigger${triggerClassName ? ` ${triggerClassName}` : ""}`} title={triggerTitle} aria-label={triggerAriaLabel}
                 onClick={(e) => { e.stopPropagation(); setOpen((o) => { if (!o) onOpen?.(); return !o; }); }}>{trigger || <LucideIcon name="moreVertical" />}</button>
             {open && pos && createPortal(
                 <div ref={popRef} className="menu-pop menu-portal"
@@ -3747,7 +3764,8 @@ function FormatToolbar({ cell, selectedKey, onMode, onAlign }) {
         if (!selectedKey) { setPos(null); return; }
         const anchor = document.querySelector(`[data-cell-key="${selectedKey}"]`);
         if (!anchor) { setPos(null); return; }
-        const r = anchor.getBoundingClientRect();
+        const visualAnchor = anchor.querySelector(".cell-note, .cell-tags") || anchor;
+        const r = visualAnchor.getBoundingClientRect();
         const margin = 8;
         const gap = 8;
         const measuredW = toolbarRef.current?.offsetWidth || 0;
