@@ -103,13 +103,14 @@ export default {
 };
 
 async function createMap(request: Request, env: Env, cors: Record<string, string>): Promise<Response> {
-  let body: { journeys?: unknown; name?: string };
+  let body: { journeys?: unknown; comments?: unknown; name?: string };
   try {
     body = await request.json();
   } catch {
     return errorJson(400, "Invalid JSON body", cors);
   }
   const journeys = Array.isArray(body.journeys) ? body.journeys : [];
+  const comments = Array.isArray(body.comments) ? body.comments : [];
   const name = typeof body.name === "string" ? body.name : "Untitled";
 
   const mapId = `m_${randomId(24)}`;
@@ -130,6 +131,7 @@ async function createMap(request: Request, env: Env, cors: Record<string, string
       mapId,
       name,
       journeys,
+      comments,
       tokenHashes,
       shareTokens: { editor: tokens.editor, viewer: tokens.viewer },
     }),

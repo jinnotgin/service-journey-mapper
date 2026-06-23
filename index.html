@@ -656,6 +656,38 @@
         .cell-boxes .cell-note>div,.cell-boxes .cell-note>p{background:var(--note-fill);border:1px solid var(--note-border);border-radius:8px;padding:7px 10px;margin-bottom:6px;box-shadow:var(--note-shadow)}
         .cell-boxes .cell-note>div:last-child,.cell-boxes .cell-note>p:last-child{margin-bottom:0}
 
+        /* ===== COMMENTS ===== */
+        .comment-badge{position:absolute;right:6px;top:6px;z-index:7;min-width:19px;height:19px;padding:0 5px;border-radius:999px;border:1px solid oklch(72% .075 95 / .72);background:oklch(93.5% .075 95);color:oklch(31% .045 75);font-size:10px;font-weight:800;line-height:17px;text-align:center;box-shadow:0 1px 4px oklch(20% .006 70 / .12);cursor:pointer}
+        .comment-badge:hover{background:oklch(90% .09 95);border-color:oklch(58% .095 95)}
+        .comments-tab{position:fixed;right:18px;bottom:56px;z-index:150;display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:8px 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:var(--fs-xs);font-weight:750;box-shadow:var(--shadow-md);cursor:pointer}
+        .comments-tab:hover{background:var(--surface-2)}
+        .comments-count{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:800}
+        .comments-panel{position:fixed;right:14px;top:calc(var(--appbar-h,52px) + 12px);bottom:54px;z-index:150;width:min(380px,calc(100vw - 28px));display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);overflow:hidden}
+        .comments-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 13px;border-bottom:1px solid var(--border-light);background:var(--ink-bar)}
+        .comments-title{font-size:var(--fs-sm);font-weight:800}
+        .comments-close{width:28px;height:28px;border:1px solid var(--border);border-radius:7px;background:var(--surface);cursor:pointer;color:var(--text);font-weight:800}
+        .comments-body{display:flex;flex-direction:column;gap:10px;padding:11px;overflow-y:auto}
+        .comment-compose{display:grid;gap:7px;padding:10px;border:1px solid var(--border-light);border-radius:8px;background:var(--surface-2)}
+        .comment-compose-label{font-size:var(--fs-2xs);font-weight:800;color:var(--text-sec);text-transform:uppercase;letter-spacing:.08em}
+        .comment-compose textarea{width:100%;min-height:68px;resize:vertical;border:1px solid var(--border);border-radius:7px;background:var(--surface);font:inherit;font-size:var(--fs-sm);padding:8px 9px;color:var(--text);outline:none}
+        .comment-compose textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+        .comment-compose-actions{display:flex;justify-content:flex-end;gap:7px}
+        .comment-thread{display:grid;gap:8px;padding:10px;border:1px solid var(--border-light);border-radius:8px;background:var(--surface)}
+        .comment-thread.resolved{opacity:.66}
+        .comment-thread.orphaned{border-style:dashed;background:oklch(98% .018 75)}
+        .comment-meta{display:flex;align-items:center;justify-content:space-between;gap:8px}
+        .comment-anchor{min-width:0;font-size:var(--fs-xs);font-weight:750;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .comment-status{font-size:10px;font-weight:800;color:var(--text-sec);text-transform:uppercase;letter-spacing:.07em}
+        .comment-msg{display:grid;gap:2px;padding:7px 8px;border-radius:7px;background:var(--bg);font-size:var(--fs-sm)}
+        .comment-author{font-size:var(--fs-2xs);font-weight:800;color:var(--text-sec)}
+        .comment-text{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text)}
+        .comment-reply{display:grid;gap:6px}
+        .comment-reply textarea{width:100%;min-height:52px;resize:vertical;border:1px solid var(--border);border-radius:7px;background:var(--surface);font:inherit;font-size:var(--fs-sm);padding:7px 8px;color:var(--text);outline:none}
+        .comment-thread-actions{display:flex;justify-content:space-between;gap:7px;align-items:center}
+        .comment-mini{border:0;background:transparent;color:var(--text-sec);font:inherit;font-size:var(--fs-xs);font-weight:750;cursor:pointer;padding:4px 0}
+        .comment-mini:hover{color:var(--text)}
+        .comments-empty{padding:22px 10px;text-align:center;color:var(--text-sec);font-size:var(--fs-sm)}
+
         /* per-cell save / discard mini-toolbar */
 
     </style>
@@ -869,6 +901,124 @@ function hydrate(journeys) {
         }));
         return { ...j, id: j.id || newId(), stages, subJourneys };
     });
+}
+
+// ═══════════════════════════════════════
+// COMMENTS (semantic anchors over the map tree)
+// ═══════════════════════════════════════
+const COMMENT_KINDS = new Set(["cell", "row", "stage", "substage", "journey"]);
+
+function normalizeComments(comments) {
+    return (Array.isArray(comments) ? comments : [])
+        .filter((thread) => thread && typeof thread.id === "string" && thread.anchor)
+        .map((thread) => ({
+            ...thread,
+            status: thread.status === "resolved" ? "resolved" : "open",
+            messages: (Array.isArray(thread.messages) ? thread.messages : []).filter((m) => m && typeof m.id === "string"),
+            updatedAt: typeof thread.updatedAt === "number" ? thread.updatedAt : Date.now(),
+        }));
+}
+
+function anchorKey(anchor) {
+    if (!anchor || !COMMENT_KINDS.has(anchor.kind)) return "";
+    if (anchor.kind === "cell") return anchor.cellId ? `cell:${anchor.cellId}` : "";
+    if (anchor.kind === "row") return anchor.rowId ? `row:${anchor.rowId}` : "";
+    if (anchor.kind === "stage") return anchor.stageId ? `stage:${anchor.stageId}` : "";
+    if (anchor.kind === "substage") return anchor.subStageId ? `substage:${anchor.subStageId}` : "";
+    if (anchor.kind === "journey") return anchor.journeyId ? `journey:${anchor.journeyId}` : "";
+    return "";
+}
+
+function applyCommentOp(comments, op) {
+    const list = normalizeComments(comments);
+    const now = op.ts || Date.now();
+    if (op.t === "comment.thread.create") {
+        const thread = op.thread;
+        if (!thread?.id || !thread.anchor) return null;
+        if (list.some((t) => t.id === thread.id)) return list;
+        return [...list, {
+            ...thread,
+            status: thread.status === "resolved" ? "resolved" : "open",
+            messages: Array.isArray(thread.messages) ? thread.messages : [],
+            createdAt: thread.createdAt || now,
+            updatedAt: thread.updatedAt || now,
+        }];
+    }
+    const threadId = op.threadId;
+    if (!threadId) return null;
+    if (op.t === "comment.thread.delete") return list.filter((thread) => thread.id !== threadId);
+    let found = false;
+    const next = list.map((thread) => {
+        if (thread.id !== threadId) return thread;
+        found = true;
+        if (op.t === "comment.message.add") {
+            if (!op.message?.id) return thread;
+            if ((thread.messages || []).some((m) => m.id === op.message.id)) return thread;
+            return { ...thread, status: "open", messages: [...(thread.messages || []), op.message], updatedAt: now };
+        }
+        if (op.t === "comment.message.edit") {
+            return {
+                ...thread,
+                messages: (thread.messages || []).map((m) => (
+                    m.id === op.messageId ? { ...m, body: String(op.body || ""), editedAt: now } : m
+                )),
+                updatedAt: now,
+            };
+        }
+        if (op.t === "comment.thread.resolve" || op.t === "comment.thread.reopen") {
+            return { ...thread, status: op.t === "comment.thread.resolve" ? "resolved" : "open", updatedAt: now };
+        }
+        return thread;
+    });
+    return found ? next : null;
+}
+
+function commentCountsByAnchor(comments) {
+    const counts = new Map();
+    for (const thread of normalizeComments(comments)) {
+        if (thread.status === "resolved") continue;
+        const key = anchorKey(thread.anchor);
+        if (!key) continue;
+        counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+}
+
+function describeAnchor(journeys, anchor) {
+    if (!anchor) return { exists: false, label: "Missing anchor" };
+    for (const j of journeys || []) {
+        if (anchor.kind === "journey" && j.id === anchor.journeyId) return { exists: true, label: j.title || "Journey" };
+        for (const s of j.stages || []) {
+            if (anchor.kind === "stage" && s.id === anchor.stageId) return { exists: true, label: s.title || "Stage" };
+            for (const ss of s.subStages || []) {
+                if (anchor.kind === "substage" && ss.id === anchor.subStageId) return { exists: true, label: ss.title || "Sub-stage" };
+            }
+        }
+        for (const sj of j.subJourneys || []) {
+            for (const r of sj.rows || []) {
+                const rowLabel = cleanLaneLabel(r.laneLabel) || ROW_META[r.rowType]?.fallback || "Row";
+                if (anchor.kind === "row" && r.id === anchor.rowId) return { exists: true, label: rowLabel };
+                for (const c of r.cells || []) {
+                    if (anchor.kind === "cell" && c.id === anchor.cellId) {
+                        return { exists: true, label: `${rowLabel} · ${j.title || "Journey"}` };
+                    }
+                }
+            }
+        }
+    }
+    return { exists: false, label: anchor.label || "Removed map item" };
+}
+
+function commentAnchorForCell(journey, subJourney, row, cell) {
+    if (!journey?.id || !subJourney?.id || !row?.id || !cell?.id) return null;
+    return {
+        kind: "cell",
+        journeyId: journey.id,
+        subJourneyId: subJourney.id,
+        rowId: row.id,
+        cellId: cell.id,
+        label: cleanLaneLabel(row.laneLabel) || ROW_META[row.rowType]?.fallback || "Cell",
+    };
 }
 
 // ═══════════════════════════════════════
@@ -1366,11 +1516,12 @@ const dbListProjects   = () => db.projects.orderBy("updatedAt").reverse().toArra
 const dbListSharedMaps = () => db.sharedMaps.orderBy("lastOpenedAt").reverse().toArray();
 const dbGetProject     = (id) => db.projects.get(id);
 const dbDeleteProject  = (id) => db.projects.delete(id);
-const dbSaveJourneys   = (id, journeys) => db.projects.update(id, { journeys, updatedAt: Date.now() });
+const dbSaveProjectState = (id, journeys, comments = []) =>
+    db.projects.update(id, { journeys, comments: normalizeComments(comments), updatedAt: Date.now() });
 const dbRenameProject  = (id, name) => db.projects.update(id, { name, updatedAt: Date.now() });
-const dbCreateProject  = (name, journeys = []) => {
+const dbCreateProject  = (name, journeys = [], comments = []) => {
     const now = Date.now();
-    return db.projects.add({ name, journeys, createdAt: now, updatedAt: now });
+    return db.projects.add({ name, journeys, comments: normalizeComments(comments), createdAt: now, updatedAt: now });
 };
 const dbFindProjectByCloudMap = async (mapId) => {
     if (!mapId) return null;
@@ -1394,10 +1545,11 @@ const dbUnmarkProjectCloud = (id) => db.projects.update(id, {
     cloudMapId: null, cloudRole: null, cloudVersion: null,
     cloudUpdatedAt: null, cloudUpdatedByName: null, cloudUpdatedByClientId: null,
 });
-const dbSaveCloudMirror = (id, journeys, mapId, role, data = {}) => {
+const dbSaveCloudMirror = (id, journeys, comments, mapId, role, data = {}) => {
     const now = Date.now();
     return db.projects.update(id, {
         journeys,
+        comments: normalizeComments(comments),
         updatedAt: now,
         ...cloudMetaFromData(mapId, role, { ...data, updatedAt: data.updatedAt || now }),
     });
@@ -1420,7 +1572,7 @@ const dbUpsertSharedMap = (mapId, patch) => {
 // HELPERS
 // ═══════════════════════════════════════
 // Accept a JSON array of journeys, or an exported project file
-// ({ name, journeys }). Returns { name?, journeys }.
+// ({ name, journeys, comments }). Returns { name?, journeys, comments }.
 function parseInput(text) {
     const t = text.trim();
     if (!t) throw new Error("Input is empty.");
@@ -1430,8 +1582,8 @@ function parseInput(text) {
     } catch (e) {
         throw new Error(`Invalid JSON: ${e.message}`);
     }
-    if (Array.isArray(obj)) return { journeys: obj };
-    if (obj && Array.isArray(obj.journeys)) return { name: obj.name, journeys: obj.journeys };
+    if (Array.isArray(obj)) return { journeys: obj, comments: [] };
+    if (obj && Array.isArray(obj.journeys)) return { name: obj.name, journeys: obj.journeys, comments: normalizeComments(obj.comments) };
     throw new Error("Expected a JSON array of journeys, or an object with a \"journeys\" array.");
 }
 
@@ -1458,7 +1610,7 @@ function embeddedProject() {
     if (!el?.textContent?.trim()) return null;
     try {
         const data = JSON.parse(el.textContent);
-        return data && Array.isArray(data.journeys) ? data : null;
+        return data && Array.isArray(data.journeys) ? { ...data, comments: normalizeComments(data.comments) } : null;
     } catch (err) {
         console.warn("Embedded project JSON could not be parsed.", err);
         return null;
@@ -1800,11 +1952,11 @@ function writeMapRoute(mapId, { replace = false } = {}) {
 
 // POST /api/maps — mint a cloud map from the current journeys. Returns
 // { mapId, version, tokens:{owner,editor,viewer} }.
-async function apiCreateMap({ name, journeys }) {
+async function apiCreateMap({ name, journeys, comments }) {
     const res = await fetch(`${SYNC_API_BASE}/api/maps`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, journeys }),
+        body: JSON.stringify({ name, journeys, comments: normalizeComments(comments) }),
     });
     if (!res.ok) throw new Error(`Could not enable sync (${res.status})`);
     return res.json();
@@ -2241,6 +2393,9 @@ const LUCIDE_PATHS = {
     link: [
         <path key="1" d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />,
         <path key="2" d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    ],
+    messageSquare: [
+        <path key="1" d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
     ],
     monitor: [
         <rect key="1" width="20" height="14" x="2" y="3" rx="2" />,
@@ -3487,7 +3642,7 @@ function TagAdder({ onAdd, onCancel, existing = [] }) {
 // while typing. The edit commits when the cell loses focus (click away, or
 // Escape to finish via the keyboard).
 function EditableCell({ html, editMode, className, style, colSpan, cellKey, cellId, lockedBy,
-        onCommit, onFocusCell, onDone, onAcquireLock, onReleaseLock }) {
+        onCommit, onFocusCell, onDone, onAcquireLock, onReleaseLock, commentCount, onOpenComments }) {
     const ref = useRef(null);
     // True once the user has actually changed content in this focus session, so
     // we lock on *edit*, not on mere focus (clicking/tabbing through cells leaves
@@ -3549,6 +3704,7 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, cell
                 data-cell-key={cellKey}
                 title={`Editing: ${lockedBy.name || "Someone"}`}>
                 <div key="locked" className="cell-note cell-locked-html" dangerouslySetInnerHTML={{ __html: html || "" }} />
+                <CommentBadge count={commentCount} onOpen={onOpenComments} />
                 <LockBadge lockedBy={lockedBy} />
             </td>
         );
@@ -3565,6 +3721,7 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, cell
             <div key="editable" ref={ref} className="cell-note" contentEditable={editMode} suppressContentEditableWarning
                 data-placeholder={editMode ? "Add note" : ""}
                 onFocus={handleFocus} onInput={handleInput} onBlur={handleBlur} onKeyDown={handleKeyDown} />
+            <CommentBadge count={commentCount} onOpen={onOpenComments} />
         </td>
     );
 }
@@ -3572,6 +3729,17 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, cell
 // ═══════════════════════════════════════
 // CELL
 // ═══════════════════════════════════════
+function CommentBadge({ count, onOpen }) {
+    if (!count) return null;
+    return (
+        <button type="button" className="comment-badge" title={`${count} open comment${count === 1 ? "" : "s"}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onOpen?.(); }}>
+            {count}
+        </button>
+    );
+}
+
 // Small badge shown on a cell another collaborator is currently editing (Phase 8).
 function LockBadge({ lockedBy }) {
     if (!lockedBy) return null;
@@ -3584,7 +3752,7 @@ function LockBadge({ lockedBy }) {
 }
 
 function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, onTagsChange, onDeselect,
-        lockedBy, onAcquireLock, onReleaseLock }) {
+        lockedBy, onAcquireLock, onReleaseLock, commentCount, onOpenComments }) {
     const mode = cell.mode || "text";
     const alignClass = (cell.align || "left") === "center" ? "al-center" : "al-left";
     const peerLocked = !!lockedBy; // a DIFFERENT collaborator is editing this cell
@@ -3613,6 +3781,7 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
                     ))}
                     {!tags.length && <span className="cell-empty-hint">{editMode ? "Add tags" : "No tags"}</span>}
                 </div>
+                <CommentBadge count={commentCount} onOpen={onOpenComments} />
                 {editMode && selected && !peerLocked && <TagAdder existing={tags}
                     onAdd={(t) => editTags([...tags, t])}
                     onCancel={onDeselect} />}
@@ -3627,7 +3796,8 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
             className={`${cls}${modeClass}`} colSpan={cell.colspan || undefined} style={style}
             cellKey={cellKey} cellId={cell.id} lockedBy={lockedBy}
             onCommit={onEditHtml} onFocusCell={onSelect} onDone={onDeselect}
-            onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock} />
+            onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock}
+            commentCount={commentCount} onOpenComments={onOpenComments} />
     );
 }
 
@@ -3636,7 +3806,7 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
 // ═══════════════════════════════════════
 function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPrefix, dragState, dropRowIdx,
         onSelect, onCellEdit, onCellTags, onRowAction, onRowDragStart, onRowDragOver, onRowDrop, onDragEnd, onDeselect,
-        lockedByPeer, onAcquireLock, onReleaseLock }) {
+        lockedByPeer, onAcquireLock, onReleaseLock, commentCounts, onOpenComments }) {
     const rowBg = row.customColor || null;
     const isDivider = row.rowType === DIVIDER_TYPE;
     return (
@@ -3697,7 +3867,9 @@ function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPr
                     colSpan={total} style={rowBg ? { background: rowBg } : undefined}
                     cellKey={`${cellKeyPrefix}-0`} cellId={dCell.id} lockedBy={dLock}
                     onCommit={(html) => onCellEdit(0, html)} onFocusCell={() => onSelect(0)} onDone={onDeselect}
-                    onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock} />
+                    onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock}
+                    commentCount={commentCounts?.get(`cell:${dCell.id}`) || 0}
+                    onOpenComments={() => onOpenComments?.({ kind: "cell", cellId: dCell.id })} />
                 );
             })() : (
                 row.cells.map((cell, ci) => (
@@ -3706,6 +3878,8 @@ function BlueprintRow({ row, rowIdx, editMode, total, selectedCellIdx, cellKeyPr
                         cellKey={`${cellKeyPrefix}-${ci}`}
                         lockedBy={lockedByPeer?.get(cell.id) || null}
                         onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock}
+                        commentCount={commentCounts?.get(`cell:${cell.id}`) || 0}
+                        onOpenComments={() => onOpenComments?.({ kind: "cell", cellId: cell.id })}
                         onSelect={() => onSelect(ci)}
                         onEditHtml={(html) => onCellEdit(ci, html)}
                         onTagsChange={(tags) => onCellTags(ci, tags)}
@@ -3874,7 +4048,7 @@ function BlueprintColGroup({ total, includeAddColumn = false }) {
 // ═══════════════════════════════════════
 function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
         onTitleEdit, onCellEdit, onCellTags, onRowAction, onStageAction, onAddRow,
-        lockedByPeer, onAcquireLock, onReleaseLock }) {
+        lockedByPeer, onAcquireLock, onReleaseLock, commentCounts, onOpenComments }) {
     const ref = useRef(null);
     const [dragState, setDragState] = useState(null);
     const [dropTarget, setDropTarget] = useState(null);
@@ -4117,7 +4291,9 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                                         onDragEnd={clearDrag}
                                         onDeselect={onDeselect}
                                         lockedByPeer={lockedByPeer}
-                                        onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock} />
+                                        onAcquireLock={onAcquireLock} onReleaseLock={onReleaseLock}
+                                        commentCounts={commentCounts}
+                                        onOpenComments={onOpenComments} />
                                 ))}
                             </tbody>
                         </table>
@@ -4141,11 +4317,107 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
     );
 }
 
+function CommentsPanel({ open, onOpen, onClose, journeys, comments, selectedAnchor, activeAnchor,
+        canComment, onCreateThread, onAddMessage, onResolveThread, onReopenThread, onDeleteThread }) {
+    const [draft, setDraft] = useState("");
+    const [replies, setReplies] = useState({});
+    const activeKey = anchorKey(activeAnchor);
+    const openThreads = normalizeComments(comments)
+        .filter((thread) => !activeKey || anchorKey(thread.anchor) === activeKey)
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    const openCount = normalizeComments(comments).filter((thread) => thread.status !== "resolved").length;
+    const selectedInfo = selectedAnchor ? describeAnchor(journeys, selectedAnchor) : null;
+
+    const submitDraft = () => {
+        const body = draft.trim();
+        if (!body || !selectedAnchor) return;
+        onCreateThread(selectedAnchor, body);
+        setDraft("");
+    };
+
+    if (!open) {
+        return (
+            <button type="button" className="comments-tab" onClick={onOpen} title="Open comments">
+                <LucideIcon name="messageSquare" /> Comments
+                {!!openCount && <span className="comments-count">{openCount}</span>}
+            </button>
+        );
+    }
+
+    return (
+        <aside className="comments-panel" aria-label="Comments">
+            <div className="comments-head">
+                <div>
+                    <div className="comments-title">Comments</div>
+                    <div className="comment-status">{openCount} open</div>
+                </div>
+                <button type="button" className="comments-close" onClick={onClose} aria-label="Close comments">×</button>
+            </div>
+            <div className="comments-body">
+                {canComment && selectedAnchor && (
+                    <div className="comment-compose">
+                        <div className="comment-compose-label">Selected: {selectedInfo?.label || "Cell"}</div>
+                        <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a comment" />
+                        <div className="comment-compose-actions">
+                            <button className="btn-s" type="button" onClick={() => setDraft("")} disabled={!draft.trim()}>Clear</button>
+                            <button className="btn-p" type="button" onClick={submitDraft} disabled={!draft.trim()}>Comment</button>
+                        </div>
+                    </div>
+                )}
+                {!openThreads.length && <div className="comments-empty">No comments here yet.</div>}
+                {openThreads.map((thread) => {
+                    const info = describeAnchor(journeys, thread.anchor);
+                    const reply = replies[thread.id] || "";
+                    const orphaned = !info.exists;
+                    return (
+                        <section key={thread.id} className={`comment-thread${thread.status === "resolved" ? " resolved" : ""}${orphaned ? " orphaned" : ""}`}>
+                            <div className="comment-meta">
+                                <div className="comment-anchor" title={info.label}>{info.label}</div>
+                                <div className="comment-status">{orphaned ? "Orphaned" : thread.status}</div>
+                            </div>
+                            {(thread.messages || []).map((m) => (
+                                <div key={m.id} className="comment-msg">
+                                    <div className="comment-author">{m.authorName || "Someone"}</div>
+                                    <div className="comment-text">{m.body}</div>
+                                </div>
+                            ))}
+                            {canComment && thread.status !== "resolved" && (
+                                <div className="comment-reply">
+                                    <textarea value={reply} onChange={(e) => setReplies((r) => ({ ...r, [thread.id]: e.target.value }))} placeholder="Reply" />
+                                    <div className="comment-compose-actions">
+                                        <button className="btn-s" type="button" disabled={!reply.trim()} onClick={() => setReplies((r) => ({ ...r, [thread.id]: "" }))}>Clear</button>
+                                        <button className="btn-p" type="button" disabled={!reply.trim()} onClick={() => {
+                                            onAddMessage(thread.id, reply.trim());
+                                            setReplies((r) => ({ ...r, [thread.id]: "" }));
+                                        }}>Reply</button>
+                                    </div>
+                                </div>
+                            )}
+                            {canComment && (
+                                <div className="comment-thread-actions">
+                                    {thread.status === "resolved"
+                                        ? <button type="button" className="comment-mini" onClick={() => onReopenThread(thread.id)}>Reopen</button>
+                                        : <button type="button" className="comment-mini" onClick={() => onResolveThread(thread.id)}>Resolve</button>}
+                                    <button type="button" className="comment-mini" onClick={() => onDeleteThread(thread.id)}>Delete</button>
+                                </div>
+                            )}
+                        </section>
+                    );
+                })}
+            </div>
+        </aside>
+    );
+}
+
 // ═══════════════════════════════════════
 // APP
 // ═══════════════════════════════════════
 function App() {
     const [journeys, setJourneys] = useState([]);
+    const [comments, setComments] = useState([]);
+    const [commentsOpen, setCommentsOpen] = useState(false);
+    const [activeCommentAnchor, setActiveCommentAnchor] = useState(null);
+    const [lastCommentAnchor, setLastCommentAnchor] = useState(null);
     const [tab, setTab] = useState(0);
     const [modal, setModal] = useState(false);
     // "library" = home screen listing projects; "project" = working inside one.
@@ -4200,6 +4472,7 @@ function App() {
     // Mirror of `journeys` kept in sync synchronously so export/save always
     // read the latest value (contentEditable onBlur fires before button clicks).
     const journeysRef = useRef([]);
+    const commentsRef = useRef([]);
 
     const syncHistoryState = useCallback(() => {
         setHistoryState({
@@ -4221,10 +4494,21 @@ function App() {
         setTab((cur) => nextJourneys.length ? Math.min(cur, nextJourneys.length - 1) : 0);
     }, []);
 
+    const applyComments = useCallback((nextComments) => {
+        const normalized = normalizeComments(nextComments);
+        commentsRef.current = normalized;
+        setComments(normalized);
+    }, []);
+
     const replaceJourneys = useCallback((next, { skipSave = false } = {}) => {
         if (skipSave) skipNextSaveRef.current = true;
         applyJourneys(typeof next === "function" ? next(journeysRef.current) : next);
     }, [applyJourneys]);
+
+    const replaceComments = useCallback((next, { skipSave = false } = {}) => {
+        if (skipSave) skipNextSaveRef.current = true;
+        applyComments(typeof next === "function" ? next(commentsRef.current) : next);
+    }, [applyComments]);
 
     const commitJourneys = useCallback((next) => {
         const prev = journeysRef.current;
@@ -4237,6 +4521,13 @@ function App() {
         applyJourneys(resolved);
         syncHistoryState();
     }, [applyJourneys, syncHistoryState]);
+
+    const commitComments = useCallback((next) => {
+        const prev = commentsRef.current;
+        const resolved = typeof next === "function" ? next(prev) : next;
+        if (resolved === prev) return;
+        applyComments(resolved);
+    }, [applyComments]);
 
     const undo = useCallback(() => {
         const previous = undoStackRef.current.pop();
@@ -4276,10 +4567,10 @@ function App() {
         setSaveState("saved");
     }, []);
 
-    const mirrorCloudState = useCallback(async (mapId, role, name, journeysData, meta = {}, localId = null) => {
+    const mirrorCloudState = useCallback(async (mapId, role, name, journeysData, commentsData, meta = {}, localId = null) => {
         const at = meta.updatedAt || Date.now();
         if (localId != null) {
-            await dbSaveCloudMirror(localId, journeysData, mapId, role, { ...meta, updatedAt: at });
+            await dbSaveCloudMirror(localId, journeysData, commentsData, mapId, role, { ...meta, updatedAt: at });
         } else if (role !== "owner") {
             await dbUpsertSharedMap(mapId, { name, role, ...meta, updatedAt: at });
         }
@@ -4301,9 +4592,9 @@ function App() {
 
     // Mirror a server-driven update using the current context ref. Stable across
     // renames so the socket effect needn't depend on name/id state.
-    const mirrorFromSocket = useCallback((journeysData, meta) => {
+    const mirrorFromSocket = useCallback((journeysData, commentsData, meta) => {
         const ctx = cloudCtxRef.current;
-        mirrorCloudState(ctx.mapId, ctx.role, ctx.name, journeysData, meta, ctx.localId)
+        mirrorCloudState(ctx.mapId, ctx.role, ctx.name, journeysData, commentsData, meta, ctx.localId)
             .catch((err) => console.warn("Cloud mirror update failed.", err));
     }, [mirrorCloudState]);
 
@@ -4332,6 +4623,7 @@ function App() {
             const { mapId, version, tokens } = await apiCreateMap({
                 name: currentName || "Untitled",
                 journeys: journeysRef.current,
+                comments: commentsRef.current,
             });
             setMapToken(mapId, tokens.owner);
             syncVersionRef.current = version;
@@ -4382,13 +4674,14 @@ function App() {
     const mountCloudMap = useCallback(async (mapId, token, session, { replaceRoute = true } = {}) => {
         const data = await apiGetMap(mapId, token, session);
         const hydrated = hydrate(data.journeys || []);
+        const hydratedComments = normalizeComments(data.comments);
         const linkedProject = await dbFindProjectByCloudMap(mapId);
         let localId = linkedProject?.id ?? null;
         // Owners always get a local "Your projects" mirror — e.g. when opening
         // their own map on a second device that has no local copy yet. Non-owners
         // stay in the lighter "Shared with me" list (no local project created).
         if (localId == null && data.role === "owner") {
-            localId = await dbCreateProject(data.name || "Untitled project", hydrated);
+            localId = await dbCreateProject(data.name || "Untitled project", hydrated, hydratedComments);
             await dbMarkProjectCloud(localId, mapId, "owner", data);
         }
         setCurrentId(localId);
@@ -4399,13 +4692,14 @@ function App() {
         setViewOnly(isViewer);
         setEditMode(!isViewer);
         replaceJourneys(hydrated, { skipSave: true });
+        replaceComments(hydratedComments, { skipSave: true });
         clearHistory();
         setView("project");
         markCloudSaved(data);
-        await mirrorCloudState(mapId, data.role, data.name || "Shared map", hydrated, data, localId);
+        await mirrorCloudState(mapId, data.role, data.name || "Shared map", hydrated, hydratedComments, data, localId);
         writeMapRoute(mapId, { replace: replaceRoute });
         setReady(true);
-    }, [clearHistory, markCloudSaved, mirrorCloudState, replaceJourneys]);
+    }, [clearHistory, markCloudSaved, mirrorCloudState, replaceComments, replaceJourneys]);
 
     // Submit a password for a gated map (Phase 5). On success store the session
     // and mount the map; on failure return an error string for the modal to show.
@@ -4445,6 +4739,7 @@ function App() {
                 setView("project");
                 setEditMode(false);
                 replaceJourneys(hydrate(embedded.journeys || []), { skipSave: true });
+                replaceComments(normalizeComments(embedded.comments), { skipSave: true });
                 clearHistory();
                 setLastSaved(embedded.lastSavedAt ? new Date(embedded.lastSavedAt).getTime() : null);
                 setLastSavedBy(null);
@@ -4508,6 +4803,7 @@ function App() {
                     } else {
                         setCurrentId(routedId);
                         replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
+                        replaceComments(normalizeComments(p.comments), { skipSave: true });
                         clearHistory();
                         setLastSaved(p.updatedAt || null);
                         setLastSavedBy(null);
@@ -4526,7 +4822,7 @@ function App() {
             setView("library");
             setReady(true);
         })();
-    }, [clearHistory, mountCloudMap, replaceJourneys]);
+    }, [clearHistory, mountCloudMap, replaceComments, replaceJourneys]);
 
     // Keep native browser Back/Forward in sync with the in-app project view.
     useEffect(() => {
@@ -4562,6 +4858,7 @@ function App() {
                 }
                 setCurrentId(routedId);
                 replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
+                replaceComments(normalizeComments(p.comments), { skipSave: true });
                 clearHistory();
                 setLastSaved(p.updatedAt || null);
                 setLastSavedBy(null);
@@ -4576,7 +4873,7 @@ function App() {
         };
         window.addEventListener("popstate", onPopState);
         return () => window.removeEventListener("popstate", onPopState);
-    }, [clearHistory, mountCloudMap, refreshProjects, replaceJourneys]);
+    }, [clearHistory, mountCloudMap, refreshProjects, replaceComments, replaceJourneys]);
 
     // ── Autosave current project (debounced) ──
     useEffect(() => {
@@ -4589,12 +4886,12 @@ function App() {
         setSaveState("saving");
         clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(() => {
-            dbSaveJourneys(currentId, journeysRef.current)
+            dbSaveProjectState(currentId, journeysRef.current, commentsRef.current)
                 .then(refreshProjects)
                 .then(() => { setSaveState("saved"); setLastSaved(Date.now()); setLastSavedBy("you"); });
         }, 600);
         return () => clearTimeout(saveTimer.current);
-    }, [journeys, currentId, ready, refreshProjects]);
+    }, [journeys, comments, currentId, ready, refreshProjects]);
 
     // ── Collaborative sync: live WebSocket channel (Phase 2) ──
     // Apply a remote whole-document payload (doc.sync / doc.update / doc.reject):
@@ -4604,10 +4901,12 @@ function App() {
         syncVersionRef.current = parsed.version;
         skipNextPushRef.current = true;
         const hydrated = hydrate(parsed.journeys || []);
+        const hydratedComments = normalizeComments(parsed.comments);
         replaceJourneys(hydrated, { skipSave: true });
+        replaceComments(hydratedComments, { skipSave: true });
         markCloudSaved(parsed);
-        mirrorFromSocket(hydrated, parsed);
-    }, [markCloudSaved, mirrorFromSocket, replaceJourneys]);
+        mirrorFromSocket(hydrated, hydratedComments, parsed);
+    }, [markCloudSaved, mirrorFromSocket, replaceComments, replaceJourneys]);
 
     // ── Phase 9: emit an op over the socket for a local optimistic change ──
     // The local immutable updater has already mutated `journeys`; this only sends
@@ -4680,8 +4979,35 @@ function App() {
         // cell.set frames carry no version (content is commutative); fall back to
         // the live version so the stored cloudVersion isn't clobbered to 0.
         const meta = typeof op.version === "number" ? op : { ...op, version: syncVersionRef.current };
-        mirrorFromSocket(next, meta);
+        mirrorFromSocket(next, commentsRef.current, meta);
     }, [markCloudSaved, mirrorFromSocket, replaceJourneys]);
+
+    const emitCommentOp = useCallback((op) => {
+        if (sync.status !== "synced" || sync.role === "viewer") return;
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        setSaveState("saving");
+        try { ws.send(JSON.stringify({ ...op, ts: op.ts || Date.now() })); } catch { /* socket going away; reconnect resyncs */ }
+    }, [sync.status, sync.role]);
+    const emitCommentOpRef = useRef(emitCommentOp);
+    useEffect(() => { emitCommentOpRef.current = emitCommentOp; }, [emitCommentOp]);
+
+    const commitCommentOp = useCallback((op) => {
+        const next = applyCommentOp(commentsRef.current, op);
+        if (!next) return false;
+        commitComments(next);
+        emitCommentOpRef.current(op);
+        return true;
+    }, [commitComments]);
+
+    const applyRemoteCommentOp = useCallback((op) => {
+        const next = applyCommentOp(commentsRef.current, op);
+        if (!next) return;
+        skipNextPushRef.current = true;
+        replaceComments(next, { skipSave: true });
+        markCloudSaved(op);
+        mirrorFromSocket(journeysRef.current, next, { ...op, version: syncVersionRef.current });
+    }, [markCloudSaved, mirrorFromSocket, replaceComments]);
 
     // Push the cell the user is actively editing to the server *before* a remote
     // change is applied on top of it. The in-progress text lives only in the
@@ -4764,6 +5090,71 @@ function App() {
         }
         return m;
     }, [locks]);
+
+    const commentCounts = useMemo(() => commentCountsByAnchor(comments), [comments]);
+
+    const selectedCommentAnchor = useMemo(() => {
+        if (!selected) return null;
+        const journey = journeys[selected.jIdx];
+        const subJourney = journey?.subJourneys?.[selected.sjIdx];
+        const row = subJourney?.rows?.[selected.rowIdx];
+        const cell = row?.cells?.[selected.cellIdx];
+        return commentAnchorForCell(journey, subJourney, row, cell);
+    }, [journeys, selected]);
+
+    const composerAnchor = selectedCommentAnchor || lastCommentAnchor;
+
+    const selectCell = useCallback((next) => {
+        setSelected(next);
+        if (!next) return;
+        const journey = journeysRef.current[next.jIdx];
+        const subJourney = journey?.subJourneys?.[next.sjIdx];
+        const row = subJourney?.rows?.[next.rowIdx];
+        const cell = row?.cells?.[next.cellIdx];
+        const anchor = commentAnchorForCell(journey, subJourney, row, cell);
+        if (anchor) setLastCommentAnchor(anchor);
+    }, []);
+
+    const openCommentsForAnchor = useCallback((anchor) => {
+        setActiveCommentAnchor(anchor || null);
+        setCommentsOpen(true);
+    }, []);
+
+    const messageFor = useCallback((body) => ({
+        id: newId(),
+        body,
+        authorId: profile.clientId,
+        authorName: profile.name || "Someone",
+        createdAt: Date.now(),
+    }), [profile.clientId, profile.name]);
+
+    const createCommentThread = useCallback((anchor, body) => {
+        if (!anchor || !body.trim()) return;
+        const now = Date.now();
+        const thread = {
+            id: newId(),
+            anchor,
+            status: "open",
+            createdAt: now,
+            updatedAt: now,
+            messages: [messageFor(body.trim())],
+        };
+        commitCommentOp({ t: "comment.thread.create", thread, ts: now });
+        setActiveCommentAnchor(anchor);
+        setCommentsOpen(true);
+    }, [commitCommentOp, messageFor]);
+
+    const addCommentMessage = useCallback((threadId, body) => {
+        if (!threadId || !body.trim()) return;
+        commitCommentOp({ t: "comment.message.add", threadId, message: messageFor(body.trim()), ts: Date.now() });
+    }, [commitCommentOp, messageFor]);
+
+    const resolveCommentThread = useCallback((threadId) =>
+        commitCommentOp({ t: "comment.thread.resolve", threadId, ts: Date.now() }), [commitCommentOp]);
+    const reopenCommentThread = useCallback((threadId) =>
+        commitCommentOp({ t: "comment.thread.reopen", threadId, ts: Date.now() }), [commitCommentOp]);
+    const deleteCommentThread = useCallback((threadId) =>
+        commitCommentOp({ t: "comment.thread.delete", threadId, ts: Date.now() }), [commitCommentOp]);
 
     // Send a lock.* frame if the socket is OPEN and locking is active.
     const sendLock = useCallback((type, cellId) => {
@@ -4858,11 +5249,18 @@ function App() {
                     }
                 } else if (parsed.t === "cell.set" || STRUCTURAL_PREFIXES.some((p) => String(parsed.t || "").startsWith(p))) {
                     applyOrDeferRemoteOp(parsed);
+                } else if (parsed.t === "comment.ack") {
+                    markCloudSaved(parsed);
+                    mirrorFromSocket(journeysRef.current, commentsRef.current, { ...parsed, version: syncVersionRef.current });
+                } else if (String(parsed.t || "").startsWith("comment.")) {
+                    applyRemoteCommentOp(parsed);
+                } else if (parsed.t === "comments.sync" && Array.isArray(parsed.comments)) {
+                    replaceComments(normalizeComments(parsed.comments), { skipSave: true });
                 } else if (parsed.t === "op.ack" || parsed.t === "doc.ack") {
                     if (typeof parsed.version === "number") syncVersionRef.current = parsed.version;
                     markCloudSaved(parsed);
                     const meta = typeof parsed.version === "number" ? parsed : { ...parsed, version: syncVersionRef.current };
-                    mirrorFromSocket(journeysRef.current, meta);
+                    mirrorFromSocket(journeysRef.current, commentsRef.current, meta);
                 }
             };
             ws.onclose = () => { if (wsRef.current === ws) { wsRef.current = null; setPeers([]); setLocks([]); } scheduleReconnect(); };
@@ -4888,7 +5286,7 @@ function App() {
             editingCellIdRef.current = null;
             if (ws) { ws.onclose = null; ws.onerror = null; try { ws.close(); } catch { /* ignore */ } }
         };
-    }, [announcePresence, applyOrDeferRemote, applyOrDeferRemoteOp, markCloudSaved, mirrorFromSocket, sync.mapId, sync.status]);
+    }, [announcePresence, applyOrDeferRemote, applyOrDeferRemoteOp, applyRemoteCommentOp, markCloudSaved, mirrorFromSocket, replaceComments, sync.mapId, sync.status]);
 
     // Phase 9 replaces the old "push the entire journeys array on every change"
     // behavior with explicit op emits from the edit handlers. The Worker still
@@ -4904,18 +5302,20 @@ function App() {
     const loadFromText = useCallback(async (text, mode = "replace", options = {}) => {
         const parsed = parseInput(text);
         const data = hydrate(parsed.journeys);
+        const incomingComments = normalizeComments(parsed.comments);
         if (!data.length) throw new Error("No valid journey data found.");
         const baseId = options.forceNew ? null : currentId;
         let id = baseId;
         if (id == null) {
             const name = parsed.name || defaultName(projects);
-            id = await dbCreateProject(name, data);
+            id = await dbCreateProject(name, data, incomingComments);
             setCurrentId(id);
             localStorage.setItem(LAST_KEY, String(id));
             writeRoute(id);
         }
         if (baseId == null) {
             replaceJourneys(data);
+            replaceComments(incomingComments);
             clearHistory();
             setTab(0);
             setEditMode(true);
@@ -4923,6 +5323,7 @@ function App() {
         } else if (mode === "append") {
             const at = journeysRef.current.length;
             commitJourneys((prev) => [...prev, ...withUniqueSheetTitles(prev, data)]);
+            commitComments((prev) => [...prev, ...incomingComments]);
             setTab(at);
         } else if (mode === "overwriteAffected") {
             const byTitle = new Map(data.filter((j) => j.title).map((j) => [j.title, j]));
@@ -4940,6 +5341,7 @@ function App() {
             if (firstChanged >= 0) setTab(firstChanged);
         } else {
             commitJourneys(data);
+            commitComments(incomingComments);
             setTab(0);
         }
         if (options.updateProjectName && parsed.name?.trim() && id != null) {
@@ -4947,7 +5349,7 @@ function App() {
         }
         await refreshProjects();
         console.log(`%c✅ Loaded ${data.length} service journey(s)`, "color:#2e7d32;font-weight:bold;font-size:14px");
-    }, [clearHistory, commitJourneys, currentId, projects, refreshProjects, replaceJourneys]);
+    }, [clearHistory, commitComments, commitJourneys, currentId, projects, refreshProjects, replaceComments, replaceJourneys]);
 
     // ── Immutable updaters ──
     const editJourney = useCallback((jIdx, fn) => {
@@ -5120,6 +5522,7 @@ function App() {
             // edits a stale snapshot before it's caught up.
             setCurrentId(id);
             replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
+            replaceComments(normalizeComments(p.comments), { skipSave: true });
             clearHistory();
             setTab(0);
             setStandaloneName(p.name || "Shared map");
@@ -5139,6 +5542,7 @@ function App() {
         }
         setCurrentId(id);
         replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
+        replaceComments(normalizeComments(p.comments), { skipSave: true });
         clearHistory();
         setLastSaved(p.updatedAt || null);
         setLastSavedBy(null);
@@ -5149,7 +5553,7 @@ function App() {
         setView("project");
         localStorage.setItem(LAST_KEY, String(id));
         writeRoute(id);
-    }, [clearHistory, mountCloudMap, replaceJourneys]);
+    }, [clearHistory, mountCloudMap, replaceComments, replaceJourneys]);
 
     const openSharedMap = useCallback(async (mapId) => {
         const token = getMapToken(mapId);
@@ -5172,6 +5576,7 @@ function App() {
         if (id === currentId) {
             setCurrentId(null);
             replaceJourneys([]);
+            replaceComments([]);
             clearHistory();
             setTab(0);
             localStorage.removeItem(LAST_KEY);
@@ -5179,7 +5584,7 @@ function App() {
             writeRoute(null, { replace: true });
         }
         await refreshProjects();
-    }, [clearHistory, currentId, refreshProjects, replaceJourneys]);
+    }, [clearHistory, currentId, refreshProjects, replaceComments, replaceJourneys]);
 
     const deleteProject = useCallback((id, name) => {
         setConfirmState({
@@ -5214,6 +5619,7 @@ function App() {
         const id = await dbCreateProject(defaultName(projects), []);
         setCurrentId(id);
         replaceJourneys([]);
+        replaceComments([]);
         clearHistory();
         setTab(0);
         setEditMode(true);
@@ -5223,7 +5629,7 @@ function App() {
         localStorage.setItem(LAST_KEY, String(id));
         writeRoute(id);
         await refreshProjects();
-    }, [clearHistory, projects, refreshProjects, replaceJourneys]);
+    }, [clearHistory, projects, refreshProjects, replaceComments, replaceJourneys]);
 
     const newBlankJourney = useCallback(async () => {
         const journey = createBlankJourney(journeysRef.current.length);
@@ -5233,6 +5639,7 @@ function App() {
             setCurrentId(id);
             localStorage.setItem(LAST_KEY, String(id));
             replaceJourneys([journey]);
+            replaceComments([]);
             clearHistory();
             setTab(0);
             setViewOnly(false);
@@ -5246,7 +5653,7 @@ function App() {
             ? journeysRef.current[journeysRef.current.length - 1]?.id
             : null;
         commitOp({ t: "journey.insert", afterJourneyId, journey }, (next) => setTab(next.length - 1));
-    }, [clearHistory, commitOp, currentId, refreshProjects, replaceJourneys, sync.status]);
+    }, [clearHistory, commitOp, currentId, refreshProjects, replaceComments, replaceJourneys, sync.status]);
 
     const deleteJourney = useCallback((jIdx) => {
         const journey = journeysRef.current[jIdx];
@@ -5273,6 +5680,9 @@ function App() {
         if (!data.length) return null;
         const activeJourney = data[Math.min(tab, data.length - 1)];
         const journeysToExport = scope === "sheet" && activeJourney ? [activeJourney] : data;
+        const commentsToExport = scope === "sheet" && activeJourney
+            ? commentsRef.current.filter((thread) => thread.anchor?.journeyId === activeJourney.id)
+            : commentsRef.current;
         const exportName = scope === "sheet" && activeJourney?.title
             ? `${currentName || "Service Journeys"} - ${activeJourney.title}`
             : currentName || "Service Journeys";
@@ -5283,8 +5693,9 @@ function App() {
             exportedAt: new Date().toISOString(),
             lastSavedAt: lastSavedRef.current ? new Date(lastSavedRef.current).toISOString() : null,
             journeys: journeysToExport,
+            comments: commentsToExport,
         };
-    }, [currentName, tab]);
+    }, [currentName, tab, comments]);
 
     // ── Export full project state ──
     const exportProject = useCallback(() => {
@@ -5485,16 +5896,29 @@ function App() {
                     journeys.map((j, i) => (
                         <div key={j.id + "-" + i} style={{ display: i === tab ? "block" : "none" }}>
                             <JourneyView journey={j} jIdx={i} editMode={!viewOnly && editMode}
-                                selected={selected} onSelect={setSelected} onDeselect={() => { setSelected(null); releaseLock(); }}
+                                selected={selected} onSelect={selectCell} onDeselect={() => { setSelected(null); releaseLock(); }}
                                 onTitleEdit={renameJourneyTitle}
                                 onCellEdit={handleCellEdit} onCellTags={handleCellTags}
                                 onRowAction={handleRowAction} onStageAction={handleStageAction}
                                 onAddRow={handleAddRow}
-                                lockedByPeer={lockedByPeer} onAcquireLock={acquireLock} onReleaseLock={releaseLock} />
+                                lockedByPeer={lockedByPeer} onAcquireLock={acquireLock} onReleaseLock={releaseLock}
+                                commentCounts={commentCounts} onOpenComments={openCommentsForAnchor} />
                         </div>
                     ))
                 )}
             </main>
+            <CommentsPanel open={commentsOpen}
+                onOpen={() => { setActiveCommentAnchor(null); setCommentsOpen(true); }}
+                onClose={() => setCommentsOpen(false)}
+                journeys={journeys} comments={comments}
+                selectedAnchor={composerAnchor}
+                activeAnchor={activeCommentAnchor}
+                canComment={!viewOnly && sync.role !== "viewer"}
+                onCreateThread={createCommentThread}
+                onAddMessage={addCommentMessage}
+                onResolveThread={resolveCommentThread}
+                onReopenThread={reopenCommentThread}
+                onDeleteThread={deleteCommentThread} />
             <TabBar journeys={journeys} activeTab={tab} setActiveTab={setTab}
                 onNew={newBlankJourney} onLoad={() => setModal(true)}
                 onDelete={deleteJourney} viewOnly={viewOnly} />

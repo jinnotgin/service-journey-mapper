@@ -17,6 +17,7 @@ interface InitBody {
   mapId: string;
   name: string;
   journeys: unknown[];
+  comments?: unknown[];
   tokenHashes: { owner: string; editor: string; viewer: string };
   // Raw editor/viewer share secrets. SECURITY TRADE-OFF (Phase 4): unlike the
   // owner key (hash-only), the editor/viewer tokens are stored raw in `meta` so
@@ -66,10 +67,97 @@ interface SaveMeta {
   updatedByName?: string;
 }
 
+interface CommentMessage {
+  id?: string;
+  body?: string;
+  authorId?: string;
+  authorName?: string;
+  createdAt?: number;
+  editedAt?: number;
+  [k: string]: unknown;
+}
+
+interface CommentThread {
+  id?: string;
+  anchor?: { kind?: string; [k: string]: unknown };
+  messages?: CommentMessage[];
+  status?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  orphaned?: boolean;
+  anchorLabel?: string;
+  [k: string]: unknown;
+}
+
 const MAX_DOC_BYTES = 2 * 1024 * 1024; // 2 MB ceiling per document
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // password sessions live 12 hours
 const LOCK_TTL_MS = 15000; // a lock with no heartbeat for this long is stale (Phase 8)
 const LOCK_SWEEP_MS = 5000; // alarm cadence while any lock is held (idle-hoarder sweep)
+
+function normalizeComments(comments: unknown): CommentThread[] {
+  return (Array.isArray(comments) ? comments : [])
+    .filter((c): c is CommentThread => !!c && typeof c === "object" && typeof (c as CommentThread).id === "string")
+    .map((c) => ({
+      ...c,
+      status: c.status === "resolved" ? "resolved" : "open",
+      messages: (Array.isArray(c.messages) ? c.messages : []).filter((m) => m && typeof m === "object"),
+      updatedAt: typeof c.updatedAt === "number" ? c.updatedAt : Date.now(),
+    }));
+}
+
+function applyCommentOp(comments: unknown[], op: { t?: string; [k: string]: unknown }): CommentThread[] | null {
+  const list = normalizeComments(comments);
+  const threadId = typeof op.threadId === "string" ? op.threadId : "";
+  const now = typeof op.ts === "number" ? op.ts : Date.now();
+
+  if (op.t === "comment.thread.create") {
+    const thread = op.thread as CommentThread;
+    if (!thread?.id || !thread.anchor) return null;
+    if (list.some((t) => t.id === thread.id)) return list;
+    return [...list, {
+      ...thread,
+      status: thread.status === "resolved" ? "resolved" : "open",
+      messages: Array.isArray(thread.messages) ? thread.messages : [],
+      createdAt: typeof thread.createdAt === "number" ? thread.createdAt : now,
+      updatedAt: typeof thread.updatedAt === "number" ? thread.updatedAt : now,
+    }];
+  }
+
+  if (!threadId) return null;
+  let found = false;
+  const next = list.map((thread) => {
+    if (thread.id !== threadId) return thread;
+    found = true;
+    if (op.t === "comment.message.add") {
+      const message = op.message as CommentMessage;
+      if (!message?.id) return thread;
+      if ((thread.messages || []).some((m) => m.id === message.id)) return thread;
+      return { ...thread, status: "open", messages: [...(thread.messages || []), message], updatedAt: now };
+    }
+    if (op.t === "comment.message.edit") {
+      const messageId = typeof op.messageId === "string" ? op.messageId : "";
+      if (!messageId) return thread;
+      return {
+        ...thread,
+        messages: (thread.messages || []).map((m) => (
+          m.id === messageId ? { ...m, body: String(op.body || ""), editedAt: now } : m
+        )),
+        updatedAt: now,
+      };
+    }
+    if (op.t === "comment.thread.resolve" || op.t === "comment.thread.reopen") {
+      return { ...thread, status: op.t === "comment.thread.resolve" ? "resolved" : "open", updatedAt: now };
+    }
+    if (op.t === "comment.thread.orphan") {
+      return { ...thread, orphaned: true, status: "open", updatedAt: now };
+    }
+    return thread;
+  });
+
+  if (!found) return null;
+  if (op.t === "comment.thread.delete") return list.filter((thread) => thread.id !== threadId);
+  return next;
+}
 
 export class MapRoom {
   private state: DurableObjectState;
@@ -243,7 +331,12 @@ export class MapRoom {
       return;
     }
 
-    if (role === "viewer") return; // viewers cannot mutate (doc.push / ops alike)
+    if (role === "viewer") return; // viewers cannot mutate (doc.push / ops / comments alike)
+
+    if (this.isCommentOp(msg.t)) {
+      this.handleCommentOp(ws, msg);
+      return;
+    }
 
     // ── Phase 9: atomic op-based sync ─────────────────────────────────────
     // The server keeps the whole-document snapshot as source of truth, applies
@@ -374,11 +467,49 @@ export class MapRoom {
     ws.send(JSON.stringify({ t: "op.ack", op: op.t, version: newVersion, ...saveMeta }));
   }
 
+  private isCommentOp(t: string | undefined): boolean {
+    return !!t && t.startsWith("comment.");
+  }
+
+  private handleCommentOp(ws: WebSocket, op: { t?: string; [k: string]: unknown }): void {
+    const comments = this.currentComments();
+    const next = applyCommentOp(comments, op);
+    if (!next) {
+      ws.send(JSON.stringify({ t: "comments.sync", comments }));
+      return;
+    }
+    const json = JSON.stringify(next);
+    if (json.length > MAX_DOC_BYTES) {
+      ws.send(JSON.stringify({ t: "comments.sync", comments }));
+      return;
+    }
+    this.setMeta("comments", json);
+    const now = Date.now();
+    const saveMeta = this.saveMetaFor(ws, now);
+    this.setMeta("updatedAt", String(saveMeta.updatedAt));
+    if (saveMeta.updatedByClientId) this.setMeta("updatedByClientId", saveMeta.updatedByClientId);
+    if (saveMeta.updatedByName) this.setMeta("updatedByName", saveMeta.updatedByName);
+    const frame = JSON.stringify({ ...op, ...saveMeta });
+    this.broadcastExcept(ws, frame);
+    ws.send(JSON.stringify({ t: "comment.ack", op: op.t, ...saveMeta }));
+  }
+
   /** The current whole-document snapshot as a parsed journeys array. */
   private currentJourneys(): unknown[] {
     const version = Number(this.getMeta("version") || "1");
     const row = this.sql.exec("SELECT json FROM snapshot WHERE version = ?", version).toArray()[0];
     return row ? (JSON.parse(row.json as string) as unknown[]) : [];
+  }
+
+  private currentComments(): unknown[] {
+    const raw = this.getMeta("comments");
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   }
 
   /** Persist a snapshot at `version` (prune older rows) and bump updatedAt. */
@@ -567,6 +698,7 @@ export class MapRoom {
     t: string;
     version: number;
     journeys: unknown;
+    comments: unknown;
     updatedAt: number | null;
     updatedByClientId: string | null;
     updatedByName: string | null;
@@ -578,6 +710,7 @@ export class MapRoom {
       t,
       version,
       journeys,
+      comments: this.currentComments(),
       updatedAt: this.numberMeta("updatedAt"),
       updatedByClientId: this.getMeta("updatedByClientId"),
       updatedByName: this.getMeta("updatedByName"),
@@ -599,6 +732,7 @@ export class MapRoom {
     this.setMeta("mapId", body.mapId);
     this.setMeta("name", body.name || "Untitled");
     this.setMeta("version", "1");
+    this.setMeta("comments", JSON.stringify(Array.isArray(body.comments) ? body.comments : []));
     this.setMeta("createdAt", String(now));
     this.setMeta("updatedAt", String(now));
     this.setMeta("updatedByName", "Owner");
@@ -644,6 +778,7 @@ export class MapRoom {
     return new Response(
       JSON.stringify({
         journeys: JSON.parse(row.json as string),
+        comments: this.currentComments(),
         version,
         role,
         name: this.getMeta("name"),
