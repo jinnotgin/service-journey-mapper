@@ -127,6 +127,8 @@
         .ab-seg button{background:transparent;color:var(--text-sec);border:none;padding:5px 13px;border-radius:7px;font-size:var(--fs-xs);font-weight:650;cursor:pointer;font-family:inherit;min-height:30px;transition:background .15s,color .15s}
         .ab-seg button:hover{color:var(--text)}
         .ab-seg button.on{background:var(--accent);color:var(--accent-ink)}
+        /* Mobile replacement for the segmented toggle (shown only ≤640). */
+        .ab-mode-select{display:none;font-family:inherit;font-size:var(--fs-xs);font-weight:650;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 26px 6px 11px;min-height:32px;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;background-size:13px}
         .ab-actions .menu-wrap{display:flex}
         .ab-actions .menu-trigger{width:auto;height:auto;min-height:32px;background:var(--surface);border-color:var(--border);color:var(--text);padding:6px 13px;border-radius:8px;font-size:var(--fs-xs);font-weight:700;white-space:nowrap;box-shadow:0 1px 1px oklch(20% .006 70 / .06)}
         .ab-actions .menu-trigger:hover{background:var(--surface-2)}
@@ -134,6 +136,10 @@
         .save-dot{width:7px;height:7px;border-radius:999px;display:inline-block;background:var(--green)}
         .save-saving{color:oklch(82% .05 80)}
         .save-saved{color:var(--text-sec)}
+        .save-syncing{color:var(--blue)}
+        .save-offline{color:var(--red)}
+        .sync-dot{width:7px;height:7px;border-radius:999px;display:inline-block;background:var(--blue);animation:sync-pulse 1s ease-in-out infinite}
+        @keyframes sync-pulse{0%,100%{opacity:.3}50%{opacity:1}}
         .save-by{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
         /* ===== MAIN ===== */
@@ -253,8 +259,8 @@
         /* Line of visibility = the blueprint's defining moment. A tall, quiet
            band of canvas separates the frontstage cluster from the backstage
            cluster, with a single dashed boundary floating through it. */
-        .row-divider>.ll{background:var(--canvas)!important;color:var(--text-sec)!important;border-bottom:0!important}
-        .row-divider>.dc{background:transparent!important;color:var(--text-sec);font-weight:700;text-align:center;padding:16px 12px!important;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:1.3px;border-bottom:0!important}
+        .row-divider>.ll{background:var(--canvas)!important;color:var(--text-sec)!important;border-bottom:0!important;vertical-align:middle!important}
+        .row-divider>.dc{background:transparent!important;color:var(--text-sec);font-weight:700;text-align:center;padding:16px 12px!important;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:1.3px;border-bottom:0!important;vertical-align:middle!important}
         .row-divider .lane-label{align-items:center}
         .row-divider .lane-main{color:var(--text-sec)}
         /* The divider is a pure boundary: any cell content is made weightless
@@ -407,24 +413,48 @@
         .icon-btn.danger:hover{background:oklch(95% .03 20);color:var(--red);border-color:oklch(85% .06 20)}
 
         /* ===== RESPONSIVE ===== */
-        @media(max-width:980px){
-            .app-bar-main{grid-template-columns:1fr;align-items:start}
-            .ab-status{justify-self:start}
-            .ab-actions{width:100%;overflow-x:auto;padding-bottom:1px;scrollbar-width:none}
-            .ab-actions::-webkit-scrollbar{display:none}
+        /* The app bar holds ONE row at every width. Under pressure it sheds
+           controls in priority order — it never wraps onto a second line. The
+           title absorbs the slack by truncating. Load-bearing to the end:
+           Library · Title · status · Edit/View · Export. First to go: save
+           timestamp/text, undo-redo, presence (presence still shows inside the
+           Share panel). */
+        .app-bar-main{flex-wrap:nowrap}
+        .ab-left{flex:0 1 auto}
+
+        /* Tablet — same toolset, less chrome: button labels collapse to icons,
+           the "Saved <time>" timestamp drops (the dot still confirms saves). */
+        @media(max-width:1024px){
+            .app-bar-main{gap:10px}
+            .ab-actions{gap:9px}
+            .ab-back .ab-label,.ab-trig .ab-label,.ab-trig .ab-caret,
+            .share-trig-label,.save-by{display:none}
+            .ab-back{padding:7px 9px}
+            .ab-actions .menu-trigger{padding:7px 9px}
         }
+
+        /* Narrow tablet / large phone — shed controls that lean on a keyboard
+           or a roomy canvas: undo/redo (⌘Z still works) and presence avatars
+           go. The save status keeps its word (e.g. "Saved") beside the dot;
+           only the timestamp drops (already hidden at ≤1024). */
+        @media(max-width:768px){
+            .history-actions,.presence-stack{display:none}
+        }
+
         @media(max-width:640px){
-            .app-bar-main{padding:8px 14px;gap:7px}
+            .app-bar-main{padding:8px 12px;gap:8px}
             .ab-brand{max-width:100%}
             .ab-brand .inline-title-input,.ch-hdr .inline-title-input{width:100%;min-width:0}
             .ab-btn{padding:5px 8px}
-            /* Compact the app bar: collapse button labels to icons, trim the
-               save status down to just "Saved" / "Saving…". */
-            .ab-actions{gap:8px}
-            .ab-back .ab-label,.ab-trig .ab-label,.ab-trig .ab-caret,.save-by{display:none}
-            .ab-back{padding:7px 9px}
-            .ab-actions .menu-trigger{padding:7px 9px}
-            .ab-seg button{padding:5px 10px}
+            .ab-actions{gap:7px}
+            /* Mode toggle becomes a compact dropdown; Export drops entirely. */
+            .ab-seg{display:none}
+            .ab-mode-select{display:inline-block}
+            .ab-export{display:none}
+            /* Bottom tab bar: drop Load, collapse New to a "+" icon. */
+            .tab-load-import{display:none}
+            .tab-new-label{display:none}
+            .tab-new{padding:0 12px;font-size:var(--fs-md);line-height:1}
             .ch-hdr{padding:12px 16px 10px}
             .ch-hdr h2{font-size:var(--fs-lg)}
             .lib{padding:28px 16px 80px;position:relative}
@@ -494,6 +524,16 @@
         .share-state svg{width:13px;height:13px;stroke:currentColor}
         .share-state.on{color:var(--green)}
         .share-state.off{color:var(--text-sec)}
+        /* Demoted secondary copy button: lighter than the solid primary */
+        .menu-item.soft{background:var(--surface-2);justify-content:center;font-weight:600}
+        .menu-item.soft:hover:not(:disabled){background:oklch(93% .005 70)}
+        /* Per-link manage actions (turn off / new link): quiet at rest, revealed
+           on hover or keyboard focus. Space is reserved so nothing shifts. */
+        .share-link-actions{display:flex;gap:6px;opacity:0;transition:opacity .12s ease-out}
+        .share-link:hover .share-link-actions,
+        .share-link:focus-within .share-link-actions{opacity:1}
+        @media (hover:none){.share-link-actions{opacity:1}}
+        .share-note{font-size:11px;color:var(--text-sec);line-height:1.45}
         .menu-label{padding:7px 10px 4px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
         .menu-divider{height:1px;margin:5px 0;background:var(--line)}
         .menu-head{font-size:var(--fs-2xs);font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-sec);padding:6px 10px 3px}
@@ -631,6 +671,10 @@ const COL_W = 260;
 const LBL_W = 180;
 const DIVIDER_TYPE = "row-divider";
 const HISTORY_LIMIT = 40;
+// How long a focused cell can sit with no further edits before it auto-commits
+// (blurs → saves + releases its lock), so a walked-away editor doesn't camp a
+// cell. Comfortably longer than the 5s lock heartbeat / 15s server TTL.
+const IDLE_COMMIT_MS = 30000;
 
 // ═══════════════════════════════════════
 // STRUCTURE HELPERS (columns / rows / cells)
@@ -2325,44 +2369,33 @@ function ShareLinkRow({ mapId, kind, link, onChange }) {
     };
 
     return (
-        <div style={{ display: "grid", gap: 7 }}>
-            <div className="share-row-head">
-                <span className={`share-cap${kind === "edit" ? " edit" : ""}`}>
-                    <LucideIcon name={kind === "edit" ? "pencil" : "eye"} />
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cap}</span>
-                </span>
-                <span className={`share-state ${enabled ? "on" : "off"}`}>
-                    {enabled && <LucideIcon name="circleCheck" />}
-                    {enabled ? "On" : "Off"}
-                </span>
-            </div>
+        <div className="share-link" style={{ display: "grid", gap: 6 }}>
+            <span className={`share-cap${kind === "edit" ? " edit" : ""}`}>
+                <LucideIcon name={kind === "edit" ? "pencil" : "eye"} />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cap}</span>
+            </span>
             {enabled ? (
                 <>
-                    <button className={kind === "edit" ? "menu-item primary" : "menu-item outline"} onClick={copy} disabled={busy}>
+                    <button className={kind === "edit" ? "menu-item primary" : "menu-item soft"} onClick={copy} disabled={busy}>
                         <LucideIcon name={copied ? "check" : "copy"} />
                         {copied ? `${linkName} copied` : `Copy ${kind} link`}
                     </button>
                     {confirmRotate ? (
-                        <>
-                            <span style={{ fontSize: "11px", color: "var(--text-sec)" }}>
-                                This invalidates the current {kind} link. Anyone using it will lose access.
-                            </span>
-                            <div style={{ display: "flex", gap: 6 }}>
-                                <button className="menu-item danger center" style={{ flex: 1 }} onClick={rotate} disabled={busy}>
-                                    {busy ? "Working…" : "Yes, replace it"}
-                                </button>
-                                <button className="menu-item outline" style={{ flex: 1 }} onClick={() => setConfirmRotate(false)} disabled={busy}>
-                                    Cancel
-                                </button>
-                            </div>
-                        </>
+                        <div className="share-link-actions" style={{ opacity: 1 }}>
+                            <button className="menu-item danger center" style={{ flex: 1 }} onClick={rotate} disabled={busy}>
+                                {busy ? "Working…" : "Replace link"}
+                            </button>
+                            <button className="menu-item outline" style={{ flex: 1 }} onClick={() => setConfirmRotate(false)} disabled={busy}>
+                                Cancel
+                            </button>
+                        </div>
                     ) : (
-                        <div style={{ display: "flex", gap: 6 }}>
+                        <div className="share-link-actions">
                             <button className="menu-item tiny" onClick={toggle} disabled={busy}>
                                 {busy ? "Working…" : "Turn off"}
                             </button>
                             <button className="menu-item tiny" style={{ marginLeft: "auto" }} onClick={() => setConfirmRotate(true)} disabled={busy}
-                                title="Invalidate the current link and generate a new one">
+                                title="Invalidate the current link and generate a new one. Anyone using it loses access.">
                                 <LucideIcon name="refreshCw" />New link
                             </button>
                         </div>
@@ -2515,7 +2548,7 @@ function ShareControl({ sync, onEnableSync, onStopSharing, peers }) {
     const trigger = (
         <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
             <span className="share-dot" style={{ background: "var(--green)" }} />
-            Shared
+            <span className="share-trig-label">Shared</span>
             {peerCount > 0 && <span style={{ color: "var(--text-sec)", fontWeight: 600 }}>· {peerCount}</span>}
             <span aria-hidden="true">▾</span>
         </span>
@@ -2564,24 +2597,20 @@ function ShareControl({ sync, onEnableSync, onStopSharing, peers }) {
                                 onChange={(pe) => setPwEnabled(pe)} />
                             <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, display: "grid", gap: 6 }}>
                                 {confirmStop ? (
-                                    <>
-                                        <span style={{ fontSize: "11px", color: "var(--text-sec)" }}>
-                                            This permanently deletes the cloud copy. Everyone loses access and the links stop working — this can't be undone.
-                                        </span>
-                                        <div style={{ display: "flex", gap: 6 }}>
-                                            <button className="menu-item danger center" style={{ flex: 1 }} onClick={stopSharing} disabled={stopping}>
-                                                {stopping ? "Deleting…" : "Yes, delete"}
-                                            </button>
-                                            <button className="menu-item outline" style={{ flex: 1 }} onClick={() => setConfirmStop(false)} disabled={stopping}>
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    </>
+                                    <div style={{ display: "flex", gap: 6 }}>
+                                        <button className="menu-item danger center" style={{ flex: 1 }} onClick={stopSharing} disabled={stopping}>
+                                            {stopping ? "Deleting…" : "Yes, delete"}
+                                        </button>
+                                        <button className="menu-item outline" style={{ flex: 1 }} onClick={() => setConfirmStop(false)} disabled={stopping}>
+                                            Cancel
+                                        </button>
+                                    </div>
                                 ) : (
                                     <button className="menu-item danger" onClick={() => setConfirmStop(true)}>
                                         <LucideIcon name="trash2" />Stop sharing &amp; delete cloud copy
                                     </button>
                                 )}
+                                <span className="share-note">Deletes the cloud copy for everyone. This can't be undone.</span>
                             </div>
                         </>
                     ) : (
@@ -2637,7 +2666,7 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
         <header className="app-bar" ref={innerRef}>
             <div className="app-bar-main">
                 <div className="ab-left">
-                    {(!viewOnly || sync.status === "synced") && (
+                    {(!viewOnly || sync.status === "synced" || sync.status === "connecting" || sync.status === "error") && (
                         <button className="ab-back" onClick={onLibrary} title="Back to your projects" aria-label="Back to your projects">
                             <LucideIcon name="arrowLeft" /><span className="ab-label">Library</span>
                         </button>
@@ -2650,6 +2679,16 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                         {sync.status === "synced" && (
                             <span className="cloud-badge" title={`Cloud copy (${sync.role || "shared"})`} aria-label="Cloud copy">
                                 <LucideIcon name="cloud" />
+                            </span>
+                        )}
+                        {sync.status === "connecting" && (
+                            <span className="save-state save-syncing" title="Syncing the latest changes — view only until ready" aria-label="Syncing">
+                                <span className="sync-dot" />Syncing…
+                            </span>
+                        )}
+                        {sync.status === "error" && (
+                            <span className="save-state save-offline" title={sync.error || "Couldn't reach the server — showing your last saved copy"} aria-label="Offline copy">
+                                <LucideIcon name="cloud" />&nbsp;Offline copy
                             </span>
                         )}
                     </div>
@@ -2669,26 +2708,35 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                             </button>
                         </div>
                     )}
-                    {!viewOnly && <ShareControl sync={sync} onEnableSync={onEnableSync} onStopSharing={onStopSharing} peers={peers} />}
                     <div className="ab-status" aria-live="polite">
                         {saveState === "saving" ? (
-                            <span className="save-state save-saving"><span className="save-dot" />Saving…</span>
+                            <span className="save-state save-saving"><span className="save-dot" /><span className="save-word">Saving…</span></span>
                         ) : lastSaved ? (
                             <span className="save-state save-saved" title={savedTooltip}>
-                                <span className="save-dot" />Saved
-                                <span className="save-by">&nbsp;{fmtDate(lastSaved)}</span>
+                                <span className="save-dot" /><span className="save-word">Saved</span>
+                                <span className="save-by">{fmtDate(lastSaved)}</span>
                             </span>
                         ) : null}
                     </div>
+                    {!viewOnly && <ShareControl sync={sync} onEnableSync={onEnableSync} onStopSharing={onStopSharing} peers={peers} />}
                     {!viewOnly && (
-                        <div className="ab-seg" role="group" aria-label="Editing mode">
-                            <button className={editMode ? "on" : ""} aria-pressed={editMode}
-                                onClick={() => onSetEdit(true)} disabled={!canExport}>Edit</button>
-                            <button className={!editMode ? "on" : ""} aria-pressed={!editMode}
-                                onClick={() => onSetEdit(false)} disabled={!canExport}>View</button>
-                        </div>
+                        <>
+                            <div className="ab-seg" role="group" aria-label="Editing mode">
+                                <button className={editMode ? "on" : ""} aria-pressed={editMode}
+                                    onClick={() => onSetEdit(true)} disabled={!canExport}>Edit</button>
+                                <button className={!editMode ? "on" : ""} aria-pressed={!editMode}
+                                    onClick={() => onSetEdit(false)} disabled={!canExport}>View</button>
+                            </div>
+                            <select className="ab-mode-select" aria-label="Editing mode" disabled={!canExport}
+                                value={editMode ? "edit" : "view"}
+                                onChange={(e) => onSetEdit(e.target.value === "edit")}>
+                                <option value="edit">Edit</option>
+                                <option value="view">View</option>
+                            </select>
+                        </>
                     )}
                     {!viewOnly && (
+                        <div className="ab-export">{
                         canExport ? (
                             <Menu align="right" trigger={promptCopied ? "Copied ✓" : (
                                 <span className="ab-trig">
@@ -2721,6 +2769,7 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                         ) : (
                             <button className="ab-btn" disabled>Export</button>
                         )
+                    }</div>
                     )}
                 </div>
             </div>
@@ -3152,8 +3201,8 @@ function TabBar({ journeys, activeTab, setActiveTab, onNew, onLoad, onDelete, vi
             </div>
             {!viewOnly && (
                 <div className="tab-actions">
-                    <button className="tab-load" onClick={onLoad}>+ Load</button>
-                    <button className="tab-load" onClick={onNew}>+ New</button>
+                    <button className="tab-load tab-load-import" onClick={onLoad}>+ Load</button>
+                    <button className="tab-load tab-new" onClick={onNew} aria-label="New sheet">+<span className="tab-new-label">&nbsp;New</span></button>
                 </div>
             )}
         </div>
@@ -3419,6 +3468,13 @@ function TagAdder({ onAdd, onCancel, existing = [] }) {
 function EditableCell({ html, editMode, className, style, colSpan, cellKey, cellId, lockedBy,
         onCommit, onFocusCell, onDone, onAcquireLock, onReleaseLock }) {
     const ref = useRef(null);
+    // True once the user has actually changed content in this focus session, so
+    // we lock on *edit*, not on mere focus (clicking/tabbing through cells leaves
+    // them unlocked). Reset on blur.
+    const editedRef = useRef(false);
+    // Idle auto-commit timer: armed/reset on each edit; on fire it blurs the cell
+    // (committing + releasing the lock) so a walked-away editor stops camping it.
+    const idleTimer = useRef(null);
     // A peer is editing this cell: render it read-only and do not let it focus.
     const peerLocked = !!lockedBy;
 
@@ -3431,12 +3487,24 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, cell
         if (el.innerHTML !== next) el.innerHTML = next;
     }, [html, peerLocked]);
 
+    const clearIdle = () => { if (idleTimer.current) { clearTimeout(idleTimer.current); idleTimer.current = null; } };
+    // Tidy the timer if the cell unmounts mid-edit (e.g. a structural change).
+    useEffect(() => clearIdle, []);
+
     const handleFocus = () => {
         onFocusCell?.();
-        // Edit-intent: acquire the lock on focus (NOT on selection/click).
-        onAcquireLock?.(cellId);
+        // Selection only — the lock is deferred to the first real edit (handleInput).
+    };
+    const handleInput = () => {
+        // Edit-intent: acquire the lock on the first content change of this session.
+        if (!editedRef.current) { editedRef.current = true; onAcquireLock?.(cellId); }
+        // (Re)arm the idle auto-commit; quietly typing keeps resetting it.
+        clearIdle();
+        idleTimer.current = setTimeout(() => { ref.current?.blur(); }, IDLE_COMMIT_MS);
     };
     const handleBlur = () => {
+        clearIdle();
+        editedRef.current = false;
         onCommit(ref.current?.innerHTML ?? "");
         onDone?.();
         onReleaseLock?.(); // clean release on blur (also covers Escape, which blurs)
@@ -3476,7 +3544,7 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, cell
             <div key="editable" ref={ref} className="cell-note" contentEditable={editMode} suppressContentEditableWarning
                 data-placeholder={editMode ? "Add note" : ""}
                 dangerouslySetInnerHTML={{ __html: html || "" }}
-                onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} />
+                onFocus={handleFocus} onInput={handleInput} onBlur={handleBlur} onKeyDown={handleKeyDown} />
         </td>
     );
 }
@@ -3507,24 +3575,26 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
     if (mode === "tags") {
         const tags = cell.tags || [];
         // While a peer holds the lock, the tags cell is read-only: no select, no
-        // add/remove affordances. Tags edit is an edit-intent → acquire on entering
-        // edit (selecting in edit mode), release when deselected.
+        // add/remove affordances. Selecting only opens the editor; the lock is an
+        // edit-intent → acquired on the first actual tag add/remove, released when
+        // deselected.
+        const editTags = (next) => { onAcquireLock?.(cell.id); onTagsChange(next); };
         return (
             <td className={`${cls} cell-tags-mode${tags.length ? " cell-filled" : ""}`} colSpan={cell.colspan || undefined} style={style}
                 data-cell-key={cellKey}
-                onClick={peerLocked ? undefined : () => { onSelect(); if (editMode && !selected) onAcquireLock?.(cell.id); }}>
+                onClick={peerLocked ? undefined : () => { onSelect(); }}>
                 <div className="cell-tags" style={{ justifyContent: (cell.align || "left") === "center" ? "center" : "flex-start" }}>
                     {tags.map((t, i) => (
                         <span key={i} className="tag-chip" style={{ background: t.bg, color: t.fg }}>
                             {t.text}
                             {editMode && selected && !peerLocked && <span className="tag-x" title="remove"
-                                onClick={(e) => { e.stopPropagation(); onTagsChange(tags.filter((_, k) => k !== i)); }}>✕</span>}
+                                onClick={(e) => { e.stopPropagation(); editTags(tags.filter((_, k) => k !== i)); }}>✕</span>}
                         </span>
                     ))}
                     {!tags.length && <span className="cell-empty-hint">{editMode ? "Add tags" : "No tags"}</span>}
                 </div>
                 {editMode && selected && !peerLocked && <TagAdder existing={tags}
-                    onAdd={(t) => onTagsChange([...tags, t])}
+                    onAdd={(t) => editTags([...tags, t])}
                     onCancel={onDeselect} />}
                 <LockBadge lockedBy={lockedBy} />
             </td>
@@ -3877,7 +3947,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
             {/* Stage header — sticky (two rows when sub-stages exist) */}
             <div className="stage-outer">
                 <div className="scroll-hide" data-ss="">
-                    <table className="bp" style={{ minWidth: hdrW }}>
+                    <table className="bp" style={{ width: hdrW, minWidth: hdrW }}>
                         <BlueprintColGroup total={total} includeAddColumn={editMode} />
                         <tbody>
                             <tr>
@@ -3997,7 +4067,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
             {journey.subJourneys.map((sj, si) => (
                 <div key={si} className="bp-lane-wrap">
                     <div className="bpw" data-ss="">
-                        <table className="bp" style={{ minWidth: hdrW }}>
+                        <table className="bp" style={{ width: hdrW, minWidth: hdrW }}>
                             <BlueprintColGroup total={total} includeAddColumn={editMode} />
                             <tbody>
                                 {sj.rows.map((row, ri) => (
@@ -4583,6 +4653,35 @@ function App() {
         mirrorFromSocket(next, meta);
     }, [markCloudSaved, mirrorFromSocket, replaceJourneys]);
 
+    // Push the cell the user is actively editing to the server *before* a remote
+    // change is applied on top of it. The in-progress text lives only in the
+    // uncontrolled contentEditable DOM until blur; without this flush a concurrent
+    // remote op — a structural op that reshuffles the positional indices the
+    // blur-commit will read, or any op that re-renders the focused cell — can drop
+    // the not-yet-committed edit, with no lock badge (different cell → no lock).
+    // Keyed by the stable cell id (never positional) and a no-op once the DOM
+    // already matches state, so it only emits when there is real pending text.
+    const flushActiveEdit = useCallback(() => {
+        const cellId = editingCellIdRef.current;
+        if (!cellId) return;
+        const el = document.activeElement;
+        if (!el || !el.isContentEditable) return;
+        const html = el.innerHTML ?? "";
+        let storedHtml;
+        outer:
+        for (const j of journeysRef.current || []) {
+            for (const sj of j.subJourneys || []) {
+                for (const r of sj.rows || []) {
+                    for (const c of r.cells || []) {
+                        if (c.id === cellId) { storedHtml = c.html ?? ""; break outer; }
+                    }
+                }
+            }
+        }
+        if (storedHtml === undefined || storedHtml === html) return; // unknown id or unchanged
+        commitOp({ t: "cell.set", cellId, fields: { html }, ts: Date.now() });
+    }, [commitOp]);
+
     // Defer a remote cell.set only when it targets the cell we are actively
     // editing; a different cell can apply immediately (the Phase 9 headline win).
     const applyOrDeferRemoteOp = useCallback((op) => {
@@ -4594,8 +4693,11 @@ function App() {
                 return;
             }
         }
+        // Commit our own pending edit first so the incoming op can't clobber it,
+        // then apply the remote op on top of the merged state.
+        flushActiveEdit();
         applyRemoteOp(op);
-    }, [applyRemoteOp]);
+    }, [applyRemoteOp, flushActiveEdit]);
 
     // If a remote payload arrives while the user is actively editing a grid
     // cell, stash it and apply on the next blur (mirrors the popstate dance).
@@ -4982,7 +5084,27 @@ function App() {
         const p = await dbGetProject(id);
         if (!p) return;
         if (p.cloudMapId && getMapToken(p.cloudMapId)) {
-            await mountCloudMap(p.cloudMapId, getMapToken(p.cloudMapId), getMapSession(p.cloudMapId), { replaceRoute: false });
+            // Paint the cached local mirror instantly so the click feels responsive,
+            // then reconcile from the server in the background. We stay read-only and
+            // show a "Syncing…" badge until the latest server state lands, so nobody
+            // edits a stale snapshot before it's caught up.
+            setCurrentId(id);
+            replaceJourneys(hydrate(p.journeys || []), { skipSave: true });
+            clearHistory();
+            setTab(0);
+            setStandaloneName(p.name || "Shared map");
+            setLastSaved(p.cloudUpdatedAt || p.updatedAt || null);
+            setLastSavedBy(p.cloudUpdatedByName || null);
+            setViewOnly(true);
+            setEditMode(false);
+            setSync({ mapId: p.cloudMapId, role: p.cloudRole || null, status: "connecting", error: null });
+            setView("project");
+            localStorage.setItem(LAST_KEY, String(id));
+            mountCloudMap(p.cloudMapId, getMapToken(p.cloudMapId), getMapSession(p.cloudMapId), { replaceRoute: false })
+                .catch((err) => {
+                    // Keep the cached copy on screen (read-only) and flag that we're offline.
+                    setSync({ mapId: p.cloudMapId, role: p.cloudRole || null, status: "error", error: err.message || "Couldn't reach the server." });
+                });
             return;
         }
         setCurrentId(id);

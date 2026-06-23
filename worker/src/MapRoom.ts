@@ -152,6 +152,10 @@ export class MapRoom {
 
     // Send the current document immediately on connect.
     server.send(JSON.stringify(this.docMessage("doc.sync")));
+    // Also send the current cell-lock roster so existing peer locks show on load,
+    // not only after the next acquire/release elsewhere. (Presence is covered by
+    // the client's own presence.update on open.)
+    server.send(this.locksFrame());
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -481,6 +485,25 @@ export class MapRoom {
    */
   private broadcastLocks(except?: WebSocket): void {
     const sockets = this.state.getWebSockets();
+    const frame = this.locksFrame(except);
+    for (const s of sockets) {
+      if (s === except) continue;
+      try {
+        s.send(frame);
+      } catch {
+        /* peer going away; ignore */
+      }
+    }
+  }
+
+  /**
+   * Serialize the current fresh-lock roster as a `{t:"locks",...}` frame. Shared
+   * by broadcastLocks and the on-connect send so a freshly-joined socket sees
+   * existing locks immediately (otherwise the roster only arrives the next time
+   * SOMEONE acquires/releases a lock, so peers' locks appear invisible on load
+   * until you click a cell yourself). `except` skips one socket (close/error).
+   */
+  private locksFrame(except?: WebSocket): string {
     const now = Date.now();
     const locks: Array<{
       cellId: string;
@@ -489,7 +512,7 @@ export class MapRoom {
       color?: string;
       lockedAt: number;
     }> = [];
-    for (const s of sockets) {
+    for (const s of this.state.getWebSockets()) {
       if (s === except) continue;
       const a = s.deserializeAttachment() as SocketAttachment | null;
       if (!a || !a.editingCellId || !a.clientId || !a.lockedAt) continue;
@@ -502,15 +525,7 @@ export class MapRoom {
         lockedAt: a.lockedAt,
       });
     }
-    const frame = JSON.stringify({ t: "locks", locks });
-    for (const s of sockets) {
-      if (s === except) continue;
-      try {
-        s.send(frame);
-      } catch {
-        /* peer going away; ignore */
-      }
-    }
+    return JSON.stringify({ t: "locks", locks });
   }
 
   /**

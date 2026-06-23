@@ -18,6 +18,84 @@ See `collab-sync.md` for the design.
 
 ## Log
 
+### 2026-06-23 — Lock on edit (not focus) + idle auto-commit
+
+Two collaboration-ergonomics changes to cell locking:
+
+1. **Lock on first content change, not on focus.** `EditableCell` previously
+   acquired the lock in `handleFocus`, so merely clicking/tabbing into a cell
+   locked it and blocked peers. Now `handleFocus` only selects; an `onInput`
+   handler acquires the lock on the first real edit of the session (`editedRef`
+   guards so it fires once), and resets on blur. Tags cells likewise no longer
+   lock on select — an `editTags()` wrapper acquires on the first tag add/remove.
+   `execCommand` formatting (B/I/U) fires `input`, so it counts as an edit too.
+
+2. **Idle auto-commit.** A focused cell with no further edits for
+   `IDLE_COMMIT_MS` (30s) auto-blurs, which commits (`cell.set`) and releases the
+   lock — so a walked-away editor stops camping a cell. The timer is armed/reset
+   on each `onInput` and cleared on blur/unmount. 30s is comfortably above the 5s
+   heartbeat / 15s server TTL.
+
+Verified in the browser preview (standalone, non-synced path): blank journey →
+type into a cell → `input` fires, cell stays focused (idle armed, no premature
+blur) → blur commits and the text persists across re-render; no console errors.
+The lock/sync-specific behavior (acquire timing across peers, idle release
+freeing a peer) still needs a two-browser + worker session to confirm end to end.
+
+Known minor gap: a tags cell left *selected* after an edit has no idle
+auto-release (idle-commit is on the text `contentEditable`); it releases on
+deselect/disconnect as before.
+
+### 2026-06-23 — Fix: peer cell locks invisible until you click a cell
+
+On connect the DO sent only `doc.sync`, never the current lock roster
+(`handleSync`). The roster is otherwise emitted solely by `broadcastLocks`, which
+fires on acquire/release/disconnect — so a freshly-joined client saw existing
+peer locks only once *someone* changed a lock. Clicking a cell "fixed" it because
+your own acquire triggers a `broadcastLocks` back to all sockets, including you.
+(Presence is unaffected: the client announces presence on open, which broadcasts.)
+
+Fix: extracted the roster builder into `locksFrame(except?)` (shared with
+`broadcastLocks`) and send `locksFrame()` to the newly-accepted socket right after
+`doc.sync`, so existing locks render on load. `cd worker && npx tsc --noEmit`
+passes. Not re-run in a two-browser session (server-side change, single-browser
+preview can't exercise it).
+
+Lock semantics confirmed while here: acquired on **focus / edit-intent** (not on
+content change); held indefinitely while focused via a 5s client heartbeat;
+considered stale only after 15s without a heartbeat (`LOCK_TTL_MS`), with
+blur/Escape/tab-hidden/disconnect releasing immediately and a 5s DO alarm sweep
+as backstop.
+
+### 2026-06-23 — Fix: concurrent edit drops in-progress text
+
+Reported symptom: two people typing simultaneously in **different** cells — one
+edit lands, the other silently vanishes (no lock badge, since different cells
+never lock each other).
+
+Root cause (client, not protocol). Cell text is an **uncontrolled**
+`contentEditable` committed only **on blur** (`EditableCell.handleBlur`), keyed
+back to state by **positional** indices (`editCell`). While a user is mid-typing,
+the in-progress text lives *only in the DOM* — it has not been committed or
+emitted. `applyOrDeferRemoteOp` applied every inbound op immediately except a
+same-cell `cell.set`, so a peer's **structural op** (row/column insert/move/
+delete) would `replaceJourneys` under the typist's feet: the positional indices
+the pending blur-commit reads are now shifted, and the not-yet-committed text is
+dropped on the re-render. The Phase 9 two-WS harness never caught this because it
+exercised the protocol, not the browser blur-commit (see the Phase 9 note).
+
+Fix: `flushActiveEdit()` — before applying any non-deferred inbound op, commit
+the actively-edited cell to the server **keyed by its stable cell id** (never
+positional), as a `cell.set`. It is a no-op once the DOM already matches state,
+so it only emits real pending text. This guarantees an in-progress edit reaches
+the server (and merges into local state) before a concurrent remote op is applied
+on top, eliminating the silent drop. Same-cell `cell.set` deferral is unchanged;
+the legacy whole-doc `doc.sync/update/reject` defer path is untouched.
+
+Verified: app compiles + renders with no console errors. Full two-browser
+concurrency repro not re-run here (single-browser preview); correctness rests on
+the flush-before-apply ordering above.
+
 ### 2026-06-22 — Phase 9 done (atomic op-based sync)
 
 Phase 9 replaces the synced client's ordinary whole-document write path with
