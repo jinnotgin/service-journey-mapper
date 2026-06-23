@@ -88,6 +88,9 @@
         .ab-left{display:flex;align-items:center;gap:12px;min-width:0}
         .ab-back{display:inline-flex;align-items:center;gap:6px;background:var(--surface);color:var(--text);border:1px solid var(--border);padding:7px 11px;border-radius:8px;font-size:var(--fs-sm);font-weight:650;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;transition:background .15s,border-color .15s,box-shadow .15s}
         .ab-back:hover{background:var(--surface-2);border-color:var(--text-sec);box-shadow:0 1px 2px oklch(20% .006 70 / .08)}
+        .ab-back svg{width:15px;height:15px;stroke:currentColor;flex:0 0 auto}
+        .ab-trig{display:inline-flex;align-items:center;gap:6px}
+        .ab-trig svg{width:15px;height:15px;stroke:currentColor;flex:0 0 auto}
         .ab-brand{display:flex;align-items:center;min-width:0;max-width:min(760px,52vw);line-height:1.15;overflow:visible}
         .ab-title-wrap{position:relative;min-width:0;flex:1 1 0;overflow:visible}
         .ab-title{font-size:var(--fs-lg);font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);display:block;max-width:100%}
@@ -415,11 +418,19 @@
             .ab-brand{max-width:100%}
             .ab-brand .inline-title-input,.ch-hdr .inline-title-input{width:100%;min-width:0}
             .ab-btn{padding:5px 8px}
+            /* Compact the app bar: collapse button labels to icons, trim the
+               save status down to just "Saved" / "Saving…". */
+            .ab-actions{gap:8px}
+            .ab-back .ab-label,.ab-trig .ab-label,.ab-trig .ab-caret,.save-by{display:none}
+            .ab-back{padding:7px 9px}
+            .ab-actions .menu-trigger{padding:7px 9px}
+            .ab-seg button{padding:5px 10px}
             .ch-hdr{padding:12px 16px 10px}
             .ch-hdr h2{font-size:var(--fs-lg)}
-            .lib{padding:28px 16px 80px}
+            .lib{padding:28px 16px 80px;position:relative}
             .lib-head{grid-template-columns:1fr;align-items:start;gap:14px}
-            .lib-head h1{font-size:26px}
+            .lib-head h1{font-size:26px;padding-right:52px}
+            .lib-right .profile-wrap{position:absolute;top:28px;right:16px;z-index:5}
             .lib-actions{width:100%}
             .lib-actions .btn-s,.lib-actions .btn-p{flex:1}
             .project-row{grid-template-columns:minmax(0,1fr) 38px;gap:10px}
@@ -2122,8 +2133,24 @@ const LUCIDE_PATHS = {
     cloud: [
         <path key="1" d="M17.5 19H8a5 5 0 1 1 1.1-9.88A6 6 0 0 1 20 12.5 3.5 3.5 0 0 1 17.5 19Z" />
     ],
+    arrowLeft: [
+        <path key="1" d="m12 19-7-7 7-7" />,
+        <path key="2" d="M19 12H5" />
+    ],
     check: [
         <path key="1" d="M20 6 9 17l-5-5" />
+    ],
+    download: [
+        <path key="1" d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />,
+        <path key="2" d="M7 10l5 5 5-5" />,
+        <path key="3" d="M12 15V3" />
+    ],
+    share2: [
+        <circle key="1" cx="18" cy="5" r="3" />,
+        <circle key="2" cx="6" cy="12" r="3" />,
+        <circle key="3" cx="18" cy="19" r="3" />,
+        <line key="4" x1="8.59" x2="15.42" y1="13.51" y2="17.49" />,
+        <line key="5" x1="15.41" x2="8.59" y1="6.51" y2="10.49" />
     ],
     circleCheck: [
         <circle key="1" cx="12" cy="12" r="10" />,
@@ -2475,8 +2502,9 @@ function ShareControl({ sync, onEnableSync, onStopSharing, peers }) {
     if (sync.status !== "synced") {
         return (
             <button className="ab-back" onClick={handleEnable} disabled={sync.status === "enabling"}
-                title="Create a shareable cloud copy of this map">
-                {sync.status === "enabling" ? "Sharing…" : "Share map"}
+                title="Create a shareable cloud copy of this map" aria-label="Share map">
+                <LucideIcon name="share2" />
+                <span className="ab-label">{sync.status === "enabling" ? "Sharing…" : "Share map"}</span>
             </button>
         );
     }
@@ -2587,12 +2615,6 @@ function PresenceStack({ peers }) {
     );
 }
 
-function saveStatusLabel(saveState, lastSaved) {
-    if (saveState === "saving") return "Saving...";
-    if (!lastSaved) return "";
-    return `Saved ${fmtDate(lastSaved)}`;
-}
-
 function saveStatusTooltip(lastSaved, lastSavedBy) {
     if (!lastSaved) return "";
     const who = lastSavedBy || "you";
@@ -2604,7 +2626,6 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
         editMode, onSetEdit, canUndo, canRedo, onUndo, onRedo,
         sync, onEnableSync, onStopSharing, peers }) {
     const [promptCopied, setPromptCopied] = useState(false);
-    const savedLabel = saveStatusLabel(saveState, lastSaved);
     const savedTooltip = saveStatusTooltip(lastSaved, lastSavedBy);
     const copyPrompt = async (close, scope) => {
         await (scope === "project" ? onPromptProject() : onPromptSheet());
@@ -2617,7 +2638,9 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
             <div className="app-bar-main">
                 <div className="ab-left">
                     {(!viewOnly || sync.status === "synced") && (
-                        <button className="ab-back" onClick={onLibrary} title="Back to your projects">← Library</button>
+                        <button className="ab-back" onClick={onLibrary} title="Back to your projects" aria-label="Back to your projects">
+                            <LucideIcon name="arrowLeft" /><span className="ab-label">Library</span>
+                        </button>
                     )}
                     <div className="ab-brand">
                         <div className="ab-title-wrap">
@@ -2649,10 +2672,11 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                     {!viewOnly && <ShareControl sync={sync} onEnableSync={onEnableSync} onStopSharing={onStopSharing} peers={peers} />}
                     <div className="ab-status" aria-live="polite">
                         {saveState === "saving" ? (
-                            <span className="save-state save-saving">Saving...</span>
+                            <span className="save-state save-saving"><span className="save-dot" />Saving…</span>
                         ) : lastSaved ? (
                             <span className="save-state save-saved" title={savedTooltip}>
-                                <span className="save-dot" /><span className="save-by">{savedLabel}</span>
+                                <span className="save-dot" />Saved
+                                <span className="save-by">&nbsp;{fmtDate(lastSaved)}</span>
                             </span>
                         ) : null}
                     </div>
@@ -2666,7 +2690,11 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                     )}
                     {!viewOnly && (
                         canExport ? (
-                            <Menu trigger={promptCopied ? "Copied ✓" : "Export ▾"} align="right">
+                            <Menu align="right" trigger={promptCopied ? "Copied ✓" : (
+                                <span className="ab-trig">
+                                    <LucideIcon name="download" /><span className="ab-label">Export</span><span className="ab-caret" aria-hidden="true">▾</span>
+                                </span>
+                            )}>
                                 {(close) => (
                                     <>
                                         <button className="menu-item" onClick={() => { onStandaloneExport(); close(); }}>Export as read-only HTML</button>
