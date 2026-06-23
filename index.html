@@ -660,7 +660,7 @@
 <body>
 <div id="root"></div>
 <script type="text/babel" data-type="module">
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import Dexie from "dexie";
@@ -3495,7 +3495,7 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, cell
     // A peer is editing this cell: render it read-only and do not let it focus.
     const peerLocked = !!lockedBy;
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const el = ref.current;
         // When a peer holds the lock React controls this td (badge + html via
         // dangerouslySetInnerHTML), so don't imperatively touch innerHTML here.
@@ -3560,7 +3560,6 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, cell
             }}>
             <div key="editable" ref={ref} className="cell-note" contentEditable={editMode} suppressContentEditableWarning
                 data-placeholder={editMode ? "Add note" : ""}
-                dangerouslySetInnerHTML={{ __html: html || "" }}
                 onFocus={handleFocus} onInput={handleInput} onBlur={handleBlur} onKeyDown={handleKeyDown} />
         </td>
     );
