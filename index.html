@@ -94,8 +94,8 @@
         .ab-brand{display:flex;align-items:center;min-width:0;max-width:min(760px,52vw);line-height:1.15;overflow:visible}
         .ab-title-wrap{position:relative;min-width:0;flex:1 1 0;overflow:visible}
         .ab-title{font-size:var(--fs-lg);font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);display:block;max-width:100%}
-        .shared-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;margin-left:8px;color:var(--green);background:oklch(96% .018 150);border:1px solid oklch(84% .045 150);flex:0 0 auto}
-        .shared-badge svg{width:15px;height:15px;stroke:currentColor}
+        .cloud-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;margin-left:8px;color:var(--blue);background:oklch(96% .018 245);border:1px solid oklch(86% .035 245);flex:0 0 auto}
+        .cloud-badge svg{width:15px;height:15px;stroke:currentColor}
         .ab-spacer{flex:1 1 auto;min-width:8px}
         .inline-title{cursor:default}
         .inline-title.editable{cursor:text;border-radius:5px;transition:background .12s,box-shadow .12s}
@@ -514,7 +514,7 @@
         .menu-item.tiny{font-size:11px;font-weight:600;padding:6px 8px;color:var(--text-sec)}
         /* Share panel: live status header + per-link capability rows. */
         .share-status{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;background:var(--surface-2);border-radius:8px}
-        .share-status-icon{display:inline-flex;align-items:center;justify-content:center;color:var(--green);flex:0 0 auto}
+        .share-status-icon{display:inline-flex;align-items:center;justify-content:center;color:var(--blue);flex:0 0 auto}
         .share-status-icon svg{width:15px;height:15px;stroke:currentColor}
         .share-row-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
         .share-cap{display:flex;align-items:center;gap:7px;font-size:var(--fs-xs);font-weight:600;color:var(--text);min-width:0}
@@ -2564,7 +2564,7 @@ function ShareControl({ sync, onEnableSync, onStopSharing, peers }) {
     const peerCount = peers?.length || 0;
     const trigger = (
         <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-            <span className="share-status-icon"><LucideIcon name="link" /></span>
+            <span className="share-status-icon"><LucideIcon name="cloud" /></span>
             <span className="share-trig-label">Shared</span>
             {peerCount > 0 && <span style={{ color: "var(--text-sec)", fontWeight: 600 }}>· {peerCount}</span>}
             <span aria-hidden="true">▾</span>
@@ -2573,7 +2573,7 @@ function ShareControl({ sync, onEnableSync, onStopSharing, peers }) {
     const statusHeader = (
         <div className="share-status share-status-on">
             <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
-                <span className="share-status-icon"><LucideIcon name="link" /></span>
+                <span className="share-status-icon"><LucideIcon name="cloud" /></span>
                 <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: "var(--fs-sm)", fontWeight: 600 }}>Sharing is on</div>
                     <div style={{ fontSize: "11px", color: "var(--text-sec)" }}>
@@ -2694,8 +2694,8 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                                 disabled={!currentName || viewOnly} onCommit={onRenameCurrent} />
                         </div>
                         {sync.status === "synced" && (
-                            <span className="shared-badge" title={`Shared link (${sync.role || "shared"})`} aria-label="Shared link">
-                                <LucideIcon name="link" />
+                            <span className="cloud-badge" title={`Cloud copy (${sync.role || "shared"})`} aria-label="Cloud copy">
+                                <LucideIcon name="cloud" />
                             </span>
                         )}
                         {sync.status === "connecting" && (
