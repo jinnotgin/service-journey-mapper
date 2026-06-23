@@ -662,12 +662,12 @@
         .comments-tab{position:fixed;right:18px;bottom:56px;z-index:150;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;padding:8px 16px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:var(--fs-xs);font-weight:750;box-shadow:var(--shadow-md);cursor:pointer}
         .comments-tab:hover{background:var(--surface-2)}
         .comments-tab svg{width:15px;height:15px;display:block;stroke:currentColor;flex:0 0 auto}
-        .comments-count{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:800}
+        .comments-count{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;padding:0 5px;border-radius:999px;border:1px solid oklch(72% .075 95 / .72);background:oklch(93.5% .075 95);color:oklch(31% .045 75);font-size:10px;font-weight:800}
         .comments-panel{position:fixed;right:14px;top:calc(var(--appbar-h,52px) + 12px);bottom:54px;z-index:150;width:min(380px,calc(100vw - 28px));display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);overflow:hidden}
         .comments-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 13px;border-bottom:1px solid var(--border-light);background:var(--ink-bar)}
         .comments-title{font-size:var(--fs-sm);font-weight:800}
         .comments-close{width:28px;height:28px;border:1px solid var(--border);border-radius:7px;background:var(--surface);cursor:pointer;color:var(--text);font-weight:800}
-        .comments-body{display:flex;flex-direction:column;gap:4px;padding:8px 9px 14px;overflow-y:auto}
+        .comments-body{display:flex;flex-direction:column;gap:0;padding:8px 9px 14px;overflow-y:auto}
         /* --- guidance when nothing selected --- */
         .comment-hint{display:flex;align-items:flex-start;gap:9px;margin:6px 4px 10px;padding:13px 13px;border:1px dashed var(--border);border-radius:9px;background:var(--surface-2);color:var(--text-sec);font-size:var(--fs-sm);line-height:1.45}
         .comment-hint-icon{flex-shrink:0;display:inline-flex;width:24px;height:24px;align-items:center;justify-content:center;border-radius:7px;background:var(--surface);border:1px solid var(--border-light);color:var(--text-sec)}
@@ -688,15 +688,20 @@
         .comment-compose textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
         .comment-compose-actions{display:flex;justify-content:flex-end;gap:7px}
         .comment-compose-actions .btn-s,.comment-compose-actions .btn-p{padding:7px 14px;font-size:var(--fs-xs)}
-        /* --- threads: content first, chrome on demand --- */
-        .comment-thread{display:grid;gap:7px;padding:11px 11px 9px;border-radius:9px;background:var(--surface);border:1px solid transparent;transition:border-color .14s ease-out,background .14s ease-out}
-        .comment-thread + .comment-thread{margin-top:2px}
-        .comment-thread:hover,.comment-thread:focus-within{background:var(--surface-2);border-color:var(--border-light)}
-        .comment-thread.resolved{opacity:.6}
-        .comment-thread.orphaned{border-color:oklch(84% .065 82);border-style:dashed;background:oklch(98.5% .018 82)}
-        .comment-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:14px}
-        .comment-anchor{min-width:0;font-size:var(--fs-2xs);font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text-sec);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .comment-status{font-size:10px;font-weight:800;color:var(--text-sec);text-transform:uppercase;letter-spacing:.07em}
+        /* --- threads: distinct cards, each a doorway to its cell --- */
+        .comment-thread{display:grid;gap:7px;padding:11px 12px 9px;border-radius:9px;background:var(--surface);border:1px solid var(--border-light);box-shadow:0 1px 2px oklch(20% .006 70 / .04);transition:border-color .14s ease-out,background .14s ease-out,box-shadow .14s ease-out,transform .14s ease-out}
+        .comment-thread + .comment-thread{margin-top:7px}
+        .comment-thread.locatable{cursor:pointer}
+        .comment-thread.locatable:hover{background:var(--surface);border-color:oklch(72% .075 95 / .85);box-shadow:0 4px 14px oklch(20% .006 70 / .1);transform:translateY(-1px)}
+        .comment-thread.locatable:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+        .comment-thread.resolved{opacity:.6;box-shadow:none}
+        .comment-thread.orphaned{border-color:oklch(84% .065 82);border-style:dashed;background:oklch(98.5% .018 82);cursor:default}
+        .comment-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:16px}
+        .comment-anchor{display:flex;align-items:center;gap:5px;min-width:0;font-size:var(--fs-xs);font-weight:750;color:var(--text);overflow:hidden}
+        .comment-anchor svg{flex:0 0 auto;width:13px;height:13px;color:oklch(56% .085 90)}
+        .comment-anchor-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .comment-thread.locatable:hover .comment-anchor{color:oklch(40% .075 80)}
+        .comment-status{flex:0 0 auto;font-size:10px;font-weight:800;color:var(--text-sec);text-transform:uppercase;letter-spacing:.06em}
         .comment-msg{display:grid;gap:2px;padding:1px 0 5px}
         .comment-msg + .comment-msg{border-top:1px solid var(--border-light);padding-top:6px}
         .comment-author{font-size:var(--fs-2xs);font-weight:800;color:var(--text-sec)}
@@ -724,6 +729,17 @@
         .comment-overflow-item.danger{color:oklch(52% .17 25)}
         .comment-overflow-item.danger:hover{background:oklch(96% .04 25)}
         .comments-empty{padding:24px 10px;text-align:center;color:var(--text-sec);font-size:var(--fs-sm)}
+        /* comment button in the cell toolbar: distinct from format controls */
+        .tb-btn.tb-comment{color:oklch(40% .075 80)}
+        .tb-btn.tb-comment svg{color:oklch(56% .085 90)}
+        .tb-btn.tb-comment:hover{background:oklch(96.5% .045 92);border-color:oklch(78% .07 92)}
+        /* flash ring drawn on a commented cell when its thread is clicked */
+        @keyframes cellLocateFlash{
+            0%{box-shadow:0 0 0 0 oklch(72% .12 92 / 0),0 0 0 3px oklch(72% .12 92 / .9)}
+            18%{box-shadow:0 0 0 6px oklch(80% .1 92 / .35),0 0 0 3px oklch(70% .13 92 / .95)}
+            100%{box-shadow:0 0 0 10px oklch(80% .1 92 / 0),0 0 0 3px oklch(72% .12 92 / 0)}
+        }
+        .cell-locate-flash{position:relative;z-index:6;border-radius:8px;animation:cellLocateFlash 1.5s ease-out forwards}
 
         /* per-cell save / discard mini-toolbar */
 
@@ -2434,6 +2450,10 @@ const LUCIDE_PATHS = {
     messageSquare: [
         <path key="1" d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
     ],
+    mapPin: [
+        <path key="1" d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />,
+        <circle key="2" cx="12" cy="10" r="3" />
+    ],
     monitor: [
         <rect key="1" width="20" height="14" x="2" y="3" rx="2" />,
         <path key="2" d="M8 21h8" />,
@@ -3738,7 +3758,7 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, cell
     if (peerLocked) {
         return (
             <td className={className} style={style} colSpan={colSpan}
-                data-cell-key={cellKey}
+                data-cell-key={cellKey} data-cell-id={cellId}
                 title={`Editing: ${lockedBy.name || "Someone"}`}>
                 <div key="locked" className="cell-note cell-locked-html" dangerouslySetInnerHTML={{ __html: html || "" }} />
                 <CommentBadge count={commentCount} onOpen={onOpenComments} />
@@ -3749,7 +3769,7 @@ function EditableCell({ html, editMode, className, style, colSpan, cellKey, cell
 
     return (
         <td className={className} style={style} colSpan={colSpan}
-            data-cell-key={cellKey}
+            data-cell-key={cellKey} data-cell-id={cellId}
             onMouseDown={(e) => {
                 if (!editMode || e.target !== e.currentTarget) return;
                 e.preventDefault();
@@ -3806,7 +3826,7 @@ function Cell({ cell, editMode, selected, rowBg, cellKey, onSelect, onEditHtml, 
         const editTags = (next) => { onAcquireLock?.(cell.id); onTagsChange(next); };
         return (
             <td className={`${cls} cell-tags-mode${tags.length ? " cell-filled" : ""}`} colSpan={cell.colspan || undefined} style={style}
-                data-cell-key={cellKey}
+                data-cell-key={cellKey} data-cell-id={cell.id}
                 onClick={peerLocked ? undefined : () => { onSelect(); }}>
                 <div className="cell-tags" style={{ justifyContent: (cell.align || "left") === "center" ? "center" : "flex-start" }}>
                     {tags.map((t, i) => (
@@ -3966,7 +3986,7 @@ function TextColorControl({ disabled }) {
 // ═══════════════════════════════════════
 // FORMAT TOOLBAR (acts on the selected cell)
 // ═══════════════════════════════════════
-function FormatToolbar({ cell, selectedKey, onMode, onAlign }) {
+function FormatToolbar({ cell, selectedKey, onMode, onAlign, onComment }) {
     const toolbarRef = useRef(null);
     const lastSizeRef = useRef({ width: 0, height: 0 });
     const [pos, setPos] = useState(null);
@@ -4065,6 +4085,13 @@ function FormatToolbar({ cell, selectedKey, onMode, onAlign }) {
                 <button className="tb-btn" disabled={mode === "tags"} title={`Italic (${modCmd}I)`} onMouseDown={fmt("italic")} style={{ fontStyle: "italic" }}>I</button>
                 <button className="tb-btn" disabled={mode === "tags"} title={`Underline (${modCmd}U)`} onMouseDown={fmt("underline")} style={{ textDecoration: "underline" }}>U</button>
                 <TextColorControl disabled={mode === "tags"} />
+            </div>
+            <div className="tb-sep" />
+            <div className="tb-group">
+                <button className="tb-btn tb-comment" title="Comment on this cell" aria-label="Comment on this cell"
+                    onMouseDown={keepFocus(() => onComment?.())}>
+                    <LucideIcon name="messageSquare" />Comment
+                </button>
             </div>
         </div>, document.body
     );
@@ -4362,13 +4389,15 @@ function splitAnchorLabel(label) {
     return { primary: label.slice(0, idx), secondary: label.slice(idx + 3) };
 }
 
-function CommentThread({ thread, info, canComment, onAddMessage, onResolveThread, onReopenThread, onDeleteThread }) {
+function CommentThread({ thread, info, canComment, onLocate, onAddMessage, onResolveThread, onReopenThread, onDeleteThread }) {
     const [replying, setReplying] = useState(false);
     const [reply, setReply] = useState("");
     const [menuOpen, setMenuOpen] = useState(false);
     const replyRef = useRef(null);
     const resolved = thread.status === "resolved";
     const orphaned = !info.exists;
+    const ctx = splitAnchorLabel(info.label);
+    const locatable = thread.anchor?.kind === "cell" && !orphaned;
 
     useEffect(() => { if (replying) replyRef.current?.focus(); }, [replying]);
 
@@ -4380,12 +4409,22 @@ function CommentThread({ thread, info, canComment, onAddMessage, onResolveThread
         setReplying(false);
     };
 
+    const locate = () => { if (locatable) onLocate?.(thread.anchor); };
+
     return (
-        <section className={`comment-thread${resolved ? " resolved" : ""}${orphaned ? " orphaned" : ""}`}>
+        <section className={`comment-thread${resolved ? " resolved" : ""}${orphaned ? " orphaned" : ""}${locatable ? " locatable" : ""}`}
+            onClick={locatable ? locate : undefined}
+            role={locatable ? "button" : undefined}
+            tabIndex={locatable ? 0 : undefined}
+            title={locatable ? "Go to this cell" : undefined}
+            onKeyDown={locatable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); locate(); } } : undefined}>
             <div className="comment-meta">
-                <div className="comment-anchor" title={info.label}>{info.label}</div>
+                <div className="comment-anchor" title={info.label}>
+                    {locatable && <LucideIcon name="mapPin" />}
+                    <span className="comment-anchor-label">{ctx.primary}</span>
+                </div>
                 {(resolved || orphaned) && (
-                    <div className="comment-status">{orphaned ? "Orphaned" : "Resolved"}</div>
+                    <div className="comment-status">{orphaned ? "Cell removed" : "Resolved"}</div>
                 )}
             </div>
             {(thread.messages || []).map((m) => (
@@ -4396,7 +4435,7 @@ function CommentThread({ thread, info, canComment, onAddMessage, onResolveThread
             ))}
             {canComment && !resolved && (
                 replying ? (
-                    <div className="comment-reply">
+                    <div className="comment-reply" onClick={(e) => e.stopPropagation()}>
                         <textarea ref={replyRef} value={reply} placeholder="Write a reply…"
                             onChange={(e) => setReply(e.target.value)}
                             onKeyDown={(e) => {
@@ -4411,7 +4450,7 @@ function CommentThread({ thread, info, canComment, onAddMessage, onResolveThread
                 ) : null
             )}
             {canComment && (
-                <div className="comment-thread-actions">
+                <div className="comment-thread-actions" onClick={(e) => e.stopPropagation()}>
                     <div className="comment-actions-left">
                         {!resolved && !replying && (
                             <button type="button" className="comment-mini" onClick={() => setReplying(true)}>Reply</button>
@@ -4444,6 +4483,7 @@ function CommentThread({ thread, info, canComment, onAddMessage, onResolveThread
 }
 
 function CommentsPanel({ open, onOpen, onClose, journeys, comments, selectedAnchor, activeAnchor,
+        composeRequest, onLocate,
         canComment, onCreateThread, onAddMessage, onResolveThread, onReopenThread, onDeleteThread }) {
     const [draft, setDraft] = useState("");
     const [composing, setComposing] = useState(false);
@@ -4459,6 +4499,11 @@ function CommentsPanel({ open, onOpen, onClose, journeys, comments, selectedAnch
     // Collapse the composer when the selection goes away.
     useEffect(() => { if (!selectedAnchor) { setComposing(false); setDraft(""); } }, [selectedAnchor]);
     useEffect(() => { if (composing) draftRef.current?.focus(); }, [composing]);
+    // The cell toolbar's "Comment" button bumps composeRequest: open the composer
+    // for the selected cell and focus it.
+    useEffect(() => {
+        if (composeRequest && selectedAnchor) setComposing(true);
+    }, [composeRequest]);
 
     const submitDraft = () => {
         const body = draft.trim();
@@ -4528,6 +4573,7 @@ function CommentsPanel({ open, onOpen, onClose, journeys, comments, selectedAnch
                     <CommentThread key={thread.id} thread={thread}
                         info={describeAnchor(journeys, thread.anchor)}
                         canComment={canComment}
+                        onLocate={onLocate}
                         onAddMessage={onAddMessage}
                         onResolveThread={onResolveThread}
                         onReopenThread={onReopenThread}
@@ -4547,6 +4593,7 @@ function App() {
     const [commentsOpen, setCommentsOpen] = useState(false);
     const [activeCommentAnchor, setActiveCommentAnchor] = useState(null);
     const [lastCommentAnchor, setLastCommentAnchor] = useState(null);
+    const [composeRequest, setComposeRequest] = useState(0);
     const [tab, setTab] = useState(0);
     const [modal, setModal] = useState(false);
     // "library" = home screen listing projects; "project" = working inside one.
@@ -5255,6 +5302,28 @@ function App() {
     const openCommentsForAnchor = useCallback((anchor) => {
         setActiveCommentAnchor(anchor || null);
         setCommentsOpen(true);
+    }, []);
+
+    // From the cell toolbar's "Comment" button: open the panel filtered to the
+    // selected cell and jump straight into the composer (skip the stub).
+    const startCommentForSelected = useCallback(() => {
+        if (!selectedCommentAnchor) return;
+        setActiveCommentAnchor(selectedCommentAnchor);
+        setCommentsOpen(true);
+        setComposeRequest((n) => n + 1);
+    }, [selectedCommentAnchor]);
+
+    // Scroll a commented cell into view and flash a highlight ring on it.
+    const locateCommentCell = useCallback((anchor) => {
+        if (anchor?.kind !== "cell" || !anchor.cellId) return;
+        const el = document.querySelector(`[data-cell-id="${anchor.cellId}"]`);
+        if (!el) return;
+        el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+        el.classList.remove("cell-locate-flash");
+        // Reflow so the animation restarts even on repeated clicks.
+        void el.offsetWidth;
+        el.classList.add("cell-locate-flash");
+        window.setTimeout(() => el.classList.remove("cell-locate-flash"), 1600);
     }, []);
 
     const messageFor = useCallback((body) => ({
@@ -6024,7 +6093,8 @@ function App() {
             {!viewOnly && editMode && journeys.length > 0 && (
                 <FormatToolbar cell={selectedCell} selectedKey={selectedKey}
                     onMode={(m) => selected && handleCellMode(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, m)}
-                    onAlign={(a) => selected && handleCellAlign(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, a)} />
+                    onAlign={(a) => selected && handleCellAlign(selected.jIdx, selected.sjIdx, selected.rowIdx, selected.cellIdx, a)}
+                    onComment={startCommentForSelected} />
             )}
             <main className="main-content">
                 {journeys.length === 0 ? (
@@ -6050,6 +6120,8 @@ function App() {
                 journeys={journeys} comments={comments}
                 selectedAnchor={composerAnchor}
                 activeAnchor={activeCommentAnchor}
+                composeRequest={composeRequest}
+                onLocate={locateCommentCell}
                 canComment={!viewOnly && sync.role !== "viewer"}
                 onCreateThread={createCommentThread}
                 onAddMessage={addCommentMessage}
