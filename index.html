@@ -94,8 +94,11 @@
         .ab-brand{display:flex;align-items:center;min-width:0;max-width:min(760px,52vw);line-height:1.15;overflow:visible}
         .ab-title-wrap{position:relative;min-width:0;flex:1 1 0;overflow:visible}
         .ab-title{font-size:var(--fs-lg);font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);display:block;max-width:100%}
-        .cloud-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;margin-left:8px;color:var(--blue);background:oklch(96% .018 245);border:1px solid oklch(86% .035 245);flex:0 0 auto}
+        .cloud-badge{position:relative;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;margin-left:8px;color:var(--blue);background:oklch(96% .018 245);border:1px solid oklch(86% .035 245);flex:0 0 auto}
         .cloud-badge svg{width:15px;height:15px;stroke:currentColor}
+        .cloud-badge.syncing{color:oklch(50% .125 245);background:oklch(96.8% .022 245);border-color:oklch(84% .045 245)}
+        .cloud-badge.syncing svg{animation:sync-cloud-breathe 1.4s ease-in-out infinite}
+        .cloud-badge .sync-dot{position:absolute;right:-2px;top:-2px;width:7px;height:7px;border-radius:999px;background:var(--blue);border:2px solid var(--ink-bar);animation:sync-pulse 1s ease-in-out infinite}
         .ab-spacer{flex:1 1 auto;min-width:8px}
         .inline-title{cursor:default}
         .inline-title.editable{cursor:text;border-radius:5px;transition:background .12s,box-shadow .12s}
@@ -136,9 +139,9 @@
         .save-dot{width:7px;height:7px;border-radius:999px;display:inline-block;background:var(--green)}
         .save-saving{color:oklch(82% .05 80)}
         .save-saved{color:var(--text-sec)}
-        .save-syncing{color:var(--blue)}
         .save-offline{color:var(--red)}
         .sync-dot{width:7px;height:7px;border-radius:999px;display:inline-block;background:var(--blue);animation:sync-pulse 1s ease-in-out infinite}
+        @keyframes sync-cloud-breathe{0%,100%{opacity:.72}50%{opacity:1}}
         @keyframes sync-pulse{0%,100%{opacity:.3}50%{opacity:1}}
         .save-by{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
@@ -2699,8 +2702,9 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                             </span>
                         )}
                         {sync.status === "connecting" && (
-                            <span className="save-state save-syncing" title="Syncing the latest changes — view only until ready" aria-label="Syncing">
-                                <span className="sync-dot" />Syncing…
+                            <span className="cloud-badge syncing" title="Syncing latest cloud copy. View only until ready." aria-label="Syncing cloud copy">
+                                <LucideIcon name="cloud" />
+                                <span className="sync-dot" aria-hidden="true" />
                             </span>
                         )}
                         {sync.status === "error" && (
