@@ -5049,9 +5049,17 @@ function App() {
                 return;
             }
         }
-        // Commit our own pending edit first so the incoming op can't clobber it,
-        // then apply the remote op on top of the merged state.
-        flushActiveEdit();
+        // For a remote cell.set targeting a *different* cell, there is no risk
+        // of positional displacement — the active editor's DOM will remain
+        // mounted and intact.  Calling flushActiveEdit() here would prematurely
+        // commit the local user's in-progress draft and broadcast it to all
+        // peers before the local user has finished typing / lost focus.
+        //
+        // Only structural ops (row, column, stage, etc.) can reshuffle indices
+        // or unmount the focused cell, so we only flush for those.
+        if (op.t !== "cell.set") {
+            flushActiveEdit();
+        }
         applyRemoteOp(op);
     }, [applyRemoteOp, flushActiveEdit]);
 
