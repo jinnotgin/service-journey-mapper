@@ -3763,8 +3763,15 @@ function FormatToolbar({ cell, selectedKey, onMode, onAlign }) {
         if (!selectedKey) { setPos(null); return; }
         const anchor = document.querySelector(`[data-cell-key="${selectedKey}"]`);
         if (!anchor) { setPos(null); return; }
-        const visualAnchor = anchor.querySelector(".cell-note, .cell-tags") || anchor;
-        const r = visualAnchor.getBoundingClientRect();
+        const anchorRect = anchor.getBoundingClientRect();
+        const rowRect = anchor.classList.contains("cell-tags-mode")
+            ? anchor.closest("tr")?.getBoundingClientRect()
+            : null;
+        const visualAnchor = rowRect ? null : (anchor.querySelector(".cell-note") || anchor);
+        const visualRect = visualAnchor?.getBoundingClientRect();
+        const r = rowRect
+            ? { left: anchorRect.left, width: anchorRect.width, top: rowRect.top, bottom: rowRect.bottom }
+            : visualRect;
         const margin = 8;
         const gap = 8;
         const measuredW = toolbarRef.current?.offsetWidth || 0;
