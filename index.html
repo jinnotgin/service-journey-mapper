@@ -214,11 +214,11 @@
         /* Stage header cells. The label rail stays an OPAQUE canvas tile so
            columns scrolling underneath it never bleed through. */
         .stg-ll{background:var(--canvas)!important;color:var(--text-sec)!important;text-align:left!important}
-        .stg-c{min-width:260px;background:transparent!important;color:var(--text)!important;font-weight:700!important;font-size:var(--fs-md)!important;letter-spacing:0!important;text-align:left!important;vertical-align:middle!important;padding:9px 6px!important}
+        .stg-c{min-width:260px;background:transparent!important;color:var(--text)!important;font-weight:700!important;font-size:var(--fs-md)!important;letter-spacing:0!important;text-align:left!important;vertical-align:middle!important;padding:5px 6px!important}
         .stg-empty-subrow{vertical-align:top!important}
         /* Stage card spans the full stage width (shows coverage); the label
            inside is sticky so it stays readable across a wide stage. */
-        .stage-card{display:flex;align-items:center;justify-content:flex-start;gap:9px;min-height:36px;margin:0 3px;padding:7px 11px 7px 8px;border:1px solid oklch(84% .01 70 / .78);border-radius:9px;background:oklch(98.4% .005 70);box-shadow:0 1px 2px oklch(20% .006 70 / .04);text-align:left}
+        .stage-card{display:flex;align-items:center;justify-content:flex-start;gap:9px;min-height:32px;margin:0 3px 2px;padding:5px 11px 5px 8px;border:1px solid oklch(84% .01 70 / .78);border-radius:9px;background:oklch(98.4% .005 70);box-shadow:0 1px 2px oklch(20% .006 70 / .04);text-align:left}
         .stage-card-label{position:sticky;left:var(--stage-label-left);display:inline-flex;align-items:center;gap:9px;min-width:0;max-width:100%}
         .stage-title{line-height:1.25;overflow-wrap:anywhere}
 
@@ -259,8 +259,8 @@
         /* Line of visibility = the blueprint's defining moment. A tall, quiet
            band of canvas separates the frontstage cluster from the backstage
            cluster, with a single dashed boundary floating through it. */
-        .row-divider>.ll{background:var(--canvas)!important;color:var(--text-sec)!important;border-bottom:0!important;vertical-align:middle!important}
-        .row-divider>.dc{background:transparent!important;color:var(--text-sec);font-weight:700;text-align:center;padding:16px 12px!important;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:1.3px;border-bottom:0!important;vertical-align:middle!important}
+        .row-divider>.ll{background:var(--canvas)!important;color:var(--text-sec)!important;border-bottom:0!important;vertical-align:middle!important;padding-top:8px!important;padding-bottom:8px!important}
+        .row-divider>.dc{background:transparent!important;color:var(--text-sec);font-weight:700;text-align:center;padding:8px 12px!important;font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:1.3px;border-bottom:0!important;vertical-align:middle!important}
         .row-divider .lane-label{align-items:center}
         .row-divider .lane-main{color:var(--text-sec)}
         /* The divider is a pure boundary: any cell content is made weightless
@@ -576,8 +576,8 @@
         .add-row-bar.drop-end{box-shadow:inset 0 3px 0 var(--accent);background:var(--accent-soft)}
 
         /* sub-stage header row */
-        .sub-c{background:transparent!important;color:var(--text-sec)!important;font-weight:600!important;font-size:var(--fs-xs)!important;text-align:center!important;vertical-align:middle!important;border:0!important;padding:10px 12px!important}
-        .step-chip{display:flex;align-items:center;justify-content:flex-start;min-height:30px;margin:0 3px;padding:5px 10px;border:1px solid oklch(86% .01 70 / .65);border-radius:8px;background:oklch(98.8% .004 70);box-shadow:0 1px 1px oklch(20% .006 70 / .025);line-height:1.2}
+        .sub-c{background:transparent!important;color:var(--text-sec)!important;font-weight:600!important;font-size:var(--fs-xs)!important;text-align:center!important;vertical-align:middle!important;border:0!important;padding:4px 12px 7px!important}
+        .step-chip{display:flex;align-items:center;justify-content:flex-start;min-height:28px;margin:0 3px;padding:4px 10px;border:1px solid oklch(86% .01 70 / .65);border-radius:8px;background:oklch(98.8% .004 70);box-shadow:0 1px 1px oklch(20% .006 70 / .025);line-height:1.2}
         .step-chip-label{position:sticky;left:var(--stage-label-left);display:inline-block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
         /* add column / add row affordances */
