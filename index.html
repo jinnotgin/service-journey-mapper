@@ -3768,9 +3768,11 @@ function FormatToolbar({ cell, selectedKey, onMode, onAlign }) {
         const anchor = document.querySelector(`[data-cell-key="${selectedKey}"]`);
         if (!anchor) { setPos(null); return; }
         const anchorRect = anchor.getBoundingClientRect();
+        // Tags open an inline editor, so place the toolbar after the whole row.
         const rowRect = anchor.classList.contains("cell-tags-mode")
             ? anchor.closest("tr")?.getBoundingClientRect()
             : null;
+        // Text-like cells stay tied to their visible note surface.
         const visualAnchor = rowRect ? null : (anchor.querySelector(".cell-note") || anchor);
         const visualRect = visualAnchor?.getBoundingClientRect();
         const r = rowRect
