@@ -147,7 +147,7 @@
         .save-by{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
         /* ===== MAIN ===== */
-        .main-content{padding-bottom:76px;min-height:60vh}
+        .main-content{padding-bottom:64px;min-height:60vh}
 
         /* ===== EMPTY ===== */
         .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:55vh;gap:8px;text-align:center;padding:48px 20px}
@@ -238,12 +238,8 @@
         /* Canvas inset lives on the non-scrolling wrapper, NOT the scroll
            container, so nothing can scroll into the gap left of the sticky rail. */
         .bp-lane-wrap{padding:0 var(--canvas-pad);background:var(--canvas)}
-        .bpw{overflow-x:auto;background:var(--canvas);padding:0 0 var(--lane-gap)}
-        .bpw::-webkit-scrollbar{height:10px}
-        .bpw::-webkit-scrollbar-track{background:var(--surface-2)}
-        .bpw::-webkit-scrollbar-thumb{background:var(--border);border-radius:5px;border:2px solid var(--surface-2)}
-        .bpw::-webkit-scrollbar-thumb:hover{background:var(--text-sec)}
-        .bpw{scrollbar-width:thin;scrollbar-color:var(--border) var(--surface-2)}
+        .bpw{overflow-x:auto;background:var(--canvas);padding:0 0 var(--lane-gap);scrollbar-width:none;-ms-overflow-style:none}
+        .bpw::-webkit-scrollbar{display:none}
         .journey-view{position:relative}
         .journey-scrollbar{position:fixed;left:0;right:0;bottom:var(--journey-scrollbar-bottom);z-index:45;overflow-x:auto;overflow-y:hidden;height:18px;background:var(--canvas);border-top:1px solid var(--border-light);box-shadow:0 -8px 18px -14px oklch(20% .006 70 / .24);scrollbar-width:thin;scrollbar-color:var(--border) var(--surface-2)}
         .journey-scrollbar::-webkit-scrollbar{height:12px}
@@ -616,7 +612,7 @@
         .ins-btn:hover{background:var(--accent-soft);border-color:var(--accent)}
         .insert-zone:hover>.ins-btn,.insert-zone:focus-within>.ins-btn{opacity:1;pointer-events:auto}
         /* edit-mode-only breathing room below the last lane (hidden in view/print) */
-        .edit-bottom-pad{height:120px}
+        .edit-bottom-pad{height:36px}
 
         /* Selection lives on the note surface only, never the cell rectangle,
            so editing never reveals the underlying table grid. */
