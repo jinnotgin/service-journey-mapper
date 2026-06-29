@@ -78,6 +78,7 @@
             --stage-label-left: 192px;
             --appbar-h: 52px;
             --toolbar-h: 0px;
+            --journey-scrollbar-bottom: 42px;
         }
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:var(--fs-md);line-height:1.5;-webkit-font-smoothing:antialiased}
@@ -146,7 +147,7 @@
         .save-by{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
         /* ===== MAIN ===== */
-        .main-content{padding-bottom:50px;min-height:60vh}
+        .main-content{padding-bottom:76px;min-height:60vh}
 
         /* ===== EMPTY ===== */
         .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:55vh;gap:8px;text-align:center;padding:48px 20px}
@@ -243,6 +244,13 @@
         .bpw::-webkit-scrollbar-thumb{background:var(--border);border-radius:5px;border:2px solid var(--surface-2)}
         .bpw::-webkit-scrollbar-thumb:hover{background:var(--text-sec)}
         .bpw{scrollbar-width:thin;scrollbar-color:var(--border) var(--surface-2)}
+        .journey-view{position:relative}
+        .journey-scrollbar{position:fixed;left:0;right:0;bottom:var(--journey-scrollbar-bottom);z-index:45;overflow-x:auto;overflow-y:hidden;height:18px;background:var(--canvas);border-top:1px solid var(--border-light);box-shadow:0 -8px 18px -14px oklch(20% .006 70 / .24);scrollbar-width:thin;scrollbar-color:var(--border) var(--surface-2)}
+        .journey-scrollbar::-webkit-scrollbar{height:12px}
+        .journey-scrollbar::-webkit-scrollbar-track{background:var(--surface-2)}
+        .journey-scrollbar::-webkit-scrollbar-thumb{background:var(--border);border-radius:999px;border:3px solid var(--surface-2)}
+        .journey-scrollbar::-webkit-scrollbar-thumb:hover{background:var(--text-sec)}
+        .journey-scrollbar-fill{height:1px;pointer-events:none}
 
         /* ===== ROW TYPES =====
            Label column carries a soft tint + readable colored label; the data
@@ -474,7 +482,7 @@
             .profile-trigger .profile-name{display:none}
         }
         @media print{
-            .tab-bar,.m-ov,.ab-actions,.cell-toolbar,.menu-wrap,.add-col-c,.add-row-bar,.insert-zone,.ins-btn,.edit-bottom-pad{display:none}
+            .tab-bar,.m-ov,.ab-actions,.cell-toolbar,.menu-wrap,.add-col-c,.add-row-bar,.insert-zone,.ins-btn,.edit-bottom-pad,.journey-scrollbar{display:none}
             .app-bar,.stage-outer{position:static}
             .ll{position:static}
         }
@@ -3885,7 +3893,7 @@ function BlueprintColGroup({ total, includeAddColumn = false }) {
 // ═══════════════════════════════════════
 function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
         onTitleEdit, onCellEdit, onCellTags, onRowAction, onStageAction, onAddRow,
-        lockedByPeer, onAcquireLock, onReleaseLock }) {
+        lockedByPeer, onAcquireLock, onReleaseLock, scrollBottomOffset = 42 }) {
     const ref = useRef(null);
     const [dragState, setDragState] = useState(null);
     const [dropTarget, setDropTarget] = useState(null);
@@ -3974,7 +3982,7 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
     }, [journey, editMode]);
 
     return (
-        <div ref={ref}>
+        <div ref={ref} className="journey-view" style={{ "--journey-scrollbar-bottom": `${scrollBottomOffset}px` }}>
             {/* Chapter header */}
             <div className="ch-hdr">
                 <h2>
@@ -4147,6 +4155,9 @@ function JourneyView({ journey, jIdx, editMode, selected, onSelect, onDeselect,
                     )}
                 </div>
             ))}
+            <div className="journey-scrollbar" data-ss="" aria-label="Scroll service journey horizontally">
+                <div className="journey-scrollbar-fill" style={{ width: hdrW, minWidth: hdrW }} />
+            </div>
             {editMode && <div className="edit-bottom-pad" aria-hidden="true" />}
         </div>
     );
@@ -5478,6 +5489,8 @@ function App() {
         );
     }
 
+    const hasTabBar = journeys.length > 0 && (!viewOnly || journeys.length > 1);
+
     return (
         <>
             <TopBar innerRef={appBarRef} currentName={currentName}
@@ -5509,7 +5522,8 @@ function App() {
                                 onCellEdit={handleCellEdit} onCellTags={handleCellTags}
                                 onRowAction={handleRowAction} onStageAction={handleStageAction}
                                 onAddRow={handleAddRow}
-                                lockedByPeer={lockedByPeer} onAcquireLock={acquireLock} onReleaseLock={releaseLock} />
+                                lockedByPeer={lockedByPeer} onAcquireLock={acquireLock} onReleaseLock={releaseLock}
+                                scrollBottomOffset={hasTabBar ? 42 : 0} />
                         </div>
                     ))
                 )}
