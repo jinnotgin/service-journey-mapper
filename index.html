@@ -666,6 +666,37 @@
         .cell-boxes .cell-note>div,.cell-boxes .cell-note>p{background:var(--note-fill);border:1px solid var(--note-border);border-radius:8px;padding:7px 10px;margin-bottom:6px;box-shadow:var(--note-shadow)}
         .cell-boxes .cell-note>div:last-child,.cell-boxes .cell-note>p:last-child{margin-bottom:0}
 
+        /* ===== FIGMA / CLIPBOARD EXPORT SURFACE ===== */
+        .figma-export-root{position:fixed;left:-100000px;top:0;z-index:-1;background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',system-ui,sans-serif}
+        .figma-sheet{background:var(--canvas);padding:26px;width:max-content;color:var(--text)}
+        .figma-sheet-title{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:0 2px 18px}
+        .figma-sheet-title h1{font-size:22px;line-height:1.15;font-weight:800;letter-spacing:0;color:var(--text)}
+        .figma-sheet-title span{font-size:12px;font-weight:700;color:var(--text-sec);white-space:nowrap}
+        .figma-table{border-collapse:separate;border-spacing:0 var(--lane-gap);table-layout:fixed;width:max-content}
+        .figma-table col.figma-lane-col{width:var(--lane-w)}
+        .figma-table col.figma-data-col{width:var(--figma-col-w,260px)}
+        .figma-table td{border:0;padding:11px 13px;vertical-align:top;text-align:left;font-size:var(--fs-sm)}
+        .figma-stage-label{background:var(--canvas);color:var(--text-sec);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+        .figma-stage-cell{background:transparent;color:var(--text);padding:5px 6px!important}
+        .figma-stage-card{display:flex;align-items:center;gap:9px;min-height:32px;padding:5px 11px 5px 8px;border:1px solid oklch(84% .01 70 / .78);border-radius:9px;background:oklch(98.4% .005 70);box-shadow:0 1px 2px oklch(20% .006 70 / .04);font-weight:760}
+        .figma-stage-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--accent-strong);color:var(--accent-ink);border:1px solid var(--accent-strong);font-weight:800;font-size:12px;flex:0 0 auto}
+        .figma-sub-cell{background:transparent;color:var(--text-sec);font-weight:650;font-size:12px;text-align:center;padding:4px 12px 7px!important}
+        .figma-sub-chip{display:flex;align-items:center;justify-content:flex-start;min-height:28px;padding:4px 10px;border:1px solid oklch(86% .01 70 / .65);border-radius:8px;background:oklch(98.8% .004 70);box-shadow:0 1px 1px oklch(20% .006 70 / .025);line-height:1.2}
+        .figma-lane{width:var(--lane-w);min-width:var(--lane-w);max-width:var(--lane-w);font-weight:720;font-size:11px;background:var(--surface);padding:16px 14px 16px 17px!important;border-top-left-radius:var(--lane-r);border-bottom-left-radius:var(--lane-r)}
+        .figma-data{min-width:var(--figma-col-w,260px);min-height:82px;padding:13px 14px!important;background:var(--surface)}
+        .figma-table tr>td:last-child{border-top-right-radius:var(--lane-r);border-bottom-right-radius:var(--lane-r)}
+        .figma-note{min-height:70px;width:100%;border-radius:8px;padding:10px 11px;color:var(--text)}
+        .figma-note.filled{background:var(--note-fill);border:1px solid var(--note-border);box-shadow:var(--note-shadow)}
+        .figma-note.empty{color:oklch(62% .006 70 / .55);font-weight:600}
+        .figma-tags{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:34px;padding:5px 8px;border-radius:9px}
+        .figma-boxes{background:transparent!important;border:0!important;box-shadow:none!important;padding:0}
+        .figma-boxes>div,.figma-boxes>p{background:var(--note-fill);border:1px solid var(--note-border);border-radius:8px;padding:7px 10px;margin-bottom:6px;box-shadow:var(--note-shadow)}
+        .figma-bullets>div,.figma-bullets>p{padding-left:14px;position:relative;margin-bottom:3px}
+        .figma-bullets>div::before,.figma-bullets>p::before{content:'•';position:absolute;left:2px;color:var(--accent-strong);font-weight:700}
+        .figma-divider .figma-lane{background:var(--canvas)!important;color:var(--text-sec)!important}
+        .figma-divider .figma-data{background:transparent!important;color:var(--text-sec);font-weight:800;text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:1.3px;vertical-align:middle!important;padding:8px 12px!important}
+        .figma-divider-line{width:100%;border-top:1.5px dashed oklch(64% .01 70 / .7);height:1px;margin:8px 0}
+
         /* per-cell save / discard mini-toolbar */
 
     </style>
@@ -1578,15 +1609,24 @@ function buildIdeationPrompt() {
         "Your task:",
         "- Design a complete, realistic service blueprint for the service described above.",
         "- Break the journey into stages (e.g. Discover, Apply, Process, Receive). Add sub-stages where a stage has distinct steps.",
-        "- For each part of the journey, fill in the relevant rows: the parties involved, frontstage (what the user sees/does), backstage and support processes (internal work and systems), pain points, and suggestions.",
-        "- Use a Line of Visibility divider to separate frontstage from backstage where helpful.",
+        "- Order the rows top-to-bottom to follow this banded structure, using divider rows as section headers between bands:",
+        "    1. **Operator Actions** first — what the operator/customer does at each stage (row-operator), with the operator's Emotion and the Parties involved alongside it.",
+        "    2. A **Line of Interaction** divider, then the **FRONT STAGE** band — role-based actions visible to the operator (row-fs-human) followed by the Physical Evidence / Touchpoints they encounter (row-fs-system).",
+        "    3. A **Line of Visibility** divider, then the **BACK STAGE** band — internal role-based actions (row-bs-human), internal Physical Evidence / Touchpoints (row-bs-system), and Support Process.",
+        "    4. A **Pain Points** divider, then pain rows split by actor.",
+        "    5. An **Additional Notes** divider, then notes split by actor, and Opportunities/Suggestions.",
         "- Be concrete and specific. Prefer short, scannable phrases in cells over long paragraphs.",
         "",
+        "Section dividers (band headers):",
+        "- Use row-divider rows as the band headers between sections (Line of Interaction, Line of Visibility, Pain Points, Additional Notes). Each divider has exactly one cell with colspan equal to the leaf column count.",
+        "- The divider whose label/content says **Line of Visibility** is the frontstage/backstage boundary; the other dividers are plain section labels.",
+        "",
         "Row granularity rules:",
-        "- For human interaction rows (Frontstage · Human, Backstage · Human), create a **separate row for each distinct role** (e.g. one row for \"Helpline Staff\", another for \"Counter Staff\", another for \"Licensing Officer\"). Use the laneLabel to name the role, prefixed with \"👤 FS Human:\" or \"👤 BS Human:\" as appropriate.",
-        "- For system and tool rows (Frontstage · System, Backstage · System), create a **separate row for each distinct system, platform, or tool**. Digital systems (e.g. CRM, case management, payment gateway) each get their own row. Non-digital or manual tools (e.g. paper forms, iPad checklists, offline notes, Excel spreadsheets) also each get their own row. Use the laneLabel to name the system or tool, prefixed with \"⚙️ System:\" or \"🛠️ Manual Tool:\" or \"📢 Comm Tool:\" as appropriate.",
+        "- For human action rows (Frontstage · Human, Backstage · Human), create a **separate row for each distinct role** (e.g. one row for \"Helpline Staff\", another for \"Counter Staff\", another for \"Licensing Officer\", another for an \"Approver\"). Use the laneLabel to name the role, prefixed with \"👤 FS Human:\" or \"👤 BS Human:\" as appropriate.",
+        "- **Physical Evidence / Touchpoints** are the system and tool rows (Frontstage · System, Backstage · System). Create a **separate row for each distinct system, platform, or tool** the operator or staff encounters. Digital systems (e.g. CRM, case management, payment gateway) each get their own row. Non-digital or manual tools (e.g. paper forms, iPad checklists, offline notes, Excel spreadsheets) also each get their own row. Use the laneLabel to name the system or tool, prefixed with \"⚙️ System:\" or \"🛠️ Manual Tool:\" or \"📢 Comm Tool:\" as appropriate.",
         "- **Pain Points** rows should be split by actor so each person's friction is visible separately. Create one row per actor who experiences distinct pain in that stage (e.g. \"Pain Points: Resident\", \"Pain Points: Counter Staff\", \"Pain Points: Licensing Officer\"). Leave a cell blank if that actor has no pain in a given stage. Use the laneLabel to name the actor, e.g. \"Pain Points: Resident\".",
-        "- Parties, Operator Actions, Support Process, Emotion, Verbatim, and Suggestions rows may remain as single combined rows spanning all relevant actors.",
+        "- **Additional Notes** should also be split by actor. Use row-verbatim rows, one per actor, labelled \"📝 Notes: <Actor>\" (e.g. \"📝 Notes: Resident\", \"📝 Notes: Licensing Officer\"). Keep these as brief observations or annotations, not as universal facts.",
+        "- Operator Actions, Parties, Emotion, Support Process, and Opportunities/Suggestions rows may remain as single combined rows spanning all relevant actors.",
         "",
         "Output:",
         "- Return ONLY a single JSON object that matches the schema below. No Markdown, no commentary before or after — unless you need to ask the user a clarifying question, in which case ask the question without returning JSON.",
@@ -1601,13 +1641,14 @@ function buildIdeationPrompt() {
         "```",
         "",
         "Notice in the example:",
-        "- Stage 2 \"Submit Request\" has two sub-stages (\"Fill Form\" and \"Make Payment\"), making the total leaf column count 4 (1 + 2 + 1). Every non-divider row has cells whose widths sum to 4, and the divider has colspan 4.",
-        "- Each distinct human role gets its own row (e.g. \"👤 FS Human: Helpline Staff\", \"👤 FS Human: Counter Staff\", \"👤 FS Human: Licensing Officer\") rather than combining all humans into one row.",
-        "- Each distinct system or tool gets its own row (e.g. \"⚙️ System: Gov Website\", \"⚙️ System: Online Form\", \"⚙️ System: Payment Gateway\", \"📢 Comm Tool: Email & SMS\").",
-        "- Non-digital tools also get their own rows (e.g. \"🛠️ Manual Tool: Paper Form\" for a frontstage walk-in form, \"🛠️ Manual Tool: Paper Logbook\" for a backstage cash ledger).",
+        "- Stage 2 \"Submit Request\" has two sub-stages (\"Fill Form\" and \"Make Payment\"), making the total leaf column count 4 (1 + 2 + 1). Every non-divider row has cells whose widths sum to 4, and every divider has colspan 4.",
+        "- The rows are ordered into bands: Operator Actions (with Emotion and Parties) first, then a Line of Interaction divider, the FRONT STAGE band, a Line of Visibility divider, the BACK STAGE band, a Pain Points divider, and an Additional Notes divider — mirroring the banded structure above.",
+        "- Each distinct human role gets its own row (e.g. \"👤 FS Human: Helpline Staff\", \"👤 FS Human: Counter Staff\", \"👤 FS Human: Licensing Officer\", and a backstage \"👤 BS Human: Approver\") rather than combining all humans into one row.",
+        "- Physical Evidence / Touchpoints: each distinct system or tool gets its own row (e.g. \"⚙️ System: Gov Website\", \"⚙️ System: Online Form\", \"⚙️ System: Payment Gateway\", \"📢 Comm Tool: Email & SMS\"). Non-digital tools also get their own rows (e.g. \"🛠️ Manual Tool: Paper Form\", \"🛠️ Manual Tool: Paper Logbook\").",
         "- Pain Points are split by actor (\"Pain Points: Resident\", \"Pain Points: Counter Staff\", \"Pain Points: Licensing Officer\") so each person's friction is visible in its own row. Leave a cell blank (empty string) where that actor has no pain in a given stage.",
-        "- Bullets/boxes cells store each line as a separate `<div>…</div>` in html; tags cells use the tags array with html \"\"; the divider row has one cell spanning all columns.",
-        "- Parties, Operator Actions, Support Process, Emotion, and Suggestions remain as single combined rows.",
+        "- Additional Notes are also split by actor using row-verbatim rows (\"📝 Notes: Resident\", \"📝 Notes: Licensing Officer\").",
+        "- Bullets/boxes cells store each line as a separate `<div>…</div>` in html; tags cells use the tags array with html \"\"; each divider row has one cell spanning all columns.",
+        "- Operator Actions, Parties, Emotion, Support Process, and Opportunities remain as single combined rows.",
         "",
         "Follow this structure, but replace the content with the service described or inferred from the user's input.",
         "",
@@ -1634,6 +1675,239 @@ function buildStandaloneHtml(payload) {
     return "<!DOCTYPE html>\n" + html.outerHTML;
 }
 
+function escapeHtml(value = "") {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function htmlToPlainText(html = "") {
+    if (!html) return "";
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    div.querySelectorAll("br").forEach((br) => br.replaceWith("\n"));
+    div.querySelectorAll("div,p,li").forEach((el) => {
+        if (el.nextSibling) el.appendChild(document.createTextNode("\n"));
+    });
+    return (div.textContent || "").replace(/\u00a0/g, " ").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function cellPlainText(cell = {}) {
+    if ((cell.mode || "text") === "tags") return (cell.tags || []).map((t) => t.text || "").filter(Boolean).join(", ");
+    return htmlToPlainText(cell.html || "");
+}
+
+function cellHasContent(cell = {}) {
+    return !!cellPlainText(cell).trim();
+}
+
+function sanitizeCellHtml(html = "") {
+    const template = document.createElement("template");
+    template.innerHTML = html || "";
+    template.content.querySelectorAll("script,style,iframe,object,embed,link,meta").forEach((el) => el.remove());
+    template.content.querySelectorAll("*").forEach((el) => {
+        [...el.attributes].forEach((attr) => {
+            const name = attr.name.toLowerCase();
+            const value = String(attr.value || "");
+            if (name.startsWith("on") || name === "srcdoc" || /javascript:/i.test(value)) el.removeAttribute(attr.name);
+        });
+    });
+    return template.innerHTML;
+}
+
+function journeyLeafColumns(journey = {}) {
+    const leaves = [];
+    (journey.stages || []).forEach((stage, stageIdx) => {
+        const subs = stage.subStages || [];
+        if (subs.length) {
+            subs.forEach((subStage, subIdx) => leaves.push({ stage, stageIdx, subStage, subIdx }));
+        } else {
+            leaves.push({ stage, stageIdx, subStage: null, subIdx: null });
+        }
+    });
+    return leaves;
+}
+
+function cellLeafSlots(row = {}, total = 0) {
+    if (row.rowType === DIVIDER_TYPE) return [{ cell: row.cells?.[0] || {}, width: Math.max(total, 1) }];
+    const slots = [];
+    (row.cells || []).forEach((cell) => slots.push({ cell, width: Math.max(1, cell.colspan || 1) }));
+    return slots;
+}
+
+function tableTextCell(value) {
+    const text = String(value ?? "").replace(/\r?\n/g, " ").replace(/\t/g, " ").trim();
+    return /["\t\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function buildSheetTableExport(journey) {
+    const leaves = journeyLeafColumns(journey);
+    const hasSubStages = leaves.some((leaf) => leaf.subStage);
+    const stageRow = [journey.stageLabel || "Stage", ...leaves.map((leaf) => {
+        const num = leaf.stage?.num != null && leaf.stage.num !== "" ? `${leaf.stage.num}. ` : "";
+        return `${num}${leaf.stage?.title || "Untitled stage"}`;
+    })];
+    const subStageRow = ["Sub-stage", ...leaves.map((leaf) => leaf.subStage?.title || "")];
+    const bodyRows = [];
+    (journey.subJourneys || []).forEach((sj) => {
+        (sj.rows || []).forEach((row) => {
+            const out = [cleanLaneLabel(row.laneLabel || "") || ROW_META[row.rowType]?.fallback || "Lane"];
+            cellLeafSlots(row, leaves.length).forEach(({ cell, width }) => {
+                const value = cellPlainText(cell);
+                for (let i = 0; i < width; i++) out.push(i === 0 ? value : "");
+            });
+            while (out.length < leaves.length + 1) out.push("");
+            bodyRows.push(out.slice(0, leaves.length + 1));
+        });
+    });
+    const rows = hasSubStages ? [stageRow, subStageRow, ...bodyRows] : [stageRow, ...bodyRows];
+    const plainText = rows.map((row) => row.map(tableTextCell).join("\t")).join("\n");
+
+    const stageHeaderHtml = `<tr><th>${escapeHtml(journey.stageLabel || "Stage")}</th>${(journey.stages || []).map((stage) => {
+        const span = leafCount(stage);
+        const num = stage?.num != null && stage.num !== "" ? `${stage.num}. ` : "";
+        return `<th colspan="${span}">${escapeHtml(`${num}${stage?.title || "Untitled stage"}`)}</th>`;
+    }).join("")}</tr>`;
+    const subHeaderHtml = hasSubStages ? `<tr><th>Sub-stage</th>${leaves.map((leaf) => `<th>${escapeHtml(leaf.subStage?.title || "")}</th>`).join("")}</tr>` : "";
+    const bodyHtml = (journey.subJourneys || []).map((sj) => (sj.rows || []).map((row) => {
+        const cells = cellLeafSlots(row, leaves.length).map(({ cell, width }) => {
+            const align = (cell.align || "left") === "center" ? "center" : "left";
+            const value = cellPlainText(cell);
+            return `<td${width > 1 ? ` colspan="${width}"` : ""} style="text-align:${align};">${escapeHtml(value).replace(/\n/g, "<br>")}</td>`;
+        }).join("");
+        const lane = cleanLaneLabel(row.laneLabel || "") || ROW_META[row.rowType]?.fallback || "Lane";
+        return `<tr><th>${escapeHtml(lane)}</th>${cells}</tr>`;
+    }).join("")).join("");
+    const html = [
+        '<table style="border-collapse:collapse;font-family:Inter,Segoe UI,Arial,sans-serif;font-size:13px;">',
+        '<thead>',
+        stageHeaderHtml,
+        subHeaderHtml,
+        '</thead>',
+        '<tbody>',
+        bodyHtml,
+        '</tbody>',
+        '</table>',
+    ].join("");
+    return { plainText, html };
+}
+
+function figmaCellHtml(cell = {}) {
+    const mode = cell.mode || "text";
+    if (mode === "tags") {
+        const tags = cell.tags || [];
+        if (!tags.length) return '<div class="figma-tags"><span class="cell-empty-hint">No tags</span></div>';
+        return `<div class="figma-tags">${tags.map((t) => `<span class="tag-chip" style="background:${escapeHtml(t.bg || "#eee")};color:${escapeHtml(t.fg || "#333")}">${escapeHtml(t.text || "")}</span>`).join("")}</div>`;
+    }
+    const safe = sanitizeCellHtml(cell.html || "");
+    const filled = cellHasContent(cell);
+    const modeClass = mode === "bullets" ? " figma-bullets" : mode === "boxes" ? " figma-boxes" : "";
+    return `<div class="figma-note${modeClass}${filled ? " filled" : " empty"}">${filled ? safe : " "}</div>`;
+}
+
+function rowColorsForFigma(rowType) {
+    const colors = {
+        "row-parties": ["oklch(96.5% .012 250)", "oklch(98.3% .006 250)"],
+        "row-operator": ["var(--surface)", "var(--surface)"],
+        "row-fs-human": ["oklch(93% .035 245)", "oklch(98% .012 245)"],
+        "row-fs-system": ["oklch(93% .035 245)", "oklch(98% .012 245)"],
+        "row-bs-human": ["oklch(94% .04 80)", "oklch(98.5% .012 80)"],
+        "row-bs-system": ["oklch(94% .04 80)", "oklch(98.5% .012 80)"],
+        "row-support": ["oklch(93% .03 305)", "oklch(98% .012 305)"],
+        "row-pain": ["oklch(92% .04 20)", "oklch(98.5% .012 20)"],
+        "row-verbatim": ["oklch(94% .05 90)", "oklch(98.5% .02 90)"],
+        "row-emotion": ["oklch(93% .04 155)", "oklch(98% .015 155)"],
+        "row-suggest": ["oklch(93% .035 235)", "oklch(98% .012 235)"],
+    };
+    return colors[rowType] || ["var(--surface)", "var(--surface)"];
+}
+
+function buildFigmaExportNode(journey, projectName) {
+    const leaves = journeyLeafColumns(journey);
+    const total = Math.max(leaves.length, 1);
+    const hasSubStages = leaves.some((leaf) => leaf.subStage);
+    const root = document.createElement("div");
+    root.id = `figma-export-sheet-${Date.now()}`;
+    root.className = "figma-export-root";
+    root.style.setProperty("--figma-col-w", `${COL_W}px`);
+    root.innerHTML = `
+        <div class="figma-sheet">
+            <div class="figma-sheet-title">
+                <h1>${escapeHtml(journey.title || "Untitled journey")}</h1>
+                <span>${escapeHtml(projectName || "Service Journey Mapper")}</span>
+            </div>
+            <table class="figma-table">
+                <colgroup>
+                    <col class="figma-lane-col">
+                    ${Array.from({ length: total }, () => '<col class="figma-data-col">').join("")}
+                </colgroup>
+                <tbody>
+                    <tr>
+                        <td class="figma-stage-label" rowspan="${hasSubStages ? 2 : 1}">${escapeHtml(journey.stageLabel || "Stage")}</td>
+                        ${(journey.stages || []).map((stage) => {
+                            const span = leafCount(stage);
+                            const num = stage?.num != null && stage.num !== "" ? `<span class="figma-stage-num">${escapeHtml(stage.num)}</span>` : "";
+                            return `<td class="figma-stage-cell" colspan="${span}"${hasSubStages && !(stage.subStages || []).length ? ' rowspan="2"' : ""}><div class="figma-stage-card">${num}<span>${escapeHtml(stage?.title || "Untitled stage")}</span></div></td>`;
+                        }).join("")}
+                    </tr>
+                    ${hasSubStages ? `<tr>${(journey.stages || []).map((stage) => {
+                        const subs = stage.subStages || [];
+                        return subs.map((sub) => `<td class="figma-sub-cell"><div class="figma-sub-chip">${escapeHtml(sub.title || "Untitled step")}</div></td>`).join("");
+                    }).join("")}</tr>` : ""}
+                    ${(journey.subJourneys || []).map((sj) => (sj.rows || []).map((row) => {
+                        const isDivider = row.rowType === DIVIDER_TYPE;
+                        const [laneBg, dataBg] = rowColorsForFigma(row.rowType);
+                        const lane = cleanLaneLabel(row.laneLabel || "") || ROW_META[row.rowType]?.fallback || "Lane";
+                        if (isDivider) {
+                            const label = cellPlainText(row.cells?.[0]) || lane;
+                            return `<tr class="figma-divider"><td class="figma-lane">${escapeHtml(lane)}</td><td class="figma-data" colspan="${total}"><div>${escapeHtml(label)}</div><div class="figma-divider-line"></div></td></tr>`;
+                        }
+                        const cells = cellLeafSlots(row, total).map(({ cell, width }) => {
+                            const align = (cell.align || "left") === "center" ? "center" : "left";
+                            return `<td class="figma-data" colspan="${width}" style="background:${escapeHtml(row.customColor || dataBg)};text-align:${align};">${figmaCellHtml(cell)}</td>`;
+                        }).join("");
+                        return `<tr class="${escapeHtml(row.rowType || "")}"><td class="figma-lane" style="background:${escapeHtml(row.customColor || laneBg)};">${escapeHtml(lane)}</td>${cells}</tr>`;
+                    }).join("")).join("")}
+                </tbody>
+            </table>
+        </div>`;
+    return root;
+}
+
+async function ensureFigmaCaptureLoaded() {
+    if (window.figma?.captureForDesign) return;
+    await new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-sjm-figma-capture="true"]');
+        if (existing) {
+            existing.addEventListener("load", resolve, { once: true });
+            existing.addEventListener("error", reject, { once: true });
+            return;
+        }
+        const script = document.createElement("script");
+        script.src = "https://mcp.figma.com/mcp/html-to-design/capture.js";
+        script.async = true;
+        script.dataset.sjmFigmaCapture = "true";
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("Could not load Figma capture."));
+        document.head.appendChild(script);
+    });
+    if (!window.figma?.captureForDesign) throw new Error("Figma capture did not initialize.");
+}
+
+async function copySheetToFigmaClipboard(journey, projectName) {
+    const node = buildFigmaExportNode(journey, projectName);
+    document.body.appendChild(node);
+    try {
+        await ensureFigmaCaptureLoaded();
+        return await window.figma.captureForDesign({ selector: `#${CSS.escape(node.id)}`, delayMs: 150 });
+    } finally {
+        window.setTimeout(() => node.remove(), 500);
+    }
+}
+
 async function copyTextToClipboard(text) {
     if (navigator.clipboard?.writeText) {
         try {
@@ -1652,6 +1926,23 @@ async function copyTextToClipboard(text) {
     ta.select();
     document.execCommand("copy");
     ta.remove();
+}
+
+async function copyRichToClipboard({ plainText, html }) {
+    if (navigator.clipboard?.write && window.ClipboardItem && html) {
+        try {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    "text/plain": new Blob([plainText], { type: "text/plain" }),
+                    "text/html": new Blob([html], { type: "text/html" }),
+                }),
+            ]);
+            return;
+        } catch (err) {
+            console.warn("Rich clipboard API failed, falling back to plain text.", err);
+        }
+    }
+    await copyTextToClipboard(plainText);
 }
 
 const safeName = (s) => (s || "export").replace(/[^a-z0-9_-]+/gi, "_").replace(/^_+|_+$/g, "") || "export";
@@ -1990,6 +2281,21 @@ function buildExampleProject() {
     const tagCells = (values) => values.map((tags) => ({ mode: "tags", html: "", align: "left", tags }));
     j.subJourneys[0].rows = [
         {
+            rowType: "row-operator",
+            laneLabel: "🏠 Operator Actions",
+            cells: textCells("bullets", [
+                bullets("Searches online for permit info"),
+                bullets("Completes online or paper form"),
+                bullets("Pays the application fee"),
+                bullets("Receives permit confirmation"),
+            ]),
+        },
+        {
+            rowType: "row-emotion",
+            laneLabel: "Emotion",
+            cells: textCells("text", ["Confused", "Anxious", "Neutral", "Relieved"], "center"),
+        },
+        {
             rowType: "row-parties",
             laneLabel: "Parties",
             cells: tagCells([
@@ -2000,14 +2306,9 @@ function buildExampleProject() {
             ]),
         },
         {
-            rowType: "row-operator",
-            laneLabel: "User Actions",
-            cells: textCells("bullets", [
-                bullets("Searches online for permit info"),
-                bullets("Completes online or paper form"),
-                bullets("Pays the application fee"),
-                bullets("Receives permit confirmation"),
-            ]),
+            rowType: DIVIDER_TYPE,
+            laneLabel: "Line of Interaction",
+            cells: [{ mode: "text", html: "━━━━━━━━ FRONT STAGE (visible to the operator) below ━━━━━━━━", align: "center", colspan: 4 }],
         },
         {
             rowType: "row-fs-human",
@@ -2062,7 +2363,7 @@ function buildExampleProject() {
         {
             rowType: DIVIDER_TYPE,
             laneLabel: "Line of Visibility",
-            cells: [{ mode: "text", html: "━━━━━━━━ BELOW THIS LINE: BACKSTAGE ACTIONS NOT VISIBLE TO CUSTOMERS ━━━━━━━━", align: "center", colspan: 4 }],
+            cells: [{ mode: "text", html: "━━━━━━━━ LINE OF VISIBILITY ─ BACK STAGE (internal, not visible to the operator) below ━━━━━━━━", align: "center", colspan: 4 }],
         },
         {
             rowType: "row-bs-human",
@@ -2077,7 +2378,12 @@ function buildExampleProject() {
         {
             rowType: "row-bs-human",
             laneLabel: "👤 BS Human: Licensing Officer",
-            cells: textCells("bullets", ["", "", "", bullets("Reviews application", "Approves &amp; issues the permit")]),
+            cells: textCells("bullets", ["", "", "", bullets("Reviews application", "Recommends approval")]),
+        },
+        {
+            rowType: "row-bs-human",
+            laneLabel: "👤 BS Human: Approver",
+            cells: textCells("bullets", ["", "", "", bullets("Endorses decision &amp; issues the permit")]),
         },
         {
             rowType: "row-bs-system",
@@ -2110,6 +2416,11 @@ function buildExampleProject() {
             ]),
         },
         {
+            rowType: DIVIDER_TYPE,
+            laneLabel: "Pain Points",
+            cells: [{ mode: "text", html: "━━━━━━━━ PAIN POINTS ─ split by actor below ━━━━━━━━", align: "center", colspan: 4 }],
+        },
+        {
             rowType: "row-pain",
             laneLabel: "Pain Points: Resident",
             cells: textCells("boxes", [
@@ -2140,9 +2451,29 @@ function buildExampleProject() {
             ]),
         },
         {
-            rowType: "row-emotion",
-            laneLabel: "Emotion",
-            cells: textCells("text", ["Confused", "Anxious", "Neutral", "Relieved"], "center"),
+            rowType: DIVIDER_TYPE,
+            laneLabel: "Additional Notes",
+            cells: [{ mode: "text", html: "━━━━━━━━ ADDITIONAL NOTES ─ split by actor below ━━━━━━━━", align: "center", colspan: 4 }],
+        },
+        {
+            rowType: "row-verbatim",
+            laneLabel: "📝 Notes: Resident",
+            cells: textCells("bullets", [
+                bullets("Older residents still prefer the counter channel"),
+                "",
+                "",
+                bullets("Frequently call to ask for a status update"),
+            ]),
+        },
+        {
+            rowType: "row-verbatim",
+            laneLabel: "📝 Notes: Licensing Officer",
+            cells: textCells("bullets", [
+                "",
+                "",
+                "",
+                bullets("Eligibility rules change yearly — checklist must be kept current"),
+            ]),
         },
         {
             rowType: "row-suggest",
@@ -2679,7 +3010,7 @@ function saveStatusTooltip(lastSaved, lastSavedBy) {
     return `Saved by ${who} ${fmtDate(lastSaved)}`;
 }
 
-function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadSheet, onDownloadProject, onStandaloneExport, onPromptSheet, onPromptProject, canExport, hasMultipleSheets, saveState, lastSaved,
+function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadSheet, onDownloadProject, onStandaloneExport, onPromptSheet, onPromptProject, onCopySheetTable, onCopySheetFigma, canExport, hasMultipleSheets, saveState, lastSaved,
         lastSavedBy, viewOnly,
         editMode, onSetEdit, canUndo, canRedo, onUndo, onRedo,
         sync, onEnableSync, onStopSharing, peers }) {
@@ -2690,6 +3021,16 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
         setPromptCopied(true);
         window.setTimeout(() => setPromptCopied(false), 1800);
         close();
+    };
+    const copySheetExport = async (close, fn) => {
+        try {
+            await fn();
+            setPromptCopied(true);
+            window.setTimeout(() => setPromptCopied(false), 1800);
+            close();
+        } catch (err) {
+            alert(err?.message || "Could not copy this sheet.");
+        }
     };
     return (
         <header className="app-bar" ref={innerRef}>
@@ -2780,6 +3121,8 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                                             <>
                                                 <div className="menu-divider" />
                                                 <div className="menu-label">Sheet</div>
+                                                <button className="menu-item" onClick={() => copySheetExport(close, onCopySheetTable)}>Copy sheet as table</button>
+                                                <button className="menu-item" onClick={() => copySheetExport(close, onCopySheetFigma)}>Copy sheet to Figma</button>
                                                 <button className="menu-item" onClick={() => copyPrompt(close, "sheet")}>Copy sheet as prompt</button>
                                                 <button className="menu-item" onClick={() => { onDownloadSheet(); close(); }}>Export sheet JSON</button>
                                                 <div className="menu-divider" />
@@ -2789,6 +3132,8 @@ function TopBar({ innerRef, currentName, onRenameCurrent, onLibrary, onDownloadS
                                             </>
                                         ) : (
                                             <>
+                                                <button className="menu-item" onClick={() => copySheetExport(close, onCopySheetTable)}>Copy as table</button>
+                                                <button className="menu-item" onClick={() => copySheetExport(close, onCopySheetFigma)}>Copy to Figma</button>
                                                 <button className="menu-item" onClick={() => copyPrompt(close, "project")}>Copy as prompt</button>
                                                 <button className="menu-item" onClick={() => { onDownloadProject(); close(); }}>Export as JSON</button>
                                             </>
@@ -5312,6 +5657,12 @@ function App() {
         };
     }, [currentName, tab]);
 
+    const currentSheet = useCallback(() => {
+        const data = journeysRef.current;
+        if (!data.length) return null;
+        return data[Math.min(tab, data.length - 1)] || null;
+    }, [tab]);
+
     // ── Export full project state ──
     const exportProject = useCallback(() => {
         const payload = currentExportPayload("project");
@@ -5329,6 +5680,19 @@ function App() {
         const filename = [safeName(currentName), safeName(sheetName), savedAt].filter(Boolean).join("_") + ".json";
         downloadFile(filename, JSON.stringify(payload, null, 2), "application/json");
     }, [currentExportPayload, currentName]);
+
+    const copyCurrentSheetTable = useCallback(async () => {
+        const sheet = currentSheet();
+        if (!sheet) return;
+        await copyRichToClipboard(buildSheetTableExport(sheet));
+    }, [currentSheet]);
+
+    const copyCurrentSheetFigma = useCallback(async () => {
+        const sheet = currentSheet();
+        if (!sheet) return;
+        const result = await copySheetToFigmaClipboard(sheet, currentName || "Service Journey Mapper");
+        if (result && result.success === false) throw new Error(result.error || "Figma capture failed.");
+    }, [currentName, currentSheet]);
 
     const exportStandaloneHtml = useCallback(() => {
         const payload = currentExportPayload("project");
@@ -5354,6 +5718,8 @@ function App() {
         window.loadJSON = loadFromText;
         window.exportProject = exportProject;
         window.exportCurrentSheet = exportCurrentSheet;
+        window.copyCurrentSheetTable = copyCurrentSheetTable;
+        window.copyCurrentSheetFigma = copyCurrentSheetFigma;
         window.exportStandaloneHtml = exportStandaloneHtml;
         window.exportPrompt = copyPromptExport;
         window.exportSheetPrompt = copyPromptCurrentSheet;
@@ -5362,12 +5728,14 @@ function App() {
             delete window.loadJSON;
             delete window.exportProject;
             delete window.exportCurrentSheet;
+            delete window.copyCurrentSheetTable;
+            delete window.copyCurrentSheetFigma;
             delete window.exportStandaloneHtml;
             delete window.exportPrompt;
             delete window.exportSheetPrompt;
             delete window.ideationPrompt;
         };
-    }, [loadFromText, exportProject, exportCurrentSheet, exportStandaloneHtml, copyPromptExport, copyPromptCurrentSheet, copyIdeationPrompt]);
+    }, [loadFromText, exportProject, exportCurrentSheet, copyCurrentSheetTable, copyCurrentSheetFigma, exportStandaloneHtml, copyPromptExport, copyPromptCurrentSheet, copyIdeationPrompt]);
 
     // App bar height → CSS var
     useEffect(() => {
@@ -5495,6 +5863,7 @@ function App() {
                 onDownloadSheet={exportCurrentSheet} onDownloadProject={exportProject}
                 onStandaloneExport={exportStandaloneHtml}
                 onPromptSheet={copyPromptCurrentSheet} onPromptProject={copyPromptProject}
+                onCopySheetTable={copyCurrentSheetTable} onCopySheetFigma={copyCurrentSheetFigma}
                 canExport={journeys.length > 0} hasMultipleSheets={journeys.length > 1} saveState={saveState} lastSaved={lastSaved} lastSavedBy={lastSavedBy}
                 viewOnly={viewOnly}
                 editMode={editMode} onSetEdit={(v) => setEditMode(v)}
